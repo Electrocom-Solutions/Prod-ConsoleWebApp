@@ -127,11 +127,11 @@ function TenderDetailPageContent() {
   const handleDownloadDocument = async (docId: number) => {
     try {
       const blob = await apiClient.downloadTenderDocument(tenderId, docId);
-      const document = documents.find((d) => d.id === docId);
+      const doc = documents.find((d) => d.id === docId);
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
+      const a = window.document.createElement("a");
       a.href = url;
-      a.download = document?.file_name || `document-${docId}`;
+      a.download = doc?.file_name || `document-${docId}`;
       a.click();
       window.URL.revokeObjectURL(url);
       showAlert("Success", "Document downloaded successfully!", "success");

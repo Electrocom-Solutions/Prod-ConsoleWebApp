@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Search, Plus, Edit, Trash2, Package, X, Loader2, Inbox } from "lucide-react";
 import { Resource } from "@/types";
 import { cn } from "@/lib/utils";
-import { showDeleteConfirm, showError, showSuccess, showAlert } from "@/lib/sweetalert";
+import { showDeleteConfirm, showError, showSuccess, showAlert, showConfirm } from "@/lib/sweetalert";
 import { apiClient, StockStatisticsResponse, BackendStockListItem, StockListResponse, StockDetail, StockCreateData } from "@/lib/api";
 import { useDebounce } from "use-debounce";
 import { ProtectedRoute } from "@/components/auth/protected-route";
@@ -104,9 +104,11 @@ function ResourcesPageContent() {
   }, [searchParams]);
 
   const handleDelete = async (resource: Resource) => {
-    const confirmed = await showDeleteConfirm(
+    const confirmed = await showConfirm(
       "Delete Resource",
-      `Are you sure you want to delete ${resource.name}?`
+      `Are you sure you want to delete ${resource.name}? This action cannot be undone.`,
+      "Yes, delete it",
+      "Cancel"
     );
 
     if (!confirmed) return;

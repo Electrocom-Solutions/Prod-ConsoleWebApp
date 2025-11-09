@@ -201,7 +201,7 @@ export default function DocumentsPage() {
 
       // Create download link
       const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
+      const link = window.document.createElement('a');
       link.href = url;
       
       const template = templates.find((t) => t.id === templateId);
@@ -214,9 +214,9 @@ export default function DocumentsPage() {
         : 'document.pdf';
       
       link.download = fileName;
-      document.body.appendChild(link);
+      window.document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+      window.document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (err: any) {
       console.error('Download error:', err);
@@ -298,12 +298,12 @@ export default function DocumentsPage() {
 
       // Create download link
       const url = window.URL.createObjectURL(blob);
-          const link = document.createElement('a');
+      const link = window.document.createElement('a');
       link.href = url;
       link.download = 'documents.zip';
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
+      window.document.body.appendChild(link);
+      link.click();
+      window.document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
 
       await showAlert('Success', `Downloaded ${selectedIds.length} document(s) as ZIP`, 'success');
