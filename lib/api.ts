@@ -32,6 +32,33 @@ export interface LoginResponse {
   session_expiry?: string;
 }
 
+export interface ExpiringAMC {
+  client_name: string;
+  amc_expiry_date: string; // ISO date string
+  expiry_count_days: number;
+  amc_number: string;
+}
+
+export interface RecentActivity {
+  id: number;
+  entity_type: string;
+  entity_id: number;
+  action: string;
+  description: string;
+  created_at: string; // ISO datetime string
+  created_by: number | null;
+  created_by_username: string | null;
+}
+
+export interface DashboardStatsResponse {
+  total_clients: number;
+  active_amcs_count: number;
+  active_tenders_count: number;
+  in_progress_tasks_count: number;
+  expiring_amcs: ExpiringAMC[];
+  recent_activities: RecentActivity[];
+}
+
 class ApiClient {
   private baseURL: string;
 
@@ -341,6 +368,15 @@ class ApiClient {
       // Even if logout fails, clear local state
       console.error('Logout error:', error);
     }
+  }
+
+  /**
+   * Get dashboard statistics
+   */
+  async getDashboardStats(): Promise<DashboardStatsResponse> {
+    return this.request<DashboardStatsResponse>('/api/dashboard/all-stats/', {
+      method: 'GET',
+    });
   }
 
   /**
