@@ -1,13 +1,17 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Search, Check, X as XIcon, ChevronLeft, ChevronRight, Download, CheckCircle, XCircle, Clock, Edit2 } from "lucide-react";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths } from "date-fns";
-import { showConfirm, showSuccess } from "@/lib/sweetalert";
+import { Calendar, Search, Check, X as XIcon, ChevronLeft, ChevronRight, Download, CheckCircle, XCircle, Clock, Edit2, Loader2, Inbox, Trash2 } from "lucide-react";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, parseISO } from "date-fns";
+import { showConfirm, showSuccess, showDeleteConfirm, showAlert } from "@/lib/sweetalert";
+import { apiClient, AttendanceStatisticsResponse, BackendAttendanceListItem, AttendanceDetail, AttendanceCreateData, BackendEmployeeListItem, EmployeeListResponse } from "@/lib/api";
+import { useDebounce } from "use-debounce";
+import { ProtectedRoute } from "@/components/auth/protected-route";
 
 type ApprovalStatus = "Pending" | "Approved" | "Rejected";
 
@@ -15,14 +19,13 @@ type AttendanceRecord = {
   id: number;
   employee_id: number;
   employee_name: string;
+  employee_code: string;
   date: string;
   status: "Present" | "Absent" | "Leave" | "Half Day";
   approval_status: ApprovalStatus;
   check_in?: string;
   check_out?: string;
   notes?: string;
-  approved_by?: string;
-  approved_at?: string;
   rejection_reason?: string;
 };
 
@@ -33,77 +36,33 @@ type Employee = {
   status: "Active" | "On Leave" | "Terminated";
 };
 
-const mockEmployees: Employee[] = [
-  { id: 1, name: "Rajesh Kumar", employee_id: "EMP-001", status: "Active" },
-  { id: 2, name: "Priya Sharma", employee_id: "EMP-002", status: "Active" },
-  { id: 3, name: "Amit Patel", employee_id: "EMP-003", status: "Active" },
-  { id: 4, name: "Sunita Verma", employee_id: "EMP-004", status: "Active" },
-  { id: 5, name: "Vikram Singh", employee_id: "EMP-005", status: "Active" },
-  { id: 6, name: "Neha Gupta", employee_id: "EMP-006", status: "Active" },
-];
+/**
+ * Map backend attendance list item to frontend AttendanceRecord type
+ */
+function mapBackendAttendanceListItemToFrontend(backendAttendance: BackendAttendanceListItem): AttendanceRecord {
+  return {
+    id: backendAttendance.id,
+    employee_id: backendAttendance.employee,
+    employee_name: backendAttendance.employee_name || '',
+    employee_code: backendAttendance.employee_code || '',
+    date: backendAttendance.attendance_date,
+    status: backendAttendance.attendance_status === 'Half-Day' ? 'Half Day' : backendAttendance.attendance_status as "Present" | "Absent" | "Leave" | "Half Day",
+    approval_status: backendAttendance.approval_status as ApprovalStatus,
+    check_in: backendAttendance.check_in_time ? format(parseISO(backendAttendance.check_in_time), 'HH:mm') : undefined,
+    check_out: backendAttendance.check_out_time ? format(parseISO(backendAttendance.check_out_time), 'HH:mm') : undefined,
+    notes: backendAttendance.notes || undefined,
+  };
+}
 
-const mockAttendance: AttendanceRecord[] = [
-  {
-    id: 1,
-    employee_id: 1,
-    employee_name: "Rajesh Kumar",
-    date: format(new Date(), "yyyy-MM-dd"),
-    status: "Present",
-    approval_status: "Pending",
-    check_in: "09:15",
-    check_out: "18:30",
-  },
-  {
-    id: 2,
-    employee_id: 2,
-    employee_name: "Priya Sharma",
-    date: format(new Date(), "yyyy-MM-dd"),
-    status: "Present",
-    approval_status: "Pending",
-    check_in: "09:00",
-    check_out: "18:00",
-  },
-  {
-    id: 3,
-    employee_id: 3,
-    employee_name: "Amit Patel",
-    date: format(new Date(), "yyyy-MM-dd"),
-    status: "Leave",
-    approval_status: "Pending",
-    notes: "Medical leave",
-  },
-  {
-    id: 4,
-    employee_id: 4,
-    employee_name: "Sunita Verma",
-    date: "2025-11-02",
-    status: "Present",
-    approval_status: "Approved",
-    check_in: "09:00",
-    check_out: "18:15",
-    approved_by: "Admin",
-    approved_at: "2025-11-02T18:30:00Z",
-  },
-  {
-    id: 5,
-    employee_id: 5,
-    employee_name: "Vikram Singh",
-    date: "2025-11-02",
-    status: "Half Day",
-    approval_status: "Approved",
-    check_in: "09:00",
-    check_out: "13:00",
-    notes: "Personal work",
-    approved_by: "Admin",
-    approved_at: "2025-11-02T13:30:00Z",
-  },
-];
-
-export default function AttendancePage() {
-  const [attendance, setAttendance] = useState<AttendanceRecord[]>(mockAttendance);
+function AttendancePageContent() {
+  const searchParams = useSearchParams();
+  const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
+  const [statistics, setStatistics] = useState<AttendanceStatisticsResponse | null>(null);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), "yyyy-MM-dd"));
+  const [selectedDate, setSelectedDate] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch] = useDebounce(searchQuery, 500);
   const [viewMode, setViewMode] = useState<"calendar" | "list">("list");
   const [approvalFilter, setApprovalFilter] = useState<ApprovalStatus | "All">("All");
   const [showMarkModal, setShowMarkModal] = useState(false);
@@ -111,41 +70,129 @@ export default function AttendancePage() {
   const [showBulkPresentModal, setShowBulkPresentModal] = useState(false);
   const [editingRecord, setEditingRecord] = useState<AttendanceRecord | null>(null);
   const [selectedEmployees, setSelectedEmployees] = useState<number[]>([]);
-  const [workingDaysPerMonth] = useState(26);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
   const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
-  const filteredAttendance = useMemo(() => {
-    return attendance.filter(record => {
-      const recordDate = new Date(record.date);
-      const matchesMonth = isSameMonth(recordDate, currentMonth);
-      const matchesDate = !selectedDate || record.date === selectedDate;
-      const matchesSearch = searchQuery === "" || record.employee_name.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesApproval = approvalFilter === "All" || record.approval_status === approvalFilter;
-      return matchesMonth && matchesDate && matchesSearch && matchesApproval;
-    });
-  }, [attendance, currentMonth, selectedDate, searchQuery, approvalFilter]);
-
-  const activeEmployees = useMemo(() => {
-    return mockEmployees.filter(emp => emp.status === "Active");
+  /**
+   * Fetch statistics from backend
+   */
+  const fetchStatistics = useCallback(async () => {
+    try {
+      const stats = await apiClient.getAttendanceStatistics();
+      setStatistics(stats);
+    } catch (err: any) {
+      console.error('Error fetching attendance statistics:', err);
+      setError(err.message || 'Failed to fetch statistics');
+    }
   }, []);
 
+  /**
+   * Fetch employees from backend
+   */
+  const fetchEmployees = useCallback(async () => {
+    try {
+      const response: EmployeeListResponse = await apiClient.getEmployees({ page: 1 });
+      const mappedEmployees: Employee[] = response.results.map(emp => ({
+        id: emp.id,
+        name: emp.full_name || '',
+        employee_id: emp.employee_code || '',
+        status: emp.availability_status === 'Present' ? 'Active' : 
+                emp.availability_status === 'Absent' ? 'On Leave' : 'Active',
+      }));
+      setEmployees(mappedEmployees);
+    } catch (err: any) {
+      console.error('Error fetching employees:', err);
+    }
+  }, []);
+
+  /**
+   * Fetch attendance records from backend
+   */
+  const fetchAttendance = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const params: any = {
+        month: currentMonth.getMonth() + 1,
+        year: currentMonth.getFullYear(),
+        page: currentPage,
+      };
+      
+      if (debouncedSearch) {
+        params.search = debouncedSearch;
+      }
+      
+      if (selectedDate) {
+        params.date = selectedDate;
+      }
+      
+      if (approvalFilter !== "All") {
+        params.approval_status = approvalFilter;
+      }
+
+      const response = await apiClient.getAttendanceRecords(params);
+      const mappedAttendance = response.results.map(mapBackendAttendanceListItemToFrontend);
+      setAttendance(mappedAttendance);
+      setTotalPages(Math.ceil(response.count / 20));
+    } catch (err: any) {
+      console.error('Error fetching attendance records:', err);
+      setError(err.message || 'Failed to fetch attendance records');
+      setAttendance([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentMonth, debouncedSearch, selectedDate, approvalFilter, currentPage]);
+
+  // Fetch statistics and employees on mount
+  useEffect(() => {
+    fetchStatistics();
+    fetchEmployees();
+  }, [fetchStatistics, fetchEmployees]);
+
+  // Fetch attendance records when filters change
+  useEffect(() => {
+    fetchAttendance();
+  }, [fetchAttendance]);
+
+  // Handle action=new URL parameter
+  useEffect(() => {
+    const action = searchParams.get('action');
+    if (action === 'new') {
+      setEditingRecord(null);
+      setShowMarkModal(true);
+    }
+  }, [searchParams]);
+
+  const activeEmployees = useMemo(() => {
+    return employees.filter(emp => emp.status === "Active");
+  }, [employees]);
+
   const stats = useMemo(() => {
-    const monthRecords = attendance.filter(r => isSameMonth(new Date(r.date), currentMonth));
-    const uniqueEmployeePresent = new Set(monthRecords.filter(r => r.status === "Present" && r.approval_status === "Approved").map(r => r.employee_id)).size;
-    const uniqueEmployeeAbsent = new Set(monthRecords.filter(r => r.status === "Absent").map(r => r.employee_id)).size;
-    const uniqueEmployeeLeave = new Set(monthRecords.filter(r => r.status === "Leave" && r.approval_status === "Approved").map(r => r.employee_id)).size;
+    if (!statistics) {
+      return {
+        workingDays: 26,
+        present: 0,
+        absent: 0,
+        leave: 0,
+        pending: 0,
+      };
+    }
     
     return {
-      workingDays: workingDaysPerMonth,
-      present: uniqueEmployeePresent,
-      absent: uniqueEmployeeAbsent,
-      leave: uniqueEmployeeLeave,
-      pending: monthRecords.filter(r => r.approval_status === "Pending").length,
+      workingDays: statistics.total_working_days,
+      present: statistics.total_employees_present,
+      absent: statistics.total_employees_absent,
+      leave: 0, // Not available in statistics
+      pending: statistics.total_pending_approvals,
     };
-  }, [attendance, currentMonth, workingDaysPerMonth]);
+  }, [statistics]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -172,18 +219,17 @@ export default function AttendancePage() {
 
     if (!confirmed) return;
 
-    setAttendance(prev => prev.map(r =>
-      r.id === record.id
-        ? {
-            ...r,
-            approval_status: "Approved" as ApprovalStatus,
-            approved_by: "Admin",
-            approved_at: new Date().toISOString(),
-          }
-        : r
-    ));
-
-    await showSuccess("Attendance approved successfully");
+    try {
+      await apiClient.bulkApproveAttendance({
+        attendance_ids: [record.id],
+        approval_status: "Approved",
+      });
+      await showSuccess("Attendance approved successfully");
+      fetchAttendance();
+      fetchStatistics();
+    } catch (err: any) {
+      await showAlert("Error", err.message || "Failed to approve attendance");
+    }
   };
 
   const handleReject = async (record: AttendanceRecord) => {
@@ -212,19 +258,18 @@ export default function AttendancePage() {
 
     if (!result.isConfirmed || !result.value) return;
 
-    setAttendance(prev => prev.map(r =>
-      r.id === record.id
-        ? {
-            ...r,
-            approval_status: "Rejected" as ApprovalStatus,
-            approved_by: "Admin",
-            approved_at: new Date().toISOString(),
-            rejection_reason: result.value as string,
-          }
-        : r
-    ));
-
-    await showSuccess("Attendance rejected");
+    try {
+      await apiClient.bulkApproveAttendance({
+        attendance_ids: [record.id],
+        approval_status: "Rejected",
+        rejection_reason: result.value as string,
+      });
+      await showSuccess("Attendance rejected");
+      fetchAttendance();
+      fetchStatistics();
+    } catch (err: any) {
+      await showAlert("Error", err.message || "Failed to reject attendance");
+    }
   };
 
   const getApprovalStatusColor = (status: ApprovalStatus) => {
@@ -258,25 +303,53 @@ export default function AttendancePage() {
     setShowMarkModal(true);
   };
 
-  const handleSaveAttendance = (record: AttendanceRecord) => {
-    if (editingRecord) {
-      setAttendance(prev => prev.map(r => r.id === editingRecord.id ? record : r));
-      showSuccess("Attendance updated successfully");
-    } else {
-      const existingIndex = attendance.findIndex(
-        r => r.employee_id === record.employee_id && r.date === record.date
-      );
-      
-      if (existingIndex >= 0) {
-        setAttendance(prev => prev.map((r, idx) => idx === existingIndex ? { ...record, id: r.id } : r));
-        showSuccess("Attendance record replaced successfully");
-      } else {
-        setAttendance(prev => [record, ...prev]);
-        showSuccess("Attendance marked successfully");
-      }
+  const handleDelete = async (record: AttendanceRecord) => {
+    const confirmed = await showDeleteConfirm(
+      "Delete Attendance",
+      `Are you sure you want to delete attendance for ${record.employee_name} on ${format(new Date(record.date), "dd MMM yyyy")}?`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await apiClient.deleteAttendance(record.id);
+      await showSuccess("Attendance deleted successfully");
+      fetchAttendance();
+      fetchStatistics();
+    } catch (err: any) {
+      await showAlert("Error", err.message || "Failed to delete attendance");
     }
-    setShowMarkModal(false);
-    setEditingRecord(null);
+  };
+
+  const handleSaveAttendance = async (record: AttendanceRecord) => {
+    setIsSaving(true);
+    try {
+      const attendanceData: AttendanceCreateData = {
+        employee: record.employee_id,
+        attendance_date: record.date,
+        attendance_status: record.status === "Half Day" ? "Half-Day" : record.status,
+        check_in_time: record.check_in ? `${record.date} ${record.check_in}:00` : undefined,
+        check_out_time: record.check_out ? `${record.date} ${record.check_out}:00` : undefined,
+        notes: record.notes,
+      };
+
+      if (editingRecord) {
+        await apiClient.updateAttendance(editingRecord.id, attendanceData);
+        await showSuccess("Attendance updated successfully");
+      } else {
+        await apiClient.createAttendance(attendanceData);
+        await showSuccess("Attendance marked successfully");
+      }
+      
+      setShowMarkModal(false);
+      setEditingRecord(null);
+      fetchAttendance();
+      fetchStatistics();
+    } catch (err: any) {
+      await showAlert("Error", err.message || "Failed to save attendance");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -298,6 +371,12 @@ export default function AttendancePage() {
             </Button>
           </div>
         </div>
+
+        {error && (
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+            <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+          </div>
+        )}
 
         <div className="grid gap-4 md:grid-cols-5">
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
@@ -327,7 +406,10 @@ export default function AttendancePage() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+              onClick={() => {
+                setCurrentMonth(subMonths(currentMonth, 1));
+                setCurrentPage(1);
+              }}
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -337,7 +419,10 @@ export default function AttendancePage() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+              onClick={() => {
+                setCurrentMonth(addMonths(currentMonth, 1));
+                setCurrentPage(1);
+              }}
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
@@ -482,14 +567,27 @@ export default function AttendancePage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {filteredAttendance.length === 0 ? (
+                  {isLoading ? (
                     <tr>
-                      <td colSpan={9} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
-                        No attendance records found
+                      <td colSpan={9} className="px-6 py-8 text-center">
+                        <div className="flex items-center justify-center">
+                          <Loader2 className="h-6 w-6 animate-spin text-sky-600" />
+                          <span className="ml-2 text-gray-500 dark:text-gray-400">Loading attendance records...</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : attendance.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="px-6 py-8 text-center">
+                        <div className="flex flex-col items-center justify-center">
+                          <Inbox className="h-12 w-12 text-gray-400 mb-4" />
+                          <p className="text-gray-500 dark:text-gray-400">No attendance records found</p>
+                          <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">Try adjusting your filters or mark attendance for employees</p>
+                        </div>
                       </td>
                     </tr>
                   ) : (
-                    filteredAttendance.map((record) => {
+                    attendance.map((record) => {
                       const employee = activeEmployees.find(emp => emp.id === record.employee_id);
                       return (
                         <tr key={record.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
@@ -563,11 +661,7 @@ export default function AttendancePage() {
                                   <XIcon className="h-4 w-4" />
                                 </Button>
                               </>
-                            ) : (
-                              <div className="text-center text-xs text-gray-500 dark:text-gray-400">
-                                {record.approved_by && `By ${record.approved_by}`}
-                              </div>
-                            )}
+                            ) : null}
                             <Button
                               variant="ghost"
                               size="sm"
@@ -576,6 +670,15 @@ export default function AttendancePage() {
                               title="Edit"
                             >
                               <Edit2 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(record)}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                              title="Delete"
+                            >
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
                         </td>
@@ -632,6 +735,7 @@ export default function AttendancePage() {
         <MarkAttendanceModal
           employees={activeEmployees}
           editingRecord={editingRecord}
+          isSaving={isSaving}
           onClose={() => {
             setShowMarkModal(false);
             setEditingRecord(null);
@@ -650,56 +754,100 @@ export default function AttendancePage() {
       {showBulkPresentModal && (
         <BulkMarkPresentModal
           employees={activeEmployees.filter(emp => selectedEmployees.includes(emp.id))}
+          isSaving={isSaving}
           onClose={() => setShowBulkPresentModal(false)}
-          onSave={(date, checkIn, checkOut) => {
-            const newRecords: AttendanceRecord[] = selectedEmployees
-              .map(empId => {
+          onSave={async (date, checkIn, checkOut) => {
+            setIsSaving(true);
+            try {
+              const promises = selectedEmployees.map(async (empId) => {
                 const employee = activeEmployees.find(e => e.id === empId);
                 if (!employee) return null;
 
-                const existingIndex = attendance.findIndex(
-                  r => r.employee_id === empId && r.date === date
-                );
-
-                if (existingIndex >= 0) {
-                  return null;
-                }
-
-                const record: AttendanceRecord = {
-                  id: Date.now() + empId,
-                  employee_id: empId,
-                  employee_name: employee.name,
-                  date,
-                  status: "Present",
-                  approval_status: "Pending",
-                  check_in: checkIn || undefined,
-                  check_out: checkOut || undefined,
+                const attendanceData: AttendanceCreateData = {
+                  employee: empId,
+                  attendance_date: date,
+                  attendance_status: "Present",
+                  check_in_time: checkIn ? `${date} ${checkIn}:00` : undefined,
+                  check_out_time: checkOut ? `${date} ${checkOut}:00` : undefined,
                 };
-                return record;
-              })
-              .filter(r => r !== null) as AttendanceRecord[];
 
-            setAttendance(prev => [...newRecords, ...prev]);
-            setSelectedEmployees([]);
-            setShowBulkPresentModal(false);
-            showSuccess(`Marked ${newRecords.length} employee${newRecords.length > 1 ? 's' : ''} as present`);
+                try {
+                  await apiClient.createAttendance(attendanceData);
+                  return true;
+                } catch (err) {
+                  console.error(`Failed to mark attendance for employee ${empId}:`, err);
+                  return false;
+                }
+              });
+
+              const results = await Promise.all(promises);
+              const successCount = results.filter(r => r === true).length;
+              
+              await showSuccess(`Marked ${successCount} employee${successCount > 1 ? 's' : ''} as present`);
+              setSelectedEmployees([]);
+              setShowBulkPresentModal(false);
+              fetchAttendance();
+              fetchStatistics();
+            } catch (err: any) {
+              await showAlert("Error", err.message || "Failed to mark attendance");
+            } finally {
+              setIsSaving(false);
+            }
           }}
         />
       )}
+
+      {attendance.length > 0 && totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            Page {currentPage} of {totalPages}
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1 || isLoading}
+            >
+              Previous
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages || isLoading}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
+  );
+}
+
+export default function AttendancePage() {
+  return (
+    <ProtectedRoute>
+      <Suspense fallback={<DashboardLayout title="Attendance" breadcrumbs={["Home", "People", "Attendance"]}><div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-sky-600" /></div></DashboardLayout>}>
+        <AttendancePageContent />
+      </Suspense>
+    </ProtectedRoute>
   );
 }
 
 function MarkAttendanceModal({ 
   employees, 
   editingRecord,
+  isSaving,
   onClose, 
   onSave 
 }: {
   employees: Employee[];
   editingRecord: AttendanceRecord | null;
+  isSaving: boolean;
   onClose: () => void;
-  onSave: (record: AttendanceRecord) => void;
+  onSave: (record: AttendanceRecord) => Promise<void>;
 }) {
   const [formData, setFormData] = useState({
     employee_id: editingRecord?.employee_id || 0,
@@ -757,15 +905,14 @@ function MarkAttendanceModal({
       id: editingRecord?.id || Date.now(),
       employee_id: formData.employee_id,
       employee_name: formData.employee_name,
+      employee_code: "",
       date: formData.date,
       status: formData.status === "Half-Day" ? "Half Day" : formData.status,
       approval_status: editingRecord ? editingRecord.approval_status : "Pending",
       check_in: formData.check_in || undefined,
       check_out: formData.check_out || undefined,
-      approved_by: editingRecord?.approved_by,
-      approved_at: editingRecord?.approved_at,
     };
-    onSave(newRecord);
+    await onSave(newRecord);
   };
 
   return (
@@ -886,11 +1033,18 @@ function MarkAttendanceModal({
           </div>
 
           <div className="flex justify-end gap-3 pt-4">
-            <Button type="button" variant="secondary" onClick={onClose}>
+            <Button type="button" variant="secondary" onClick={onClose} disabled={isSaving}>
               Cancel
             </Button>
-            <Button type="submit">
-              {editingRecord ? "Update Attendance" : "Mark Attendance"}
+            <Button type="submit" disabled={isSaving}>
+              {isSaving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  {editingRecord ? "Updating..." : "Marking..."}
+                </>
+              ) : (
+                editingRecord ? "Update Attendance" : "Mark Attendance"
+              )}
             </Button>
           </div>
         </form>
@@ -1026,20 +1180,22 @@ function ExportReportModal({
 
 function BulkMarkPresentModal({
   employees,
+  isSaving,
   onClose,
   onSave,
 }: {
   employees: Employee[];
+  isSaving: boolean;
   onClose: () => void;
-  onSave: (date: string, checkIn: string, checkOut: string) => void;
+  onSave: (date: string, checkIn: string, checkOut: string) => Promise<void>;
 }) {
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(date, checkIn, checkOut);
+    await onSave(date, checkIn, checkOut);
   };
 
   return (
@@ -1119,12 +1275,21 @@ function BulkMarkPresentModal({
           </div>
 
           <div className="flex justify-end gap-3 pt-4">
-            <Button type="button" variant="secondary" onClick={onClose}>
+            <Button type="button" variant="secondary" onClick={onClose} disabled={isSaving}>
               Cancel
             </Button>
-            <Button type="submit">
-              <Check className="h-4 w-4 mr-2" />
-              Mark as Present
+            <Button type="submit" disabled={isSaving}>
+              {isSaving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Marking...
+                </>
+              ) : (
+                <>
+                  <Check className="h-4 w-4 mr-2" />
+                  Mark as Present
+                </>
+              )}
             </Button>
           </div>
         </form>

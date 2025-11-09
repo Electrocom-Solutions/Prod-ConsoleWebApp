@@ -661,6 +661,87 @@ export interface BulkUploadContractWorkerResponse {
   errors: string[];
 }
 
+/**
+ * Attendance Management Interfaces
+ */
+
+export interface AttendanceStatisticsResponse {
+  total_working_days: number;
+  total_employees_present: number;
+  total_employees_absent: number;
+  total_pending_approvals: number;
+}
+
+export interface BackendAttendanceListItem {
+  id: number;
+  employee: number;
+  employee_name: string;
+  employee_code: string;
+  attendance_date: string;
+  attendance_status: 'Present' | 'Absent' | 'Half-Day' | 'Leave';
+  approval_status: 'Approved' | 'Pending' | 'Rejected';
+  check_in_time: string | null;
+  check_out_time: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface AttendanceListResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: BackendAttendanceListItem[];
+}
+
+export interface AttendanceDetail {
+  id: number;
+  employee: number;
+  employee_name: string;
+  employee_code: string;
+  attendance_date: string;
+  attendance_status: 'Present' | 'Absent' | 'Half-Day' | 'Leave';
+  approval_status: 'Approved' | 'Pending' | 'Rejected';
+  rejection_reason: string | null;
+  check_in_time: string | null;
+  check_out_time: string | null;
+  check_in_location: string | null;
+  check_out_location: string | null;
+  check_in_location_latitude: string | null;
+  check_in_location_longitude: string | null;
+  check_out_location_latitude: string | null;
+  check_out_location_longitude: string | null;
+  check_in_selfie: string | null;
+  check_in_selfie_url: string | null;
+  check_out_selfie: string | null;
+  check_out_selfie_url: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: number | null;
+  updated_by: number | null;
+}
+
+export interface AttendanceCreateData {
+  employee: number;
+  attendance_date: string; // YYYY-MM-DD
+  attendance_status: 'Present' | 'Absent' | 'Half-Day' | 'Leave';
+  check_in_time?: string; // YYYY-MM-DD HH:MM:SS
+  check_out_time?: string; // YYYY-MM-DD HH:MM:SS
+  notes?: string;
+}
+
+export interface BulkApproveAttendanceRequest {
+  attendance_ids: number[];
+  approval_status: 'Approved' | 'Rejected';
+  rejection_reason?: string;
+}
+
+export interface BulkApproveAttendanceResponse {
+  updated_count: number;
+  skipped_count: number;
+  errors: string[] | null;
+}
+
 class ApiClient {
   private baseURL: string;
 
@@ -2315,6 +2396,144 @@ Please verify:
     }
 
     return response.json();
+  }
+
+  /**
+   * Attendance Management APIs
+   */
+
+  /**
+   * Get attendance statistics
+   */
+  async getAttendanceStatistics(): Promise<AttendanceStatisticsResponse> {
+    return this.request<AttendanceStatisticsResponse>('/api/attendance/statistics/');
+  }
+
+  /**
+   * Get attendance records with filters
+   */
+  async getAttendanceRecords(params?: {
+    search?: string;
+    employee?: number;
+    date?: string;
+    month?: number;
+    year?: number;
+    attendance_status?: 'Present' | 'Absent' | 'Half-Day' | 'Leave';
+    approval_status?: 'Approved' | 'Pending' | 'Rejected';
+    date_from?: string;
+    date_to?: string;
+    page?: number;
+  }): Promise<AttendanceListResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.employee) queryParams.append('employee', params.employee.toString());
+    if (params?.date) queryParams.append('date', params.date);
+    if (params?.month) queryParams.append('month', params.month.toString());
+    if (params?.year) queryParams.append('year', params.year.toString());
+    if (params?.attendance_status) queryParams.append('attendance_status', params.attendance_status);
+    if (params?.approval_status) queryParams.append('approval_status', params.approval_status);
+    if (params?.date_from) queryParams.append('date_from', params.date_from);
+    if (params?.date_to) queryParams.append('date_to', params.date_to);
+    if (params?.page) queryParams.append('page', params.page.toString());
+
+    const queryString = queryParams.toString();
+    const endpoint = `/api/attendance/${queryString ? `?${queryString}` : ''}`;
+    return this.request<AttendanceListResponse>(endpoint);
+  }
+
+  /**
+   * Get attendance record details
+   */
+  async getAttendanceRecord(id: number): Promise<AttendanceDetail> {
+    return this.request<AttendanceDetail>(`/api/attendance/${id}/`);
+  }
+
+  /**
+   * Create or update attendance record
+   */
+  async createAttendance(data: AttendanceCreateData): Promise<AttendanceDetail> {
+    const formData = new FormData();
+    formData.append('employee', data.employee.toString());
+    formData.append('attendance_date', data.attendance_date);
+    formData.append('attendance_status', data.attendance_status);
+    if (data.check_in_time) formData.append('check_in_time', data.check_in_time);
+    if (data.check_out_time) formData.append('check_out_time', data.check_out_time);
+    if (data.notes) formData.append('notes', data.notes);
+
+    const csrfToken = this.getCsrfToken();
+    const headers: Record<string, string> = {};
+    if (csrfToken) {
+      headers['X-CSRFToken'] = csrfToken;
+    }
+
+    const response = await fetch(`${this.baseURL}/api/attendance/`, {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Create failed' }));
+      throw error;
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Update attendance record
+   */
+  async updateAttendance(id: number, data: Partial<AttendanceCreateData>): Promise<AttendanceDetail> {
+    const formData = new FormData();
+    if (data.employee) formData.append('employee', data.employee.toString());
+    if (data.attendance_date) formData.append('attendance_date', data.attendance_date);
+    if (data.attendance_status) formData.append('attendance_status', data.attendance_status);
+    if (data.check_in_time !== undefined) formData.append('check_in_time', data.check_in_time || '');
+    if (data.check_out_time !== undefined) formData.append('check_out_time', data.check_out_time || '');
+    if (data.notes !== undefined) formData.append('notes', data.notes || '');
+
+    const csrfToken = this.getCsrfToken();
+    const headers: Record<string, string> = {};
+    if (csrfToken) {
+      headers['X-CSRFToken'] = csrfToken;
+    }
+
+    const response = await fetch(`${this.baseURL}/api/attendance/${id}/`, {
+      method: 'PATCH',
+      headers,
+      credentials: 'include',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Update failed' }));
+      throw error;
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Delete attendance record
+   */
+  async deleteAttendance(id: number): Promise<void> {
+    await this.request(`/api/attendance/${id}/`, {
+      method: 'DELETE',
+    });
+  }
+
+  /**
+   * Bulk approve/reject attendance records
+   */
+  async bulkApproveAttendance(data: BulkApproveAttendanceRequest): Promise<BulkApproveAttendanceResponse> {
+    return this.request<BulkApproveAttendanceResponse>('/api/attendance/bulk-approve/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
   }
 }
 
