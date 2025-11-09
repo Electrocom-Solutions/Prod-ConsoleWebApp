@@ -350,7 +350,7 @@ function TaskHubPageContent() {
       console.log('[Tasks Page] fetchTasks finally block - setting isLoading to false');
       setIsLoading(false);
     }
-  }, [currentPage, debouncedSearchQuery, projectFilter, statusFilter, periodFilter, projects.length]); // Use projects.length to avoid recreating when projects array reference changes
+  }, [currentPage, debouncedSearchQuery, projectFilter, statusFilter, periodFilter, projects]); // Include projects array for project filter lookup
 
   // Initial data fetch - run once on mount
   useEffect(() => {

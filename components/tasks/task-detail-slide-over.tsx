@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   X,
   Calendar,
@@ -59,14 +59,9 @@ export function TaskDetailSlideOver({
   const [isSaving, setIsSaving] = useState(false);
   const [taskDetail, setTaskDetail] = useState<BackendTaskDetail | null>(null);
 
-  // Fetch task details, attachments, and activities from backend
-  useEffect(() => {
-    if (isOpen && task.id) {
-      fetchTaskDetail();
-    }
-  }, [isOpen, task.id]);
-
-  const fetchTaskDetail = async () => {
+  const fetchTaskDetail = useCallback(async () => {
+    if (!task.id) return;
+    
     setIsLoading(true);
     try {
       const detail = await apiClient.getTask(task.id);
@@ -140,7 +135,14 @@ export function TaskDetailSlideOver({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [task.id, initialResources]);
+
+  // Fetch task details when slide over opens
+  useEffect(() => {
+    if (isOpen && task.id) {
+      fetchTaskDetail();
+    }
+  }, [isOpen, task.id, fetchTaskDetail]);
 
   const updateResourceUnitCost = (resourceId: number, unitCost: number | null) => {
     setResources((prev) =>
