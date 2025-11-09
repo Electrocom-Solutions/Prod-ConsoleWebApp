@@ -29,12 +29,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const currentUser = await apiClient.getCurrentUser();
       if (currentUser && (currentUser.is_staff || currentUser.is_superuser)) {
         setUser(currentUser);
+        console.log('[Auth] User authenticated:', currentUser);
       } else {
         // User is not staff or superuser, clear user state
+        console.log('[Auth] User not authorized or not found');
         setUser(null);
       }
     } catch (error) {
       // Authentication failed or user is not authorized
+      console.error('[Auth] Authentication check failed:', error);
       setUser(null);
     } finally {
       setIsLoading(false);
@@ -85,7 +88,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Protect routes - redirect to login if not authenticated or not authorized
+  // Only redirect from login page to dashboard if user is already logged in
+  // Route protection is handled by ProtectedRoute component
   useEffect(() => {
     // Don't redirect while loading
     if (isLoading) {
@@ -94,12 +98,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Check if user is authenticated and authorized (staff or superuser)
     const isAuthorized = user && (user.is_staff || user.is_superuser);
-
-    // If user is not authorized and not on login page, redirect to login
-    if (!isAuthorized && pathname !== "/login") {
-      router.push("/login");
-      return;
-    }
 
     // If user is authorized and on login page, redirect to dashboard
     if (isAuthorized && pathname === "/login") {

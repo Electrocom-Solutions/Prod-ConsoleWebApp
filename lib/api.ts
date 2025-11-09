@@ -132,9 +132,9 @@ class ApiClient {
     // Get CSRF token for POST, PUT, DELETE, PATCH requests
     const csrfToken = this.getCsrfToken();
 
-    const headers: HeadersInit = {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...options.headers,
+      ...(options.headers as Record<string, string>),
     };
 
     if (csrfToken && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
@@ -240,7 +240,7 @@ class ApiClient {
       }
     }
     
-    const headers: HeadersInit = {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
     
@@ -302,16 +302,28 @@ class ApiClient {
    */
   async getCurrentUser(): Promise<LoginResponse['user'] | null> {
     try {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[API] Getting current user from:', `${this.baseURL}/api/user/`);
+      }
       const response = await this.request<{ user: LoginResponse['user'] }>('/api/user/', {
         method: 'GET',
       });
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[API] Current user response:', response);
+      }
       return response.user;
     } catch (error: any) {
       // If it's a 403, user is not authorized (not staff/superuser)
       // If it's a 401, user is not authenticated
       // In both cases, return null
-      if (error?.error || error?.message) {
-        console.debug('getCurrentUser error:', error.error || error.message);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[API] getCurrentUser error:', error);
+        if (error?.status) {
+          console.error('[API] Response status:', error.status);
+        }
+        if (error?.error || error?.message) {
+          console.error('[API] Error message:', error.error || error.message);
+        }
       }
       return null;
     }

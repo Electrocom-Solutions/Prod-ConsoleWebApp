@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   Search,
@@ -33,7 +33,7 @@ import { mockClients } from "@/lib/mock-data/clients";
 
 type PeriodFilter = "today" | "week" | "month" | "custom";
 
-export default function TaskHubPage() {
+function TaskHubPageContent() {
   const searchParams = useSearchParams();
   const [tasks, setTasks] = useState<Task[]>(mockTasks);
   const [taskResources, setTaskResources] = useState<Record<number, TaskResource[]>>(() => {
@@ -641,6 +641,20 @@ export default function TaskHubPage() {
         />
       )}
     </DashboardLayout>
+  );
+}
+
+export default function TaskHubPage() {
+  return (
+    <Suspense fallback={
+      <DashboardLayout title="Tasks">
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-gray-500">Loading...</div>
+        </div>
+      </DashboardLayout>
+    }>
+      <TaskHubPageContent />
+    </Suspense>
   );
 }
 

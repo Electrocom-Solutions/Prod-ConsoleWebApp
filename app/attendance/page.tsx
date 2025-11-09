@@ -706,7 +706,7 @@ function MarkAttendanceModal({
     employee_name: editingRecord?.employee_name || "",
     employee_search: "",
     date: editingRecord?.date || format(new Date(), "yyyy-MM-dd"),
-    status: (editingRecord?.status || "Present") as "Present" | "Absent" | "Half-Day" | "Leave",
+    status: editingRecord?.status === "Half Day" ? "Half-Day" : (editingRecord?.status || "Present") as "Present" | "Absent" | "Half-Day" | "Leave",
     check_in: editingRecord?.check_in || "",
     check_out: editingRecord?.check_out || "",
   });
@@ -849,7 +849,7 @@ function MarkAttendanceModal({
               Attendance Status <span className="text-red-500">*</span>
             </label>
             <select
-              value={formData.status === "Half Day" ? "Half-Day" : formData.status}
+              value={formData.status}
               onChange={(e) => setFormData({ ...formData, status: e.target.value as "Present" | "Absent" | "Half-Day" | "Leave" })}
               required
               className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm dark:text-gray-200 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
