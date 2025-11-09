@@ -296,29 +296,58 @@ function ClientsPageContent() {
       }
     } catch (err: any) {
       console.error("Failed to save client:", err);
+      console.error("Error details:", {
+        message: err?.message,
+        error: err?.error,
+        detail: err?.detail,
+        response: err?.response,
+        status: err?.status,
+      });
+      
       // Extract error message - handle both Error objects and plain objects
       let errorMessage = "Failed to save client.";
-      if (err instanceof Error) {
+      
+      // Check for detail field first (Django's standard error format)
+      if (err?.detail) {
+        errorMessage = err.detail;
+      } else if (err instanceof Error) {
         errorMessage = err.message;
       } else if (err?.message) {
         errorMessage = err.message;
       } else if (err?.error) {
-        errorMessage = err.error;
+        errorMessage = typeof err.error === 'string' ? err.error : JSON.stringify(err.error);
       } else if (typeof err === 'string') {
         errorMessage = err;
       }
-      // If there are validation errors, show them
-      if (err?.response) {
+      
+      // If there are validation errors in response, show them
+      if (err?.response && typeof err.response === 'object') {
         const validationErrors = Object.entries(err.response)
           .map(([field, messages]: [string, any]) => {
             if (Array.isArray(messages)) {
               return `${field}: ${messages.join(', ')}`;
+            } else if (typeof messages === 'string') {
+              return `${field}: ${messages}`;
+            } else if (typeof messages === 'object') {
+              return `${field}: ${JSON.stringify(messages)}`;
             }
-            return `${field}: ${messages}`;
+            return `${field}: ${String(messages)}`;
           })
           .join('\n');
-        errorMessage = validationErrors || errorMessage;
+        if (validationErrors) {
+          errorMessage = validationErrors;
+        }
       }
+      
+      // If error message is still generic, try to extract more info
+      if (errorMessage === "Failed to save client." || errorMessage === "An unexpected error occurred") {
+        if (err?.response) {
+          errorMessage = JSON.stringify(err.response);
+        } else if (err) {
+          errorMessage = JSON.stringify(err);
+        }
+      }
+      
       showAlert("Error", errorMessage, "error");
     } finally {
       setIsSaving(false);

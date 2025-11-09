@@ -1600,12 +1600,35 @@ class ApiClient {
       const data = await response.json();
 
       if (!response.ok) {
-        const error: ApiError = data || { error: 'An error occurred' };
+        // Extract error information from Django response
+        // Django typically returns errors in these formats:
+        // - { detail: "Error message" }
+        // - { error: "Error message" }
+        // - { field_name: ["error1", "error2"] } (validation errors)
+        const error: ApiError = {
+          error: data.error || 'Error',
+          message: data.detail || data.message || data.error || 'An error occurred',
+          detail: data.detail,
+          response: data,
+          status: response.status,
+        };
+        
+        // Log the error for debugging
+        if (process.env.NODE_ENV === 'development') {
+          console.error('[API] Request failed:', {
+            url,
+            method,
+            status: response.status,
+            error: error,
+            data: data,
+          });
+        }
         
         // Check if it's a CSRF error (403 or 400 with CSRF in the message)
         const isCsrfError = response.status === 403 || 
                            (response.status === 400 && 
                             (error.detail?.toLowerCase().includes('csrf') || 
+                             error.message?.toLowerCase().includes('csrf') ||
                              error.error?.toLowerCase().includes('csrf')));
         
         // If it's a CSRF error and we haven't retried yet, refresh token and retry once
@@ -1642,7 +1665,15 @@ class ApiClient {
               const retryData = await retryResponse.json();
               
               if (!retryResponse.ok) {
-                throw retryData;
+                // Format retry error the same way
+                const retryError: ApiError = {
+                  error: retryData.error || 'Error',
+                  message: retryData.detail || retryData.message || retryData.error || 'An error occurred',
+                  detail: retryData.detail,
+                  response: retryData,
+                  status: retryResponse.status,
+                };
+                throw retryError;
               }
               
               return retryData;
@@ -1673,15 +1704,70 @@ class ApiClient {
         throw networkError;
       }
       
+      // Handle Error instances
       if (error instanceof Error) {
         console.error('[API Error]', error.message);
+        console.error('[API Error] Full error:', error);
         throw error;
       }
       
+      // Handle plain objects (like Django error responses)
+      if (error && typeof error === 'object') {
+        const errorObj = error as any;
+        // Check for common Django error formats
+        if (errorObj.detail) {
+          const detailError: ApiError = {
+            error: errorObj.error || 'Error',
+            message: errorObj.detail,
+            detail: errorObj.detail,
+          };
+          console.error('[API Error] Django error:', detailError);
+          throw detailError;
+        }
+        
+        if (errorObj.message) {
+          const messageError: ApiError = {
+            error: errorObj.error || 'Error',
+            message: errorObj.message,
+          };
+          console.error('[API Error] Error with message:', messageError);
+          throw messageError;
+        }
+        
+        if (errorObj.error) {
+          const errorOnly: ApiError = {
+            error: errorObj.error,
+            message: typeof errorObj.error === 'string' ? errorObj.error : 'An error occurred',
+          };
+          console.error('[API Error] Error only:', errorOnly);
+          throw errorOnly;
+        }
+        
+        // If it's an object but we don't recognize the format, stringify it
+        const stringifiedError: ApiError = {
+          error: 'Error',
+          message: JSON.stringify(errorObj),
+        };
+        console.error('[API Error] Unknown error format:', errorObj);
+        throw stringifiedError;
+      }
+      
+      // Handle string errors
+      if (typeof error === 'string') {
+        const stringError: ApiError = {
+          error: 'Error',
+          message: error,
+        };
+        console.error('[API Error] String error:', stringError);
+        throw stringError;
+      }
+      
+      // Last resort - unknown error type
       const unknownError: ApiError = {
         error: 'Unknown Error',
-        message: 'An unexpected error occurred',
+        message: `An unexpected error occurred: ${String(error)}`,
       };
+      console.error('[API Error] Unknown error type:', typeof error, error);
       throw unknownError;
     }
   }
@@ -2065,30 +2151,11 @@ Please verify:
     if (data.profile) formData.append('profile', data.profile.toString());
 
     // Use the request method which handles CSRF tokens properly
-    try {
-      return await this.request<BackendClientDetail>('/api/clients/', {
-        method: 'POST',
-        body: formData,
-      });
-    } catch (error: any) {
-      // Handle Django REST Framework validation errors
-      if (error?.response && typeof error.response === 'object') {
-        const errorMessages: string[] = [];
-        for (const [field, messages] of Object.entries(error.response)) {
-          if (Array.isArray(messages)) {
-            errorMessages.push(`${field}: ${messages.join(', ')}`);
-          } else if (typeof messages === 'string') {
-            errorMessages.push(messages);
-          } else if (typeof messages === 'object') {
-            errorMessages.push(`${field}: ${JSON.stringify(messages)}`);
-          }
-        }
-        const formattedError = new Error(errorMessages.length > 0 ? errorMessages.join('\n') : 'Failed to create client');
-        (formattedError as any).response = error.response;
-        throw formattedError;
-      }
-      throw error;
-    }
+    // The request method will handle errors and format them correctly
+    return await this.request<BackendClientDetail>('/api/clients/', {
+      method: 'POST',
+      body: formData,
+    });
   }
 
   /**
