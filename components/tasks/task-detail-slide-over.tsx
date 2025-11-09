@@ -21,14 +21,14 @@ import {
   AlertCircle,
   Eye,
   ExternalLink,
+  Loader2,
+  Upload,
 } from "lucide-react";
 import { Task, TaskResource, TaskAttachment, TaskActivity } from "@/types";
-import {
-  getResourcesByTaskId,
-  getAttachmentsByTaskId,
-  getActivitiesByTaskId,
-} from "@/lib/mock-data/tasks";
 import { format } from "date-fns";
+import { apiClient, BackendTaskDetail, BackendTaskAttachment, BackendTaskActivity } from "@/lib/api";
+import { showAlert, showDeleteConfirm, showSuccess, showConfirm } from "@/lib/sweetalert";
+import Swal from "sweetalert2";
 
 interface TaskDetailSlideOverProps {
   task: Task;
@@ -55,16 +55,92 @@ export function TaskDetailSlideOver({
   const [internalNote, setInternalNote] = useState(task.internal_notes || "");
   const [hasChanges, setHasChanges] = useState(false);
   const [previewAttachment, setPreviewAttachment] = useState<TaskAttachment | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [taskDetail, setTaskDetail] = useState<BackendTaskDetail | null>(null);
 
+  // Fetch task details, attachments, and activities from backend
   useEffect(() => {
-    if (isOpen) {
-      setResources(initialResources);
-      setAttachments(getAttachmentsByTaskId(task.id));
-      setActivities(getActivitiesByTaskId(task.id));
-      setInternalNote(task.internal_notes || "");
-      setHasChanges(false);
+    if (isOpen && task.id) {
+      fetchTaskDetail();
     }
-  }, [task.id, task.internal_notes, isOpen, initialResources]);
+  }, [isOpen, task.id]);
+
+  const fetchTaskDetail = async () => {
+    setIsLoading(true);
+    try {
+      const detail = await apiClient.getTask(task.id);
+      setTaskDetail(detail);
+      
+      // Map attachments
+      const mappedAttachments: TaskAttachment[] = detail.attachments.map((att) => {
+        const fileName = att.file_name.toLowerCase();
+        let fileType: "image" | "pdf" | "doc" | "other" = "other";
+        if (fileName.endsWith(".pdf")) fileType = "pdf";
+        else if (fileName.match(/\.(jpg|jpeg|png|gif|webp)$/)) fileType = "image";
+        else if (fileName.match(/\.(doc|docx)$/)) fileType = "doc";
+
+        return {
+          id: att.id,
+          task_id: task.id,
+          file_name: att.file_name,
+          file_url: att.file_url,
+          file_type: fileType,
+          file_size: 0,
+          uploaded_by: att.created_by_username || "Unknown",
+          uploaded_at: att.created_at,
+          notes: att.notes,
+        };
+      });
+      setAttachments(mappedAttachments);
+
+      // Map activities
+      const mappedActivities: TaskActivity[] = detail.activity_feed.map((act) => {
+        let type: TaskActivity["type"] = "Created";
+        if (act.action === "CREATED") type = "Created";
+        else if (act.action === "UPDATED") type = "Edited";
+        else if (act.action === "APPROVED") type = "Approved";
+        else if (act.action === "DELETED") type = "Created";
+
+        return {
+          id: act.id,
+          task_id: task.id,
+          type,
+          description: act.description,
+          performed_by: act.created_by_username || "Unknown",
+          timestamp: act.created_at,
+        };
+      });
+      setActivities(mappedActivities);
+
+      // Update resources and internal notes from detail
+      if (detail.resources) {
+        const mappedResources: TaskResource[] = detail.resources.map((r) => ({
+          id: r.id,
+          task_id: task.id,
+          resource_name: r.resource_name,
+          quantity: parseFloat(r.quantity),
+          unit: "pcs",
+          unit_cost: parseFloat(r.unit_cost),
+          total_cost: parseFloat(r.total_cost),
+          created_at: r.created_at,
+        }));
+        setResources(mappedResources);
+      } else {
+        setResources(initialResources);
+      }
+
+      setInternalNote(detail.internal_notes || "");
+      setHasChanges(false);
+    } catch (err: any) {
+      console.error("Failed to fetch task detail:", err);
+      showAlert("Error", "Failed to load task details.", "error");
+      // Fallback to initial resources
+      setResources(initialResources);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const updateResourceUnitCost = (resourceId: number, unitCost: number | null) => {
     setResources((prev) =>
@@ -106,9 +182,27 @@ export function TaskDetailSlideOver({
     setHasChanges(true);
   };
 
-  const removeResource = (resourceId: number) => {
-    setResources((prev) => prev.filter((r) => r.id !== resourceId));
-    setHasChanges(true);
+  const removeResource = async (resourceId: number) => {
+    // Only delete if resource exists in backend (id > 0)
+    if (resourceId > 0) {
+      const confirmed = await showDeleteConfirm("this resource");
+      if (!confirmed) return;
+
+      try {
+        await apiClient.deleteTaskResource(task.id, resourceId);
+        setResources((prev) => prev.filter((r) => r.id !== resourceId));
+        showSuccess("Resource deleted successfully!");
+        // Refresh task detail to get updated data
+        await fetchTaskDetail();
+      } catch (err: any) {
+        console.error("Failed to delete resource:", err);
+        showAlert("Delete Failed", err.message || "Failed to delete resource.", "error");
+      }
+    } else {
+      // Just remove from local state if it's a new resource
+      setResources((prev) => prev.filter((r) => r.id !== resourceId));
+      setHasChanges(true);
+    }
   };
 
   const calculateTotalResourceCost = () => {
@@ -119,32 +213,138 @@ export function TaskDetailSlideOver({
     return resources.some((r) => !r.unit_cost);
   };
 
-  const handleSave = () => {
-    if (onSave) {
-      onSave({ ...task, internal_notes: internalNote }, resources);
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      // Update task internal notes
+      if (onSave) {
+        await onSave({ ...task, internal_notes: internalNote }, resources);
+      } else {
+        // Fallback: update directly via API
+        await apiClient.updateTask(task.id, {
+          internal_notes: internalNote,
+        });
+      }
+
+      // Update/create/delete resources
+      for (const resource of resources) {
+        if (resource.id > 0) {
+          // Update existing resource
+          await apiClient.updateTaskResource(task.id, resource.id, {
+            quantity: resource.quantity,
+            unit_cost: resource.unit_cost || 0,
+            total_cost: resource.total_cost,
+          });
+        } else if (resource.resource_name && resource.quantity > 0) {
+          // Create new resource
+          await apiClient.attachTaskResource(task.id, {
+            resource_name: resource.resource_name,
+            quantity: resource.quantity,
+            unit_cost: resource.unit_cost || 0,
+            total_cost: resource.total_cost,
+          });
+        }
+      }
+
+      showSuccess("Changes saved successfully!");
+      setHasChanges(false);
+      // Refresh task detail
+      await fetchTaskDetail();
+    } catch (err: any) {
+      console.error("Failed to save changes:", err);
+      showAlert("Save Failed", err.message || "Failed to save changes.", "error");
+    } finally {
+      setIsSaving(false);
     }
-    setHasChanges(false);
   };
 
-  const handleApprove = () => {
+  const handleApprove = async () => {
     if (hasMissingUnitCosts()) {
-      const confirmed = window.confirm(
+      const confirmed = await showConfirm(
+        "Warning",
         "Some resources have no unit cost — totals may be inaccurate. Continue?"
       );
       if (!confirmed) return;
     }
-    if (onApprove) {
-      onApprove(task);
+
+    // Save any pending changes first
+    if (hasChanges) {
+      await handleSave();
     }
-    onClose();
+
+    if (onApprove) {
+      await onApprove(task);
+    }
   };
 
-  const handleReject = () => {
-    const reason = window.prompt("Enter rejection reason:");
+  const handleReject = async () => {
+    const { value: reason } = await Swal.fire({
+      title: "Reject Task",
+      text: "Enter rejection reason:",
+      input: "text",
+      inputPlaceholder: "Enter reason for rejection",
+      showCancelButton: true,
+      confirmButtonText: "Reject",
+      cancelButtonText: "Cancel",
+      inputValidator: (value) => {
+        if (!value) {
+          return "You need to provide a reason!";
+        }
+      },
+    });
+    
     if (reason && onReject) {
-      onReject(task, reason);
+      await onReject(task, reason);
     }
-    onClose();
+  };
+
+  const handleUploadAttachment = async (file: File, notes?: string) => {
+    try {
+      const attachment = await apiClient.attachTaskDocument(task.id, file, notes);
+      
+      // Map and add to attachments
+      const fileName = attachment.file_name.toLowerCase();
+      let fileType: "image" | "pdf" | "doc" | "other" = "other";
+      if (fileName.endsWith(".pdf")) fileType = "pdf";
+      else if (fileName.match(/\.(jpg|jpeg|png|gif|webp)$/)) fileType = "image";
+      else if (fileName.match(/\.(doc|docx)$/)) fileType = "doc";
+
+      const mappedAttachment: TaskAttachment = {
+        id: attachment.id,
+        task_id: task.id,
+        file_name: attachment.file_name,
+        file_url: attachment.file_url,
+        file_type: fileType,
+        file_size: 0,
+        uploaded_by: attachment.created_by_username || "Unknown",
+        uploaded_at: attachment.created_at,
+        notes: attachment.notes,
+      };
+
+      setAttachments((prev) => [...prev, mappedAttachment]);
+      showSuccess("Attachment uploaded successfully!");
+      // Refresh task detail
+      await fetchTaskDetail();
+    } catch (err: any) {
+      console.error("Failed to upload attachment:", err);
+      showAlert("Upload Failed", err.message || "Failed to upload attachment.", "error");
+    }
+  };
+
+  const handleDeleteAttachment = async (attachmentId: number) => {
+    const confirmed = await showDeleteConfirm("this attachment");
+    if (!confirmed) return;
+
+    try {
+      await apiClient.deleteTaskDocument(task.id, attachmentId);
+      setAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
+      showSuccess("Attachment deleted successfully!");
+      // Refresh task detail
+      await fetchTaskDetail();
+    } catch (err: any) {
+      console.error("Failed to delete attachment:", err);
+      showAlert("Delete Failed", err.message || "Failed to delete attachment.", "error");
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -187,7 +387,7 @@ export function TaskDetailSlideOver({
           <div className="flex-1">
             <div className="flex items-center gap-3">
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                Task #{task.id}
+                {task.description}
               </h2>
               <span
                 className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusColor(
@@ -198,7 +398,7 @@ export function TaskDetailSlideOver({
               </span>
             </div>
             <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-              {task.employee_name} · {task.client_name}
+              {task.employee_name || "Unassigned"} · {task.client_name || "N/A"}
             </p>
           </div>
           <button
@@ -211,78 +411,105 @@ export function TaskDetailSlideOver({
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto p-6">
-          <div className="space-y-8">
-            {/* Task Info */}
-            <section>
-              <h3 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
-                Task Information
-              </h3>
-              <div className="space-y-4 rounded-lg bg-gray-50 p-4 dark:bg-gray-900">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                      <Calendar className="h-4 w-4" />
-                      <span>Date</span>
-                    </div>
-                    <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
-                      {format(new Date(task.date), "MMMM dd, yyyy")}
-                    </p>
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                      <Clock className="h-4 w-4" />
-                      <span>Time Taken</span>
-                    </div>
-                    <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
-                      {task.time_taken_minutes} minutes ({(task.time_taken_minutes / 60).toFixed(1)} hrs)
-                    </p>
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                      <MapPin className="h-4 w-4" />
-                      <span>Location</span>
-                    </div>
-                    <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
-                      {task.location}
-                    </p>
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                      <Briefcase className="h-4 w-4" />
-                      <span>Project</span>
-                    </div>
-                    <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
-                      {task.project_name}
-                    </p>
-                  </div>
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                    <FileText className="h-4 w-4" />
-                    <span>Description</span>
-                  </div>
-                  <p className="mt-1 text-sm text-gray-900 dark:text-white">
-                    {task.description}
-                  </p>
-                </div>
-              </div>
-            </section>
-
-            {/* Attachments */}
-            {attachments.length > 0 && (
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-sky-500" />
+              <p className="ml-3 text-gray-500">Loading task details...</p>
+            </div>
+          ) : (
+            <div className="space-y-8">
+              {/* Task Info */}
               <section>
                 <h3 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
+                  Task Information
+                </h3>
+                <div className="space-y-4 rounded-lg bg-gray-50 p-4 dark:bg-gray-900">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                        <Calendar className="h-4 w-4" />
+                        <span>Date</span>
+                      </div>
+                      <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
+                        {format(new Date(task.date), "MMMM dd, yyyy")}
+                      </p>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                        <Clock className="h-4 w-4" />
+                        <span>Time Taken</span>
+                      </div>
+                      <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
+                        {task.time_taken_minutes} minutes ({(task.time_taken_minutes / 60).toFixed(1)} hrs)
+                      </p>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                        <MapPin className="h-4 w-4" />
+                        <span>Location</span>
+                      </div>
+                      <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
+                        {task.location || "-"}
+                      </p>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                        <Briefcase className="h-4 w-4" />
+                        <span>Project</span>
+                      </div>
+                      <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
+                        {task.project_name || "-"}
+                      </p>
+                    </div>
+                  </div>
+                  {taskDetail?.task_description && (
+                    <div>
+                      <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                        <FileText className="h-4 w-4" />
+                        <span>Description</span>
+                      </div>
+                      <p className="mt-1 text-sm text-gray-900 dark:text-white">
+                        {taskDetail.task_description}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </section>
+
+            {/* Attachments */}
+            <section>
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                   Attachments ({attachments.length})
                 </h3>
+                <label className="inline-flex items-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600 cursor-pointer">
+                  <Upload className="h-4 w-4" />
+                  Upload
+                  <input
+                    type="file"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        handleUploadAttachment(file);
+                      }
+                      e.target.value = ""; // Reset input
+                    }}
+                  />
+                </label>
+              </div>
+              {attachments.length > 0 ? (
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
                   {attachments.map((attachment) => (
                     <div
                       key={attachment.id}
-                      className="group relative overflow-hidden rounded-lg border border-gray-200 bg-white p-3 hover:border-sky-300 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-sky-600 cursor-pointer"
-                      onClick={() => setPreviewAttachment(attachment)}
+                      className="group relative overflow-hidden rounded-lg border border-gray-200 bg-white p-3 hover:border-sky-300 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-sky-600"
                     >
                       <div className="flex items-start gap-3">
-                        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-sky-100 dark:bg-sky-900/30">
+                        <div
+                          className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-sky-100 dark:bg-sky-900/30 cursor-pointer"
+                          onClick={() => setPreviewAttachment(attachment)}
+                        >
                           {attachment.file_type === "image" ? (
                             <ImageIcon className="h-5 w-5 text-sky-600 dark:text-sky-400" />
                           ) : (
@@ -290,20 +517,43 @@ export function TaskDetailSlideOver({
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
+                          <p
+                            className="truncate text-sm font-medium text-gray-900 dark:text-white cursor-pointer"
+                            onClick={() => setPreviewAttachment(attachment)}
+                          >
                             {attachment.file_name}
                           </p>
                           <p className="text-xs text-gray-500 dark:text-gray-400">
                             {formatFileSize(attachment.file_size)}
                           </p>
                         </div>
-                        <Eye className="h-4 w-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => setPreviewAttachment(attachment)}
+                            className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                            title="Preview"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteAttachment(attachment.id)}
+                            className="p-1 text-red-400 hover:text-red-600 dark:hover:text-red-300"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
                 </div>
-              </section>
-            )}
+              ) : (
+                <div className="rounded-lg border-2 border-dashed border-gray-300 p-8 text-center dark:border-gray-700">
+                  <FileText className="mx-auto h-12 w-12 text-gray-400" />
+                  <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">No attachments</p>
+                </div>
+              )}
+            </section>
 
             {/* Resources Used */}
             <section>
@@ -320,145 +570,148 @@ export function TaskDetailSlideOver({
                 </button>
               </div>
 
-              {hasMissingUnitCosts() && (
+              {hasMissingUnitCosts() && resources.length > 0 && (
                 <div className="mb-4 flex items-center gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-900/20 dark:text-amber-400">
                   <AlertCircle className="h-4 w-4 flex-shrink-0" />
                   <span>Some resources have no unit cost — totals may be inaccurate</span>
                 </div>
               )}
 
-              <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
-                <table className="w-full">
-                  <thead className="bg-gray-50 dark:bg-gray-900">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
-                        Resource Name
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
-                        Quantity
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
-                        Unit
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
-                        Unit Cost (₹)
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
-                        Total Cost (₹)
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                    {resources.map((resource) => (
-                      <tr key={resource.id} className="bg-white dark:bg-gray-800">
-                        <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
-                          {resource.resource_name || (
-                            <input
-                              type="text"
-                              placeholder="Enter name"
-                              className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm dark:border-gray-600 dark:bg-gray-700"
-                              onChange={(e) => {
-                                setResources((prev) =>
-                                  prev.map((r) =>
-                                    r.id === resource.id
-                                      ? { ...r, resource_name: e.target.value }
-                                      : r
-                                  )
-                                );
-                                setHasChanges(true);
-                              }}
-                            />
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          <input
-                            type="number"
-                            value={resource.quantity}
-                            onChange={(e) =>
-                              updateResourceQuantity(
-                                resource.id,
-                                parseFloat(e.target.value) || 0
-                              )
-                            }
-                            className="w-20 rounded border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                            min="0"
-                            step="0.01"
-                          />
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
-                          {resource.unit}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="relative">
-                            <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400">
-                              ₹
-                            </span>
+              {resources.length === 0 ? (
+                <div className="rounded-lg border-2 border-dashed border-gray-300 p-8 text-center dark:border-gray-700">
+                  <IndianRupee className="mx-auto h-12 w-12 text-gray-400" />
+                  <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">No resources added</p>
+                  <button
+                    onClick={addResource}
+                    className="mt-4 inline-flex items-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Resource
+                  </button>
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 dark:bg-gray-900">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
+                          Resource Name
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
+                          Quantity
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
+                          Unit
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
+                          Unit Cost (₹)
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
+                          Total Cost (₹)
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                      {resources.map((resource) => (
+                        <tr key={resource.id} className="bg-white dark:bg-gray-800">
+                          <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                            {resource.resource_name || (
+                              <input
+                                type="text"
+                                placeholder="Enter name"
+                                className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm dark:border-gray-600 dark:bg-gray-700"
+                                onChange={(e) => {
+                                  setResources((prev) =>
+                                    prev.map((r) =>
+                                      r.id === resource.id
+                                        ? { ...r, resource_name: e.target.value }
+                                        : r
+                                    )
+                                  );
+                                  setHasChanges(true);
+                                }}
+                              />
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
                             <input
                               type="number"
-                              value={resource.unit_cost || ""}
-                              onChange={(e) => {
-                                const value = e.target.value;
-                                updateResourceUnitCost(
+                              value={resource.quantity}
+                              onChange={(e) =>
+                                updateResourceQuantity(
                                   resource.id,
-                                  value ? parseFloat(value) : null
-                                );
-                              }}
-                              placeholder="0.00"
-                              className="w-28 rounded border border-gray-300 bg-white py-1 pl-6 pr-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                                  parseFloat(e.target.value) || 0
+                                )
+                              }
+                              className="w-20 rounded border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                               min="0"
                               step="0.01"
                             />
-                          </div>
-                          {!resource.unit_cost && (
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                            {resource.unit}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="relative">
+                              <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400">
+                                ₹
+                              </span>
+                              <input
+                                type="number"
+                                value={resource.unit_cost || ""}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  updateResourceUnitCost(
+                                    resource.id,
+                                    value ? parseFloat(value) : null
+                                  );
+                                }}
+                                placeholder="0.00"
+                                className="w-28 rounded border border-gray-300 bg-white py-1 pl-6 pr-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                                min="0"
+                                step="0.01"
+                              />
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
+                            {resource.total_cost
+                              ? `₹${resource.total_cost.toLocaleString("en-IN")}`
+                              : "—"}
+                          </td>
+                          <td className="px-4 py-3">
                             <button
-                              onClick={() => {
-                                const input = document.querySelector(
-                                  `input[type="number"][placeholder="0.00"]`
-                                ) as HTMLInputElement;
-                                input?.focus();
-                              }}
-                              className="mt-1 text-xs text-sky-600 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300"
+                              onClick={() => removeResource(resource.id)}
+                              className="rounded p-1 text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                              title="Remove"
                             >
-                              Set unit cost
+                              <Trash2 className="h-4 w-4" />
                             </button>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
-                          {resource.total_cost
-                            ? `₹${resource.total_cost.toLocaleString("en-IN")}`
-                            : "—"}
-                        </td>
-                        <td className="px-4 py-3">
-                          <button
-                            onClick={() => removeResource(resource.id)}
-                            className="rounded p-1 text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
-                            title="Remove"
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    {resources.length > 0 && (
+                      <tfoot className="bg-gray-50 dark:bg-gray-900">
+                        <tr>
+                          <td
+                            colSpan={4}
+                            className="px-4 py-3 text-right text-sm font-semibold text-gray-900 dark:text-white"
                           >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot className="bg-gray-50 dark:bg-gray-900">
-                    <tr>
-                      <td
-                        colSpan={4}
-                        className="px-4 py-3 text-right text-sm font-semibold text-gray-900 dark:text-white"
-                      >
-                        Total Resource Cost:
-                      </td>
-                      <td className="px-4 py-3 text-sm font-bold text-gray-900 dark:text-white">
-                        ₹{calculateTotalResourceCost().toLocaleString("en-IN")}
-                      </td>
-                      <td></td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
+                            Total Resource Cost:
+                          </td>
+                          <td className="px-4 py-3 text-sm font-bold text-gray-900 dark:text-white">
+                            ₹{calculateTotalResourceCost().toLocaleString("en-IN")}
+                          </td>
+                          <td></td>
+                        </tr>
+                      </tfoot>
+                    )}
+                  </table>
+                </div>
+              )}
             </section>
 
             {/* Internal Notes */}
@@ -483,24 +736,31 @@ export function TaskDetailSlideOver({
               <h3 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
                 Activity Feed
               </h3>
-              <div className="space-y-4">
-                {activities.map((activity) => (
-                  <div key={activity.id} className="flex gap-3">
-                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-sky-100 dark:bg-sky-900/30">
-                      <div className="h-2 w-2 rounded-full bg-sky-600 dark:bg-sky-400"></div>
+              {activities.length > 0 ? (
+                <div className="space-y-4">
+                  {activities.map((activity) => (
+                    <div key={activity.id} className="flex gap-3">
+                      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-sky-100 dark:bg-sky-900/30">
+                        <div className="h-2 w-2 rounded-full bg-sky-600 dark:bg-sky-400"></div>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm text-gray-900 dark:text-white">
+                          {activity.description}
+                        </p>
+                        <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                          {activity.performed_by} ·{" "}
+                          {format(new Date(activity.timestamp), "MMM dd, yyyy 'at' HH:mm")}
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex-1">
-                      <p className="text-sm text-gray-900 dark:text-white">
-                        {activity.description}
-                      </p>
-                      <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                        {activity.performed_by} ·{" "}
-                        {format(new Date(activity.timestamp), "MMM dd, yyyy 'at' HH:mm")}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-lg border-2 border-dashed border-gray-300 p-8 text-center dark:border-gray-700">
+                  <MessageSquare className="mx-auto h-12 w-12 text-gray-400" />
+                  <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">No activity yet</p>
+                </div>
+              )}
             </section>
           </div>
         </div>
@@ -516,29 +776,40 @@ export function TaskDetailSlideOver({
           <div className="flex flex-wrap gap-3">
             <button
               onClick={handleSave}
-              disabled={!hasChanges}
+              disabled={!hasChanges || isSaving}
               className="inline-flex items-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <Save className="h-4 w-4" />
-              Save Changes
+              {isSaving ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4" />
+                  Save Changes
+                </>
+              )}
             </button>
-            {task.status !== "Approved" && (
-              <button
-                onClick={handleApprove}
-                className="inline-flex items-center gap-2 rounded-lg bg-green-500 px-4 py-2 text-sm font-medium text-white hover:bg-green-600"
-              >
-                <Check className="h-4 w-4" />
-                Approve & Close
-              </button>
-            )}
-            {task.status !== "Rejected" && (
-              <button
-                onClick={handleReject}
-                className="inline-flex items-center gap-2 rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-600 dark:bg-gray-800 dark:text-red-400 dark:hover:bg-red-900/20"
-              >
-                <XCircle className="h-4 w-4" />
-                Reject
-              </button>
+            {task.status === "Open" && (
+              <>
+                <button
+                  onClick={handleApprove}
+                  disabled={isSaving}
+                  className="inline-flex items-center gap-2 rounded-lg bg-green-500 px-4 py-2 text-sm font-medium text-white hover:bg-green-600 disabled:opacity-50"
+                >
+                  <Check className="h-4 w-4" />
+                  Approve
+                </button>
+                <button
+                  onClick={handleReject}
+                  disabled={isSaving}
+                  className="inline-flex items-center gap-2 rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-600 dark:bg-gray-800 dark:text-red-400 dark:hover:bg-red-900/20 disabled:opacity-50"
+                >
+                  <XCircle className="h-4 w-4" />
+                  Reject
+                </button>
+              </>
             )}
           </div>
         </div>

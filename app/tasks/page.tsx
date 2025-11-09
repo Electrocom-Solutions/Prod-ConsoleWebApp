@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, Suspense } from "react";
+import { useState, useMemo, useEffect, Suspense, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
   Search,
@@ -22,29 +22,171 @@ import {
   ChevronDown,
   ChevronUp,
   X,
+  Loader2,
+  Inbox,
+  Trash2,
 } from "lucide-react";
-import { mockTasks, getResourcesByTaskId, calculateTaskResourceCost, hasMissingUnitCosts } from "@/lib/mock-data/tasks";
-import { Task, TaskStatus, TaskResource, TaskPriority } from "@/types";
-import { format, isToday, isThisWeek, isThisMonth, isWithinInterval, startOfDay, endOfDay } from "date-fns";
+import { Task, TaskStatus, TaskResource, TaskPriority, TaskAttachment, TaskActivity } from "@/types";
+import { format } from "date-fns";
 import { TaskDetailSlideOver } from "@/components/tasks/task-detail-slide-over";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
-import { showSuccess, showError } from "@/lib/sweetalert";
-import { mockClients } from "@/lib/mock-data/clients";
+import { showSuccess, showError, showDeleteConfirm, showAlert } from "@/lib/sweetalert";
+import {
+  apiClient,
+  TaskStatisticsResponse,
+  BackendTaskListItem,
+  BackendTaskDetail,
+  BackendTaskResource,
+  BackendTaskAttachment,
+  BackendTaskActivity,
+  BackendProjectListItem,
+  BackendClientListItem,
+} from "@/lib/api";
+import { useDebounce } from "use-debounce";
+import { ProtectedRoute } from "@/components/auth/protected-route";
 
-type PeriodFilter = "today" | "week" | "month" | "custom";
+type PeriodFilter = "today" | "this_week" | "this_month" | "all";
+
+/**
+ * Map backend task list item to frontend Task type
+ */
+function mapBackendTaskListItemToFrontend(backendTask: BackendTaskListItem): Task {
+  // Map backend status to frontend status
+  let status: TaskStatus = "Open";
+  if (backendTask.status === "Draft") status = "Open";
+  else if (backendTask.status === "In Progress") status = "In Progress";
+  else if (backendTask.status === "Completed") status = "Completed";
+  else if (backendTask.status === "Canceled") status = "Rejected";
+
+  return {
+    id: backendTask.id,
+    employee_id: backendTask.employee || 0,
+    employee_name: backendTask.employee_name || undefined,
+    client_id: undefined, // Not in list item
+    client_name: backendTask.client_name || undefined,
+    project_id: backendTask.project,
+    project_name: backendTask.project_name || undefined,
+    description: backendTask.task_name, // task_name is the description/title
+    date: backendTask.task_date,
+    location: backendTask.location || "",
+    time_taken_minutes: backendTask.time_taken_minutes,
+    estimated_time_minutes: backendTask.time_taken_minutes,
+    status,
+    priority: "Medium" as TaskPriority, // Default, not in backend
+    created_at: backendTask.created_at,
+    updated_at: backendTask.created_at,
+  };
+}
+
+/**
+ * Map backend task detail to frontend Task type
+ */
+function mapBackendTaskDetailToFrontend(backendTask: BackendTaskDetail): Task {
+  // Map backend status to frontend status
+  let status: TaskStatus = "Open";
+  if (backendTask.status === "Draft") status = "Open";
+  else if (backendTask.status === "In Progress") status = "In Progress";
+  else if (backendTask.status === "Completed") status = "Completed";
+  else if (backendTask.status === "Canceled") status = "Rejected";
+
+  return {
+    id: backendTask.id,
+    employee_id: backendTask.employee || 0,
+    employee_name: backendTask.employee_name || undefined,
+    client_id: undefined,
+    client_name: backendTask.client_name || undefined,
+    project_id: backendTask.project,
+    project_name: backendTask.project_name || undefined,
+    description: backendTask.task_name, // task_name is the description/title
+    date: backendTask.task_date,
+    location: backendTask.location || "",
+    time_taken_minutes: backendTask.time_taken_minutes,
+    estimated_time_minutes: backendTask.time_taken_minutes,
+    status,
+    priority: "Medium" as TaskPriority,
+    internal_notes: backendTask.internal_notes,
+    created_at: backendTask.created_at,
+    updated_at: backendTask.updated_at,
+  };
+}
+
+/**
+ * Map backend task resource to frontend TaskResource type
+ */
+function mapBackendTaskResourceToFrontend(backendResource: BackendTaskResource, taskId: number): TaskResource {
+  return {
+    id: backendResource.id,
+    task_id: taskId,
+    resource_name: backendResource.resource_name,
+    quantity: parseFloat(backendResource.quantity),
+    unit: "pcs", // Default unit, not in backend
+    unit_cost: parseFloat(backendResource.unit_cost),
+    total_cost: parseFloat(backendResource.total_cost),
+    created_at: backendResource.created_at,
+  };
+}
+
+/**
+ * Map backend task attachment to frontend TaskAttachment type
+ */
+function mapBackendTaskAttachmentToFrontend(backendAttachment: BackendTaskAttachment, taskId: number): TaskAttachment {
+  // Determine file type from file name
+  const fileName = backendAttachment.file_name.toLowerCase();
+  let fileType: "image" | "pdf" | "doc" | "other" = "other";
+  if (fileName.endsWith(".pdf")) fileType = "pdf";
+  else if (fileName.match(/\.(jpg|jpeg|png|gif|webp)$/)) fileType = "image";
+  else if (fileName.match(/\.(doc|docx)$/)) fileType = "doc";
+
+  return {
+    id: backendAttachment.id,
+    task_id: taskId,
+    file_name: backendAttachment.file_name,
+    file_url: backendAttachment.file_url,
+    file_type: fileType,
+    file_size: 0, // Not in backend response
+    uploaded_by: backendAttachment.created_by_username || "Unknown",
+    uploaded_at: backendAttachment.created_at,
+    notes: backendAttachment.notes,
+  };
+}
+
+/**
+ * Map backend task activity to frontend TaskActivity type
+ */
+function mapBackendTaskActivityToFrontend(backendActivity: BackendTaskActivity, taskId: number): TaskActivity {
+  // Map backend action to frontend type
+  let type: TaskActivity["type"] = "Created";
+  if (backendActivity.action === "CREATED") type = "Created";
+  else if (backendActivity.action === "UPDATED") type = "Edited";
+  else if (backendActivity.action === "APPROVED") type = "Approved";
+  else if (backendActivity.action === "DELETED") type = "Created"; // Default
+
+  return {
+    id: backendActivity.id,
+    task_id: taskId,
+    type,
+    description: backendActivity.description,
+    performed_by: backendActivity.created_by_username || "Unknown",
+    timestamp: backendActivity.created_at,
+  };
+}
 
 function TaskHubPageContent() {
   const searchParams = useSearchParams();
-  const [tasks, setTasks] = useState<Task[]>(mockTasks);
-  const [taskResources, setTaskResources] = useState<Record<number, TaskResource[]>>(() => {
-    // Initialize resources from mock data, indexed by task_id
-    const resourcesMap: Record<number, TaskResource[]> = {};
-    mockTasks.forEach((task) => {
-      resourcesMap[task.id] = getResourcesByTaskId(task.id);
-    });
-    return resourcesMap;
-  });
+  const router = useRouter();
+  
+  // State
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [taskResources, setTaskResources] = useState<Record<number, TaskResource[]>>({});
+  const [statistics, setStatistics] = useState<TaskStatisticsResponse | null>(null);
+  const [projects, setProjects] = useState<BackendProjectListItem[]>([]);
+  const [employees, setEmployees] = useState<any[]>([]); // TODO: Add Employee type
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery] = useDebounce(searchQuery, 500);
   const [statusFilter, setStatusFilter] = useState<TaskStatus | "all">("all");
   const [projectFilter, setProjectFilter] = useState<string>("all");
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>("today");
@@ -53,7 +195,88 @@ function TaskHubPageContent() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isSlideOverOpen, setIsSlideOverOpen] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const router = useRouter();
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+
+  // Fetch statistics
+  const fetchStatistics = useCallback(async () => {
+    try {
+      const filter = periodFilter === "all" ? "all" : periodFilter;
+      const stats = await apiClient.getTaskStatistics({ filter: filter as any });
+      setStatistics(stats);
+    } catch (err: any) {
+      console.error("Failed to fetch task statistics:", err);
+    }
+  }, [periodFilter]);
+
+  // Fetch projects for dropdown
+  const fetchProjects = useCallback(async () => {
+    try {
+      const response = await apiClient.getProjects();
+      setProjects(response.results);
+    } catch (err: any) {
+      console.error("Failed to fetch projects:", err);
+    }
+  }, []);
+
+  // Fetch tasks
+  const fetchTasks = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const params: {
+        search?: string;
+        project?: number;
+        status?: "Draft" | "In Progress" | "Completed" | "Canceled";
+        date_filter?: "today" | "this_week" | "this_month" | "all";
+        page?: number;
+      } = { page: currentPage };
+
+      if (debouncedSearchQuery) params.search = debouncedSearchQuery;
+      if (projectFilter !== "all") {
+        const project = projects.find((p) => p.name === projectFilter);
+        if (project) params.project = project.id;
+      }
+      if (statusFilter !== "all") {
+        // Map frontend status to backend status
+        if (statusFilter === "Open") params.status = "Draft";
+        else if (statusFilter === "In Progress") params.status = "In Progress";
+        else if (statusFilter === "Completed") params.status = "Completed";
+        else if (statusFilter === "Rejected") params.status = "Canceled";
+      }
+      params.date_filter = periodFilter === "all" ? "all" : periodFilter;
+
+      const response = await apiClient.getTasks(params);
+      const mappedTasks = response.results.map(mapBackendTaskListItemToFrontend);
+      setTasks(mappedTasks);
+      setTotalPages(Math.ceil(response.count / 20)); // Assuming 20 items per page
+
+      // Note: Resources are fetched on-demand when task detail is opened
+      // This improves performance by not fetching resources for all tasks upfront
+      const resourcesMap: Record<number, TaskResource[]> = {};
+      mappedTasks.forEach((task) => {
+        resourcesMap[task.id] = []; // Initialize empty, will be fetched when needed
+      });
+      setTaskResources(resourcesMap);
+    } catch (err: any) {
+      console.error("Failed to fetch tasks:", err);
+      setError(err.message || "Failed to load tasks.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentPage, debouncedSearchQuery, projectFilter, statusFilter, periodFilter, projects]);
+
+  // Initial data fetch
+  useEffect(() => {
+    fetchStatistics();
+    fetchProjects();
+  }, [fetchStatistics, fetchProjects]);
+
+  useEffect(() => {
+    if (projects.length > 0) {
+      fetchTasks();
+    }
+  }, [fetchTasks]);
 
   // Check for project filter and action=new in URL query params on mount
   useEffect(() => {
@@ -87,9 +310,28 @@ function TaskHubPageContent() {
     return resources.some((r) => !r.unit_cost);
   };
 
-  const openTaskDetail = (task: Task) => {
-    setSelectedTask(task);
-    setIsSlideOverOpen(true);
+  const openTaskDetail = async (task: Task) => {
+    setIsLoading(true);
+    try {
+      // Fetch full task details from backend
+      const taskDetail = await apiClient.getTask(task.id);
+      const mappedTask = mapBackendTaskDetailToFrontend(taskDetail);
+      const mappedResources = taskDetail.resources.map((r) =>
+        mapBackendTaskResourceToFrontend(r, task.id)
+      );
+      
+      setSelectedTask(mappedTask);
+      setTaskResources((prev) => ({
+        ...prev,
+        [task.id]: mappedResources,
+      }));
+      setIsSlideOverOpen(true);
+    } catch (err: any) {
+      console.error("Failed to fetch task details:", err);
+      showAlert("Error", err.message || "Failed to load task details.", "error");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const closeTaskDetail = () => {
@@ -97,107 +339,127 @@ function TaskHubPageContent() {
     setSelectedTask(null);
   };
 
-  const handleSaveTask = (updatedTask: Task, resources: TaskResource[]) => {
-    // Update task
-    setTasks((prev) =>
-      prev.map((t) => (t.id === updatedTask.id ? updatedTask : t))
-    );
-    // **FIX: Persist resources to state**
-    setTaskResources((prev) => ({
-      ...prev,
-      [updatedTask.id]: resources,
-    }));
+  const handleSaveTask = async (updatedTask: Task, resources: TaskResource[]) => {
+    if (!selectedTask) return;
+    
+    setIsSaving(true);
+    try {
+      // Update task
+      const updateData: any = {
+        task_name: updatedTask.description,
+        task_date: updatedTask.date,
+        location: updatedTask.location,
+        time_taken_minutes: updatedTask.time_taken_minutes,
+        internal_notes: updatedTask.internal_notes,
+      };
+      
+      // Map frontend status to backend status
+      if (updatedTask.status === "Open") updateData.status = "Draft";
+      else if (updatedTask.status === "In Progress") updateData.status = "In Progress";
+      else if (updatedTask.status === "Completed") updateData.status = "Completed";
+      else if (updatedTask.status === "Rejected") updateData.status = "Canceled";
+
+      await apiClient.updateTask(updatedTask.id, updateData);
+
+      // Update resources
+      for (const resource of resources) {
+        if (resource.id > 0) {
+          // Update existing resource
+          await apiClient.updateTaskResource(updatedTask.id, resource.id, {
+            quantity: resource.quantity,
+            unit_cost: resource.unit_cost,
+            total_cost: resource.total_cost,
+          });
+        } else {
+          // Create new resource
+          await apiClient.attachTaskResource(updatedTask.id, {
+            resource_name: resource.resource_name,
+            quantity: resource.quantity,
+            unit_cost: resource.unit_cost || 0,
+            total_cost: resource.total_cost,
+          });
+        }
+      }
+
+      // Refresh tasks and resources
+      await fetchTasks();
+      await fetchStatistics();
+      
+      showSuccess("Task updated successfully!");
+      closeTaskDetail();
+    } catch (err: any) {
+      console.error("Failed to save task:", err);
+      showAlert("Save Failed", err.message || "An error occurred during save.", "error");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleApproveTask = (task: Task) => {
-    setTasks((prev) =>
-      prev.map((t) =>
-        t.id === task.id
-          ? {
-              ...t,
-              status: "Approved",
-              approved_by: "Admin",
-              approved_at: new Date().toISOString(),
-            }
-          : t
-      )
-    );
+  const handleApproveTask = async (task: Task) => {
+    try {
+      await apiClient.approveTask(task.id);
+      showSuccess("Task approved successfully!");
+      await fetchTasks();
+      await fetchStatistics();
+      closeTaskDetail();
+    } catch (err: any) {
+      console.error("Failed to approve task:", err);
+      showAlert("Approval Failed", err.message || "An error occurred during approval.", "error");
+    }
   };
 
-  const handleRejectTask = (task: Task, reason: string) => {
-    setTasks((prev) =>
-      prev.map((t) =>
-        t.id === task.id
-          ? {
-              ...t,
-              status: "Rejected",
-              internal_notes: (t.internal_notes || "") + `\n\nRejection reason: ${reason}`,
-            }
-          : t
-      )
-    );
+  const handleRejectTask = async (task: Task, reason: string) => {
+    try {
+      await apiClient.rejectTask(task.id, reason);
+      showSuccess("Task rejected successfully!");
+      await fetchTasks();
+      await fetchStatistics();
+      closeTaskDetail();
+    } catch (err: any) {
+      console.error("Failed to reject task:", err);
+      showAlert("Rejection Failed", err.message || "An error occurred during rejection.", "error");
+    }
   };
 
-  // Get unique projects for filter
+  const handleDeleteTask = async (taskId: number) => {
+    const confirmed = await showDeleteConfirm("this task");
+    if (confirmed) {
+      try {
+        await apiClient.deleteTask(taskId);
+        showSuccess("Task deleted successfully!");
+        await fetchTasks();
+        await fetchStatistics();
+      } catch (err: any) {
+        console.error("Failed to delete task:", err);
+        showAlert("Delete Failed", err.message || "An error occurred during deletion.", "error");
+      }
+    }
+  };
+
+  // Get unique projects for filter (from fetched projects)
   const uniqueProjects = useMemo(() => {
-    const projects = tasks
-      .map((task) => task.project_name)
-      .filter((name): name is string => !!name);
-    return Array.from(new Set(projects)).sort();
-  }, [tasks]);
+    return projects.map((p) => p.name).sort();
+  }, [projects]);
 
-  // Filter tasks by period
-  const filteredTasks = useMemo(() => {
-    let filtered = tasks;
-
-    // Period filter
-    filtered = filtered.filter((task) => {
-      const taskDate = new Date(task.date);
-      if (periodFilter === "today") return isToday(taskDate);
-      if (periodFilter === "week") return isThisWeek(taskDate, { weekStartsOn: 1 });
-      if (periodFilter === "month") return isThisMonth(taskDate);
-      return true; // custom or all
-    });
-
-    // Status filter
-    if (statusFilter !== "all") {
-      filtered = filtered.filter((task) => task.status === statusFilter);
-    }
-
-    // Project filter
-    if (projectFilter !== "all") {
-      filtered = filtered.filter((task) => task.project_name === projectFilter);
-    }
-
-    // Search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (task) =>
-          task.employee_name?.toLowerCase().includes(query) ||
-          task.client_name?.toLowerCase().includes(query) ||
-          task.project_name?.toLowerCase().includes(query) ||
-          task.location.toLowerCase().includes(query) ||
-          task.description.toLowerCase().includes(query)
-      );
-    }
-
-    return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [tasks, periodFilter, statusFilter, projectFilter, searchQuery]);
-
-  // Calculate summary stats
+  // Statistics from backend (already filtered by period)
   const stats = useMemo(() => {
-    const total = filteredTasks.length;
-    const pending = filteredTasks.filter((t) => t.status === "Completed" && !t.approved_by).length;
-    const completed = filteredTasks.filter((t) => t.status === "Approved").length;
-    const totalTime = filteredTasks.reduce((sum, t) => sum + t.time_taken_minutes, 0);
-    const totalResourceCost = filteredTasks.reduce((sum, t) => {
-      const resources = taskResources[t.id] || [];
-      return sum + resources.reduce((resourceSum, r) => resourceSum + (r.total_cost || 0), 0);
-    }, 0);
-
-    return { total, pending, completed, totalTime, totalResourceCost };
-  }, [filteredTasks, taskResources]);
+    if (!statistics) {
+      return {
+        total: 0,
+        pending: 0,
+        completed: 0,
+        totalTime: 0,
+        totalResourceCost: 0,
+      };
+    }
+    return {
+      total: statistics.total_tasks,
+      pending: statistics.pending_approval,
+      completed: statistics.approved_tasks,
+      totalTime: statistics.total_timings, // Already in hours
+      totalResourceCost: statistics.total_resource_cost,
+    };
+  }, [statistics]);
 
   const toggleTaskExpand = (taskId: number) => {
     setExpandedTaskId(expandedTaskId === taskId ? null : taskId);
@@ -218,6 +480,12 @@ function TaskHubPageContent() {
       case "Rejected": return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400";
       default: return "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300";
     }
+  };
+
+  // Update period filter and refetch
+  const handlePeriodFilterChange = (filter: PeriodFilter) => {
+    setPeriodFilter(filter);
+    // Statistics will be refetched via useEffect
   };
 
   const getPriorityColor = (priority: string) => {
@@ -245,6 +513,11 @@ function TaskHubPageContent() {
   };
 
   const handleExportCSV = () => {
+    if (tasks.length === 0) {
+      showAlert("No Data", "No tasks to export.", "info");
+      return;
+    }
+
     // Prepare CSV data with all details
     const headers = [
       "Task ID",
@@ -254,25 +527,19 @@ function TaskHubPageContent() {
       "Description",
       "Location",
       "Time Taken (hrs)",
-      "Priority",
       "Status",
       "Resource Cost (₹)",
-      "Assigned By",
-      "Approved By",
     ];
-    const rows = filteredTasks.map((task) => [
+    const rows = tasks.map((task) => [
       task.id,
       format(new Date(task.date), "dd/MM/yyyy"),
       task.employee_name || "-",
       task.project_name || "-",
       task.description,
-      task.location,
+      task.location || "-",
       (task.time_taken_minutes / 60).toFixed(2),
-      task.priority,
       task.status,
       calculateTaskResourceCostFromState(task.id).toLocaleString("en-IN"),
-      task.assigned_by || "-",
-      task.approved_by || "-",
     ]);
 
     // Convert to CSV string with proper escaping
@@ -292,6 +559,34 @@ function TaskHubPageContent() {
     link.click();
     document.body.removeChild(link);
   };
+
+  if (isLoading && tasks.length === 0) {
+    return (
+      <DashboardLayout title="Task Hub" breadcrumbs={["Home", "Tasks"]}>
+        <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
+          <Loader2 className="h-8 w-8 animate-spin text-sky-500" />
+          <p className="ml-3 text-gray-500">Loading tasks...</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (error && tasks.length === 0) {
+    return (
+      <DashboardLayout title="Task Hub" breadcrumbs={["Home", "Tasks"]}>
+        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] text-red-500">
+          <AlertCircle className="h-12 w-12 mb-4" />
+          <p className="text-lg font-medium">Error loading tasks: {error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600"
+          >
+            <Loader2 className="h-4 w-4" /> Retry
+          </button>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout title="Task Hub" breadcrumbs={["Home", "Tasks"]}>
@@ -318,7 +613,7 @@ function TaskHubPageContent() {
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex rounded-lg border border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-800">
             <button
-              onClick={() => setPeriodFilter("today")}
+              onClick={() => handlePeriodFilterChange("today")}
               className={`px-4 py-2 text-sm font-medium transition-colors ${
                 periodFilter === "today"
                   ? "bg-sky-500 text-white"
@@ -328,9 +623,9 @@ function TaskHubPageContent() {
               Today
             </button>
             <button
-              onClick={() => setPeriodFilter("week")}
+              onClick={() => handlePeriodFilterChange("this_week")}
               className={`border-x border-gray-300 px-4 py-2 text-sm font-medium transition-colors dark:border-gray-600 ${
-                periodFilter === "week"
+                periodFilter === "this_week"
                   ? "bg-sky-500 text-white"
                   : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700"
               }`}
@@ -338,9 +633,9 @@ function TaskHubPageContent() {
               This Week
             </button>
             <button
-              onClick={() => setPeriodFilter("month")}
+              onClick={() => handlePeriodFilterChange("this_month")}
               className={`border-r border-gray-300 px-4 py-2 text-sm font-medium transition-colors dark:border-gray-600 ${
-                periodFilter === "month"
+                periodFilter === "this_month"
                   ? "bg-sky-500 text-white"
                   : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700"
               }`}
@@ -348,14 +643,14 @@ function TaskHubPageContent() {
               This Month
             </button>
             <button
-              onClick={() => setPeriodFilter("custom")}
+              onClick={() => handlePeriodFilterChange("all")}
               className={`px-4 py-2 text-sm font-medium transition-colors ${
-                periodFilter === "custom"
+                periodFilter === "all"
                   ? "bg-sky-500 text-white"
                   : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700"
               } rounded-r-lg`}
             >
-              <Calendar className="h-4 w-4" />
+              All
             </button>
           </div>
         </div>
@@ -367,7 +662,9 @@ function TaskHubPageContent() {
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Tasks</p>
               <FileText className="h-5 w-5 text-gray-400" />
             </div>
-            <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
+            <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
+              {statistics?.total_tasks ?? "..."}
+            </p>
           </div>
 
           <div className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
@@ -376,10 +673,10 @@ function TaskHubPageContent() {
               <AlertCircle className="h-5 w-5 text-orange-500" />
             </div>
             <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-              {stats.pending}
-              {stats.pending > 0 && (
+              {statistics?.pending_approval ?? "..."}
+              {statistics && statistics.pending_approval > 0 && (
                 <span className="ml-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-red-100 text-xs font-medium text-red-600 dark:bg-red-900/30 dark:text-red-400">
-                  {stats.pending}
+                  {statistics.pending_approval}
                 </span>
               )}
             </p>
@@ -390,7 +687,9 @@ function TaskHubPageContent() {
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Approved</p>
               <CheckCircle className="h-5 w-5 text-green-500" />
             </div>
-            <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{stats.completed}</p>
+            <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
+              {statistics?.approved_tasks ?? "..."}
+            </p>
           </div>
 
           <div className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
@@ -399,7 +698,7 @@ function TaskHubPageContent() {
               <Clock className="h-5 w-5 text-blue-500" />
             </div>
             <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-              {(stats.totalTime / 60).toFixed(1)}
+              {statistics ? statistics.total_timings.toFixed(1) : "..."}
               <span className="ml-1 text-base font-normal text-gray-600 dark:text-gray-400">hrs</span>
             </p>
           </div>
@@ -410,8 +709,7 @@ function TaskHubPageContent() {
               <IndianRupee className="h-5 w-5 text-purple-500" />
             </div>
             <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-              ₹{(stats.totalResourceCost / 100000).toFixed(2)}
-              <span className="ml-1 text-base font-normal text-gray-600 dark:text-gray-400">L</span>
+              {statistics ? `₹${(statistics.total_resource_cost / 1000).toFixed(1)}K` : "..."}
             </p>
           </div>
         </div>
@@ -446,11 +744,10 @@ function TaskHubPageContent() {
             className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
           >
             <option value="all">All Status</option>
-            <option value="Open">Open</option>
+            <option value="Open">Draft</option>
             <option value="In Progress">In Progress</option>
             <option value="Completed">Completed</option>
-            <option value="Approved">Approved</option>
-            <option value="Rejected">Rejected</option>
+            <option value="Rejected">Canceled</option>
           </select>
         </div>
 
@@ -480,23 +777,41 @@ function TaskHubPageContent() {
         )}
 
         {/* Task Table */}
-        <div className="overflow-hidden rounded-lg bg-white shadow dark:bg-gray-800">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900">
-                <tr>
-                  <th className="w-12 px-4 py-3"></th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-600 dark:text-gray-400">
-                    Date
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-600 dark:text-gray-400">
-                    Employee
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-600 dark:text-gray-400">
-                    Project
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-600 dark:text-gray-400">
-                    Description
+        {tasks.length === 0 ? (
+          <div className="rounded-lg border-2 border-dashed border-gray-300 p-12 text-center dark:border-gray-700">
+            <Inbox className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-600" />
+            <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-white">
+              No tasks found
+            </h3>
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+              Get started by creating your first task
+            </p>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600"
+            >
+              <Plus className="h-4 w-4" />
+              Create Task
+            </button>
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-lg bg-white shadow dark:bg-gray-800">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900">
+                  <tr>
+                    <th className="w-12 px-4 py-3"></th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-600 dark:text-gray-400">
+                      Date
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-600 dark:text-gray-400">
+                      Employee
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-600 dark:text-gray-400">
+                      Project
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-600 dark:text-gray-400">
+                      Description
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-600 dark:text-gray-400">
                     Time
@@ -513,7 +828,7 @@ function TaskHubPageContent() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {filteredTasks.map((task) => {
+                {tasks.map((task) => {
                   const resourceCost = calculateTaskResourceCostFromState(task.id);
                   const missingCosts = hasMissingUnitCostsFromState(task.id);
                   const isExpanded = expandedTaskId === task.id;
@@ -586,13 +901,24 @@ function TaskHubPageContent() {
                         )}
                       </td>
                       <td className="px-4 py-4">
-                        <button
-                          onClick={() => openTaskDetail(task)}
-                          className="rounded p-1 text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-600 dark:hover:text-white"
-                          title="View Details"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => openTaskDetail(task)}
+                            className="rounded p-1 text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-600 dark:hover:text-white"
+                            title="View Details"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </button>
+                          {(task.status === "Open" || task.status === "Rejected") && (
+                            <button
+                              onClick={() => handleDeleteTask(task.id)}
+                              className="rounded p-1 text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
+                              title="Delete"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -600,28 +926,12 @@ function TaskHubPageContent() {
               </tbody>
             </table>
           </div>
-
-          {filteredTasks.length === 0 && (
-            <div className="py-12 text-center">
-              <FileText className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No tasks found</h3>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                No field tasks for this period — create a task or expand the date range.
-              </p>
-              <button
-                onClick={() => setShowCreateModal(true)}
-                className="mt-4 inline-flex items-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600"
-              >
-                <Plus className="h-4 w-4" />
-                Create Task
-              </button>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Task Detail Slide-Over */}
-      {selectedTask && (
+      {selectedTask !== null && (
         <TaskDetailSlideOver
           task={selectedTask}
           resources={getTaskResources(selectedTask.id)}
@@ -637,15 +947,38 @@ function TaskHubPageContent() {
       {showCreateModal && (
         <CreateTaskModal
           onClose={() => setShowCreateModal(false)}
-          onCreate={(newTask) => {
-            setTasks([newTask, ...tasks]);
-            setTaskResources((prev) => ({ ...prev, [newTask.id]: [] }));
-            setShowCreateModal(false);
-            showSuccess("Task created successfully");
+          onCreate={async (taskData) => {
+            try {
+              // Find project ID from project name
+              const project = projects.find((p) => p.name === taskData.project_name);
+              if (!project) {
+                showAlert("Error", "Project not found.", "error");
+                return;
+              }
+
+              // Create task via backend API
+              const createdTask = await apiClient.createTask({
+                project: project.id,
+                task_name: taskData.task_name,
+                deadline: taskData.deadline,
+                employee: taskData.employee_id || undefined,
+                status: taskData.status === "Open" ? "Draft" : (taskData.status as any),
+                estimated_time: taskData.estimated_time_minutes || undefined,
+                location: taskData.location || undefined,
+                task_description: taskData.description || undefined,
+              });
+
+              showSuccess("Task created successfully!");
+              setShowCreateModal(false);
+              await fetchTasks();
+              await fetchStatistics();
+            } catch (err: any) {
+              console.error("Failed to create task:", err);
+              showAlert("Create Failed", err.message || "An error occurred during task creation.", "error");
+            }
           }}
-          employees={Array.from(new Set(tasks.map((t) => t.employee_name).filter((n): n is string => !!n)))}
-          projects={uniqueProjects}
-          clients={mockClients}
+          projects={projects}
+          isSaving={isSaving}
         />
       )}
     </DashboardLayout>
@@ -654,15 +987,17 @@ function TaskHubPageContent() {
 
 export default function TaskHubPage() {
   return (
-    <Suspense fallback={
-      <DashboardLayout title="Tasks">
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-gray-500">Loading...</div>
-        </div>
-      </DashboardLayout>
-    }>
-      <TaskHubPageContent />
-    </Suspense>
+    <ProtectedRoute>
+      <Suspense fallback={
+        <DashboardLayout title="Tasks" breadcrumbs={["Home", "Tasks"]}>
+          <div className="flex items-center justify-center min-h-screen">
+            <Loader2 className="h-8 w-8 animate-spin text-sky-500" />
+          </div>
+        </DashboardLayout>
+      }>
+        <TaskHubPageContent />
+      </Suspense>
+    </ProtectedRoute>
   );
 }
 
@@ -670,33 +1005,41 @@ export default function TaskHubPage() {
 function CreateTaskModal({
   onClose,
   onCreate,
-  employees,
   projects,
-  clients,
+  isSaving = false,
 }: {
   onClose: () => void;
-  onCreate: (task: Task) => void;
-  employees: string[];
-  projects: string[];
-  clients: typeof mockClients;
+  onCreate: (taskData: {
+    task_name: string;
+    project_name: string;
+    employee_id?: number;
+    deadline: string;
+    estimated_time_minutes: number;
+    location: string;
+    description: string;
+    status: TaskStatus;
+  }) => Promise<void>;
+  projects: BackendProjectListItem[];
+  isSaving?: boolean;
 }) {
   const [formData, setFormData] = useState({
     task_name: "",
-    employee_name: "",
+    project_id: 0,
     project_name: "",
     project_search: "",
     description: "",
     deadline: new Date().toISOString().split("T")[0],
     location: "",
-    time_taken_minutes: 0,
     estimated_time_minutes: 0,
-    status: "Draft" as TaskStatus,
+    status: "Open" as TaskStatus, // Maps to "Draft" in backend
   });
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
+  const [employees, setEmployees] = useState<any[]>([]); // TODO: Fetch employees
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | undefined>(undefined);
 
   // Filter projects based on search
   const filteredProjects = projects.filter((project) =>
-    project.toLowerCase().includes(formData.project_search.toLowerCase())
+    project.name.toLowerCase().includes(formData.project_search.toLowerCase())
   );
 
   // Close dropdown when clicking outside
@@ -718,31 +1061,26 @@ function CreateTaskModal({
     e.preventDefault();
     
     // Validate project is selected
-    if (!formData.project_name) {
-      alert("Please select a project");
+    if (!formData.project_name || !formData.project_id) {
+      showAlert("Validation Error", "Please select a project", "error");
       return;
     }
-    
-    const newTask: Task = {
-      id: Math.max(...mockTasks.map((t) => t.id), 0) + 1,
-      employee_id: Math.floor(Math.random() * 1000),
-      employee_name: formData.employee_name,
-      project_id: Math.floor(Math.random() * 1000),
-      project_name: formData.project_name,
-      description: formData.description || formData.task_name,
-      date: formData.deadline,
-      location: formData.location,
-      time_taken_minutes: formData.time_taken_minutes,
-      estimated_time_minutes: formData.estimated_time_minutes,
-      status: formData.status,
-      priority: "Medium" as TaskPriority,
-      assigned_by: "Admin",
-      is_new: true,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
 
-    onCreate(newTask);
+    if (!formData.task_name.trim()) {
+      showAlert("Validation Error", "Task name is required", "error");
+      return;
+    }
+
+    await onCreate({
+      task_name: formData.task_name,
+      project_name: formData.project_name,
+      employee_id: selectedEmployeeId,
+      deadline: formData.deadline,
+      estimated_time_minutes: formData.estimated_time_minutes,
+      location: formData.location,
+      description: formData.description,
+      status: formData.status,
+    });
   };
 
   return (
@@ -775,23 +1113,18 @@ function CreateTaskModal({
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            {/* Employee */}
+            {/* Employee - Optional for now */}
             <div>
               <label className="block text-sm font-medium mb-2 text-gray-900 dark:text-white">
-                Assign to Employee <span className="text-red-500">*</span>
+                Assign to Employee (Optional)
               </label>
               <select
-                value={formData.employee_name}
-                onChange={(e) => setFormData({ ...formData, employee_name: e.target.value })}
-                required
+                value={selectedEmployeeId || ""}
+                onChange={(e) => setSelectedEmployeeId(e.target.value ? parseInt(e.target.value) : undefined)}
                 className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2 text-sm text-gray-900 dark:text-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
               >
-                <option value="">Select employee</option>
-                {employees.map((emp) => (
-                  <option key={emp} value={emp}>
-                    {emp}
-                  </option>
-                ))}
+                <option value="">Select employee (optional)</option>
+                {/* TODO: Populate with employees from backend */}
               </select>
             </div>
 
@@ -821,15 +1154,15 @@ function CreateTaskModal({
                   <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                     {filteredProjects.map((project) => (
                       <button
-                        key={project}
+                        key={project.id}
                         type="button"
                         onClick={() => {
-                          setFormData({ ...formData, project_name: project, project_search: project });
+                          setFormData({ ...formData, project_name: project.name, project_id: project.id, project_search: project.name });
                           setShowProjectDropdown(false);
                         }}
                         className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
                       >
-                        {project}
+                        {project.name}
                       </button>
                     ))}
                   </div>
@@ -853,10 +1186,10 @@ function CreateTaskModal({
                 required
                 className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2 text-sm text-gray-900 dark:text-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
               >
-                <option value="Draft">Draft</option>
+                <option value="Open">Draft</option>
                 <option value="In Progress">In Progress</option>
                 <option value="Completed">Completed</option>
-                <option value="Canceled">Canceled</option>
+                <option value="Rejected">Canceled</option>
               </select>
             </div>
 
@@ -907,13 +1240,12 @@ function CreateTaskModal({
           {/* Description */}
           <div>
             <label className="block text-sm font-medium mb-2 text-gray-900 dark:text-white">
-              Task Description <span className="text-red-500">*</span>
+              Task Description
             </label>
             <textarea
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               placeholder="Describe the task in detail..."
-              required
               rows={4}
               className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2 text-sm text-gray-900 dark:text-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
             />
@@ -923,9 +1255,17 @@ function CreateTaskModal({
           <div className="flex gap-3 pt-4">
             <button
               type="submit"
-              className="flex-1 rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600"
+              disabled={isSaving}
+              className="flex-1 rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              Create Task
+              {isSaving ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                "Create Task"
+              )}
             </button>
             <button
               type="button"

@@ -341,6 +341,98 @@ export interface BackendProjectDetail {
   updated_by?: number;
 }
 
+/**
+ * Task Management Interfaces
+ */
+
+export interface TaskStatisticsResponse {
+  total_tasks: number;
+  pending_approval: number;
+  approved_tasks: number;
+  total_timings: number; // in hours
+  total_resource_cost: number;
+}
+
+export interface BackendTaskListItem {
+  id: number;
+  task_name: string;
+  task_date: string;
+  location: string;
+  time_taken_minutes: number;
+  time_taken_hours: number;
+  status: 'Draft' | 'In Progress' | 'Completed' | 'Canceled';
+  employee: number | null;
+  employee_name: string | null;
+  project: number;
+  project_name: string;
+  client_name: string;
+  created_at: string;
+}
+
+export interface BackendTaskListResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: BackendTaskListItem[];
+}
+
+export interface BackendTaskResource {
+  id: number;
+  resource_name: string;
+  quantity: string; // Decimal as string
+  unit_cost: string; // Decimal as string
+  total_cost: string; // Decimal as string
+  created_at: string;
+}
+
+export interface BackendTaskAttachment {
+  id: number;
+  file: string; // File path
+  file_url: string; // Full URL
+  file_name: string;
+  notes?: string;
+  created_at: string;
+  created_by?: number;
+  created_by_username?: string;
+}
+
+export interface BackendTaskActivity {
+  id: number;
+  entity_type: string;
+  entity_id: number;
+  action: string;
+  description: string;
+  created_at: string;
+  created_by?: number;
+  created_by_username?: string;
+}
+
+export interface BackendTaskDetail {
+  id: number;
+  task_name: string;
+  task_description?: string;
+  task_date: string;
+  location: string;
+  time_taken_minutes: number;
+  time_taken_hours: number;
+  status: 'Draft' | 'In Progress' | 'Completed' | 'Canceled';
+  internal_notes?: string;
+  employee: number | null;
+  employee_name: string | null;
+  project: number;
+  project_name: string;
+  client_name: string;
+  attachments: BackendTaskAttachment[];
+  resources: BackendTaskResource[];
+  activity_feed: BackendTaskActivity[];
+  created_at: string;
+  updated_at: string;
+  created_by?: number;
+  created_by_username?: string;
+  updated_by?: number;
+  updated_by_username?: string;
+}
+
 // Document Management Interfaces
 export interface DocumentTemplateVersion {
   id: number;
@@ -1289,6 +1381,217 @@ Please verify:
    */
   async deleteProject(id: number): Promise<void> {
     await this.request(`/api/projects/${id}/`, {
+      method: 'DELETE',
+    });
+  }
+
+  /**
+   * Task Management APIs
+   */
+
+  /**
+   * Get task statistics
+   */
+  async getTaskStatistics(params?: {
+    filter?: 'today' | 'this_week' | 'this_month' | 'all';
+  }): Promise<TaskStatisticsResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.filter) queryParams.append('filter', params.filter);
+
+    const queryString = queryParams.toString();
+    const endpoint = `/api/tasks/statistics/${queryString ? `?${queryString}` : ''}`;
+
+    return this.request<TaskStatisticsResponse>(endpoint, {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * Get all tasks with optional filters
+   */
+  async getTasks(params?: {
+    search?: string;
+    project?: number;
+    status?: 'Draft' | 'In Progress' | 'Completed' | 'Canceled';
+    date_filter?: 'today' | 'this_week' | 'this_month' | 'all';
+    page?: number;
+  }): Promise<BackendTaskListResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.project) queryParams.append('project', params.project.toString());
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.date_filter) queryParams.append('date_filter', params.date_filter);
+    if (params?.page) queryParams.append('page', params.page.toString());
+
+    const queryString = queryParams.toString();
+    const endpoint = `/api/tasks/${queryString ? `?${queryString}` : ''}`;
+
+    return this.request<BackendTaskListResponse>(endpoint, {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * Get a specific task by ID
+   */
+  async getTask(id: number): Promise<BackendTaskDetail> {
+    return this.request<BackendTaskDetail>(`/api/tasks/${id}/`, {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * Create a new task
+   */
+  async createTask(data: {
+    project: number;
+    task_name: string;
+    deadline: string; // Maps to task_date
+    employee?: number;
+    status?: 'Draft' | 'In Progress' | 'Completed' | 'Canceled';
+    estimated_time?: number; // Maps to time_taken_minutes
+    location?: string;
+    task_description?: string;
+  }): Promise<BackendTaskDetail> {
+    return this.request<BackendTaskDetail>('/api/tasks/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  /**
+   * Update a task
+   */
+  async updateTask(id: number, data: Partial<{
+    project: number;
+    task_name: string;
+    deadline: string;
+    employee: number;
+    status: 'Draft' | 'In Progress' | 'Completed' | 'Canceled';
+    estimated_time: number;
+    location: string;
+    task_description: string;
+    internal_notes: string;
+  }>): Promise<BackendTaskDetail> {
+    return this.request<BackendTaskDetail>(`/api/tasks/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  /**
+   * Delete a task
+   */
+  async deleteTask(id: number): Promise<void> {
+    await this.request(`/api/tasks/${id}/`, {
+      method: 'DELETE',
+    });
+  }
+
+  /**
+   * Approve a task
+   */
+  async approveTask(id: number): Promise<BackendTaskDetail> {
+    return this.request<BackendTaskDetail>(`/api/tasks/${id}/approve/`, {
+      method: 'POST',
+    });
+  }
+
+  /**
+   * Reject a task
+   */
+  async rejectTask(id: number, reason?: string): Promise<BackendTaskDetail> {
+    return this.request<BackendTaskDetail>(`/api/tasks/${id}/reject/`, {
+      method: 'POST',
+      body: JSON.stringify({ reason: reason || 'Task rejected' }),
+    });
+  }
+
+  /**
+   * Attach a document to a task
+   */
+  async attachTaskDocument(taskId: number, file: File, notes?: string): Promise<BackendTaskAttachment> {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (notes) formData.append('notes', notes);
+
+    const csrfToken = this.getCsrfToken();
+    const headers: Record<string, string> = {};
+    if (csrfToken) {
+      headers['X-CSRFToken'] = csrfToken;
+    }
+
+    const response = await fetch(`${this.baseURL}/api/tasks/${taskId}/attach-document/`, {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Upload failed' }));
+      throw error;
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Download a task document (returns file URL for direct access)
+   * Note: The backend returns a FileResponse, so we can use file_url directly for preview/download
+   */
+  getTaskDocumentUrl(taskId: number, fileUrl: string): string {
+    // If file_url is already a full URL, return it
+    if (fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) {
+      return fileUrl;
+    }
+    // Otherwise, construct the full URL
+    return `${this.baseURL}${fileUrl}`;
+  }
+
+  /**
+   * Delete a task document
+   */
+  async deleteTaskDocument(taskId: number, documentId: number): Promise<void> {
+    await this.request(`/api/tasks/${taskId}/delete-document/${documentId}/`, {
+      method: 'DELETE',
+    });
+  }
+
+  /**
+   * Attach a resource to a task
+   */
+  async attachTaskResource(taskId: number, data: {
+    resource_name: string;
+    quantity: number;
+    unit_cost: number;
+    total_cost?: number;
+  }): Promise<BackendTaskResource> {
+    return this.request<BackendTaskResource>(`/api/tasks/${taskId}/attach-resource/`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  /**
+   * Update a task resource
+   */
+  async updateTaskResource(taskId: number, resourceId: number, data: {
+    quantity?: number;
+    unit_cost?: number;
+    total_cost?: number;
+  }): Promise<BackendTaskResource> {
+    return this.request<BackendTaskResource>(`/api/tasks/${taskId}/update-resource/${resourceId}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  /**
+   * Delete a task resource
+   */
+  async deleteTaskResource(taskId: number, resourceId: number): Promise<void> {
+    await this.request(`/api/tasks/${taskId}/delete-resource/${resourceId}/`, {
       method: 'DELETE',
     });
   }
