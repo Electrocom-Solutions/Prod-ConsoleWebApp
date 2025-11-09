@@ -1,13 +1,17 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Upload, Download, CheckCircle, X, Calendar } from "lucide-react";
-import { showDeleteConfirm, showSuccess, showError } from "@/lib/sweetalert";
+import { Search, Upload, Download, CheckCircle, X, Calendar, Loader2, Inbox, Trash2 } from "lucide-react";
+import { showDeleteConfirm, showSuccess, showError, showAlert } from "@/lib/sweetalert";
 import { format } from "date-fns";
 import * as XLSX from "xlsx";
+import { apiClient, PaymentTrackerStatisticsResponse, BackendPaymentTrackerListItem, PaymentTrackerListResponse, PaymentTrackerUploadResponse } from "@/lib/api";
+import { useDebounce } from "use-debounce";
+import { ProtectedRoute } from "@/components/auth/protected-route";
 
 interface ContractWorkerPayment {
   id: number;
@@ -25,67 +29,59 @@ interface ContractWorkerPayment {
   paymentMode?: string;
 }
 
-const mockPayments: ContractWorkerPayment[] = [
-  {
-    id: 1,
-    month: "October",
-    year: 2025,
-    placeOfWork: "BSNL Site A",
-    workerName: "Ramesh Kumar",
-    mobileNumber: "9876543210",
-    netSalaryPayable: 25000,
-    bankName: "State Bank of India",
-    bankAccountNumber: "12345678901234",
-    ifscCode: "SBIN0001234",
-    paymentStatus: "Paid",
-    paymentCompletionDate: "2025-11-01T00:00:00Z",
-    paymentMode: "Bank Transfer",
-  },
-  {
-    id: 2,
-    month: "November",
-    year: 2025,
-    placeOfWork: "Metro Station Project",
-    workerName: "Sunil Verma",
-    mobileNumber: "9876543211",
-    netSalaryPayable: 28000,
-    bankName: "HDFC Bank",
-    bankAccountNumber: "98765432109876",
-    ifscCode: "HDFC0001234",
-    paymentStatus: "Pending",
-  },
-  {
-    id: 3,
-    month: "November",
-    year: 2025,
-    placeOfWork: "Tower Installation Site",
-    workerName: "Rajesh Singh",
-    mobileNumber: "9876543212",
-    netSalaryPayable: 26500,
-    bankName: "ICICI Bank",
-    bankAccountNumber: "11223344556677",
-    ifscCode: "ICIC0001234",
-    paymentStatus: "Pending",
-  },
-];
+/**
+ * Map backend payment tracker list item to frontend ContractWorkerPayment type
+ */
+function mapBackendPaymentTrackerToFrontend(backendPayment: BackendPaymentTrackerListItem): ContractWorkerPayment {
+  const sheetPeriod = new Date(backendPayment.sheet_period);
+  const monthIndex = sheetPeriod.getMonth();
+  const months = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+
+  return {
+    id: backendPayment.id,
+    month: months[monthIndex],
+    year: sheetPeriod.getFullYear(),
+    placeOfWork: backendPayment.place_of_work || '',
+    workerName: backendPayment.worker_name || '',
+    mobileNumber: backendPayment.mobile_number || '',
+    netSalaryPayable: parseFloat(backendPayment.net_salary) || 0,
+    bankName: backendPayment.bank_name || '',
+    bankAccountNumber: backendPayment.account_number || '',
+    ifscCode: backendPayment.ifsc_code || '',
+    paymentStatus: backendPayment.payment_status === 'Paid' ? 'Paid' : 'Pending',
+    paymentCompletionDate: backendPayment.payment_date || undefined,
+    paymentMode: backendPayment.payment_mode || undefined,
+  };
+}
 
 const months = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December"
 ];
 
-export default function PaymentsPage() {
+function PaymentsPageContent() {
+  const searchParams = useSearchParams();
   const currentDate = new Date();
-  const currentMonth = months[currentDate.getMonth()];
+  const currentMonthNum = currentDate.getMonth() + 1;
   const currentYear = currentDate.getFullYear();
 
-  const [payments, setPayments] = useState<ContractWorkerPayment[]>(mockPayments);
+  const [payments, setPayments] = useState<ContractWorkerPayment[]>([]);
+  const [statistics, setStatistics] = useState<PaymentTrackerStatisticsResponse | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedMonth, setSelectedMonth] = useState<string>(currentMonth);
+  const [debouncedSearch] = useDebounce(searchTerm, 500);
+  const [selectedMonth, setSelectedMonth] = useState<number>(currentMonthNum);
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showMarkPaidModal, setShowMarkPaidModal] = useState(false);
   const [selectedPayments, setSelectedPayments] = useState<Set<number>>(new Set());
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   const years = useMemo(() => {
     const startYear = 2020;
@@ -93,30 +89,82 @@ export default function PaymentsPage() {
     return Array.from({ length: endYear - startYear + 1 }, (_, i) => startYear + i);
   }, [currentYear]);
 
-  const filteredPayments = useMemo(() => {
-    return payments.filter((payment) => {
-      const matchesSearch =
-        payment.workerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        payment.placeOfWork.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        payment.mobileNumber.includes(searchTerm);
-      const matchesMonth = payment.month === selectedMonth;
-      const matchesYear = payment.year === selectedYear;
-      return matchesSearch && matchesMonth && matchesYear;
-    });
-  }, [payments, searchTerm, selectedMonth, selectedYear]);
+  /**
+   * Fetch statistics from backend
+   */
+  const fetchStatistics = useCallback(async () => {
+    try {
+      const stats = await apiClient.getPaymentTrackerStatistics({
+        month: selectedMonth,
+        year: selectedYear,
+      });
+      setStatistics(stats);
+    } catch (err: any) {
+      console.error('Error fetching payment tracker statistics:', err);
+      setError(err.message || 'Failed to fetch statistics');
+    }
+  }, [selectedMonth, selectedYear]);
+
+  /**
+   * Fetch payment records from backend
+   */
+  const fetchPayments = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const params: any = {
+        month: selectedMonth,
+        year: selectedYear,
+        page: currentPage,
+      };
+      
+      if (debouncedSearch) {
+        params.search = debouncedSearch;
+      }
+
+      const response: PaymentTrackerListResponse = await apiClient.getPaymentTrackerRecords(params);
+      const mappedPayments = response.results.map(mapBackendPaymentTrackerToFrontend);
+      setPayments(mappedPayments);
+      setTotalPages(Math.ceil(response.count / 20));
+    } catch (err: any) {
+      console.error('Error fetching payment records:', err);
+      setError(err.message || 'Failed to fetch payment records');
+      setPayments([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [selectedMonth, selectedYear, debouncedSearch, currentPage]);
+
+  // Fetch statistics and payments on mount and when filters change
+  useEffect(() => {
+    fetchStatistics();
+  }, [fetchStatistics]);
+
+  useEffect(() => {
+    fetchPayments();
+  }, [fetchPayments]);
 
   const stats = useMemo(() => {
+    if (!statistics) {
+      return {
+        total: 0,
+        pending: 0,
+        paid: 0,
+        pendingCount: 0,
+      };
+    }
+    
     return {
-      total: filteredPayments.reduce((sum, p) => sum + p.netSalaryPayable, 0),
-      pending: filteredPayments.filter((p) => p.paymentStatus === "Pending").reduce((sum, p) => sum + p.netSalaryPayable, 0),
-      paid: filteredPayments.filter((p) => p.paymentStatus === "Paid").reduce((sum, p) => sum + p.netSalaryPayable, 0),
-      pendingCount: filteredPayments.filter((p) => p.paymentStatus === "Pending").length,
+      total: statistics.total_payable,
+      pending: statistics.pending_payment_amount,
+      paid: statistics.total_paid,
+      pendingCount: statistics.pending_payment_count,
     };
-  }, [filteredPayments]);
+  }, [statistics]);
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
-      setSelectedPayments(new Set(filteredPayments.map(p => p.id)));
+      setSelectedPayments(new Set(payments.map(p => p.id)));
     } else {
       setSelectedPayments(new Set());
     }
@@ -132,9 +180,32 @@ export default function PaymentsPage() {
     setSelectedPayments(newSelected);
   };
 
+  const handleDelete = async (payment: ContractWorkerPayment) => {
+    const confirmed = await showDeleteConfirm(
+      "Delete Payment",
+      `Are you sure you want to delete payment for ${payment.workerName}?`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await apiClient.deletePaymentTracker(payment.id);
+      await showSuccess("Payment deleted successfully");
+      fetchPayments();
+      fetchStatistics();
+    } catch (err: any) {
+      await showAlert("Error", err.message || "Failed to delete payment");
+    }
+  };
+
   const handleExportSelected = () => {
     if (selectedPayments.size === 0) {
       showError("No Selection", "Please select at least one payment to export");
+      return;
+    }
+
+    if (payments.length === 0) {
+      showError("No Data", "No payment records to export");
       return;
     }
 
@@ -155,7 +226,7 @@ export default function PaymentsPage() {
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Payments");
-    XLSX.writeFile(wb, `Contract_Worker_Payments_${selectedMonth}_${selectedYear}.xlsx`);
+    XLSX.writeFile(wb, `Contract_Worker_Payments_${months[selectedMonth - 1]}_${selectedYear}.xlsx`);
     showSuccess("Exported Successfully", `${selectedPayments.size} payment records exported`);
   };
 
@@ -165,6 +236,30 @@ export default function PaymentsPage() {
       return;
     }
     setShowMarkPaidModal(true);
+  };
+
+  const handleBulkMarkPaidSubmit = async (paymentDate: string, paymentMode: string) => {
+    if (selectedPayments.size === 0) return;
+
+    setIsSaving(true);
+    try {
+      await apiClient.bulkMarkPaymentTrackerPaid({
+        payment_ids: Array.from(selectedPayments),
+        payment_date: paymentDate,
+        payment_mode: paymentMode as 'Cash' | 'Bank Transfer' | 'Cheque' | 'UPI',
+      });
+
+      const count = selectedPayments.size;
+      setSelectedPayments(new Set());
+      setShowMarkPaidModal(false);
+      await showSuccess("Payments Updated", `Successfully marked ${count} payment record(s) as paid!`);
+      fetchPayments();
+      fetchStatistics();
+    } catch (err: any) {
+      await showAlert("Error", err.message || "Failed to mark payments as paid");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -192,6 +287,12 @@ export default function PaymentsPage() {
           </div>
         </div>
 
+        {error && (
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+            <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+          </div>
+        )}
+
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -199,22 +300,31 @@ export default function PaymentsPage() {
               type="text"
               placeholder="Search by worker name, place of work, mobile..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
               className="pl-10"
             />
           </div>
           <select
             value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
+            onChange={(e) => {
+              setSelectedMonth(Number(e.target.value));
+              setCurrentPage(1);
+            }}
             className="rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
           >
-            {months.map(month => (
-              <option key={month} value={month}>{month}</option>
+            {months.map((month, index) => (
+              <option key={month} value={index + 1}>{month}</option>
             ))}
           </select>
           <select
             value={selectedYear}
-            onChange={(e) => setSelectedYear(Number(e.target.value))}
+            onChange={(e) => {
+              setSelectedYear(Number(e.target.value));
+              setCurrentPage(1);
+            }}
             className="rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
           >
             {years.map(year => (
@@ -254,7 +364,7 @@ export default function PaymentsPage() {
                 <th className="px-4 py-3 text-left">
                   <input
                     type="checkbox"
-                    checked={filteredPayments.length > 0 && selectedPayments.size === filteredPayments.length}
+                    checked={payments.length > 0 && selectedPayments.size === payments.length}
                     onChange={handleSelectAll}
                     className="rounded border-gray-300"
                   />
@@ -267,52 +377,104 @@ export default function PaymentsPage() {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Payment Date</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Payment Mode</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
-              {filteredPayments.map((payment) => (
-                <tr key={payment.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                  <td className="px-4 py-3">
-                    <input
-                      type="checkbox"
-                      checked={selectedPayments.has(payment.id)}
-                      onChange={() => handleSelectPayment(payment.id)}
-                      className="rounded border-gray-300"
-                    />
-                  </td>
-                  <td className="px-4 py-3 text-sm">{payment.placeOfWork}</td>
-                  <td className="px-4 py-3 text-sm font-medium">{payment.workerName}</td>
-                  <td className="px-4 py-3 text-sm">{payment.mobileNumber}</td>
-                  <td className="px-4 py-3 text-sm font-semibold">₹{payment.netSalaryPayable.toLocaleString("en-IN")}</td>
-                  <td className="px-4 py-3 text-sm">
-                    <div className="text-xs">
-                      <p className="font-medium">{payment.bankName}</p>
-                      <p className="text-gray-500">{payment.bankAccountNumber}</p>
-                      <p className="text-gray-500">{payment.ifscCode}</p>
+              {isLoading ? (
+                <tr>
+                  <td colSpan={10} className="px-4 py-8 text-center">
+                    <div className="flex items-center justify-center">
+                      <Loader2 className="h-6 w-6 animate-spin text-sky-600" />
+                      <span className="ml-2 text-gray-500 dark:text-gray-400">Loading payment records...</span>
                     </div>
                   </td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full ${
-                      payment.paymentStatus === "Paid"
-                        ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                        : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
-                    }`}>
-                      {payment.paymentStatus}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-sm">
-                    {payment.paymentCompletionDate
-                      ? format(new Date(payment.paymentCompletionDate), "dd/MM/yyyy")
-                      : "-"}
-                  </td>
-                  <td className="px-4 py-3 text-sm">{payment.paymentMode || "-"}</td>
                 </tr>
-              ))}
+              ) : payments.length === 0 ? (
+                <tr>
+                  <td colSpan={10} className="px-4 py-8 text-center">
+                    <div className="flex flex-col items-center justify-center">
+                      <Inbox className="h-12 w-12 text-gray-400 mb-4" />
+                      <p className="text-gray-500 dark:text-gray-400">No payment records found</p>
+                      <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">Try adjusting your filters or upload a payment sheet</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                payments.map((payment) => (
+                  <tr key={payment.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                    <td className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedPayments.has(payment.id)}
+                        onChange={() => handleSelectPayment(payment.id)}
+                        className="rounded border-gray-300"
+                      />
+                    </td>
+                    <td className="px-4 py-3 text-sm">{payment.placeOfWork}</td>
+                    <td className="px-4 py-3 text-sm font-medium">{payment.workerName}</td>
+                    <td className="px-4 py-3 text-sm">{payment.mobileNumber}</td>
+                    <td className="px-4 py-3 text-sm font-semibold">₹{payment.netSalaryPayable.toLocaleString("en-IN")}</td>
+                    <td className="px-4 py-3 text-sm">
+                      <div className="text-xs">
+                        <p className="font-medium">{payment.bankName || "-"}</p>
+                        <p className="text-gray-500">{payment.bankAccountNumber || "-"}</p>
+                        <p className="text-gray-500">{payment.ifscCode || "-"}</p>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full ${
+                        payment.paymentStatus === "Paid"
+                          ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                          : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+                      }`}>
+                        {payment.paymentStatus}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      {payment.paymentCompletionDate
+                        ? format(new Date(payment.paymentCompletionDate), "dd/MM/yyyy")
+                        : "-"}
+                    </td>
+                    <td className="px-4 py-3 text-sm">{payment.paymentMode || "-"}</td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => handleDelete(payment)}
+                        className="rounded p-1 text-red-600 hover:bg-red-50 hover:text-red-900 dark:text-red-400 dark:hover:bg-red-900/30"
+                        title="Delete"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
-          {filteredPayments.length === 0 && (
-            <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-              No payment records found for {selectedMonth} {selectedYear}
+          
+          {payments.length > 0 && totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-gray-700">
+              <div className="text-sm text-gray-500 dark:text-gray-400">
+                Page {currentPage} of {totalPages}
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1 || isLoading}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages || isLoading}
+                >
+                  Next
+                </Button>
+              </div>
             </div>
           )}
         </div>
@@ -320,11 +482,34 @@ export default function PaymentsPage() {
 
       {showUploadModal && (
         <UploadSheetModal
+          isSaving={isSaving}
           onClose={() => setShowUploadModal(false)}
-          onUpload={(data, month, year) => {
-            setPayments((prev) => [...data, ...prev]);
-            setShowUploadModal(false);
-            showSuccess("Upload Successful", `${data.length} payment records added for ${month} ${year}`);
+          onUpload={async (month, year, file) => {
+            setIsSaving(true);
+            try {
+              const response: PaymentTrackerUploadResponse = await apiClient.uploadPaymentTrackerSheet({
+                month: month,
+                year: year,
+                excel_file: file,
+              });
+              
+              let message = `Successfully uploaded ${response.records_created} payment record(s)`;
+              if (response.records_replaced > 0) {
+                message += ` (replaced ${response.records_replaced} existing record(s))`;
+              }
+              if (response.errors && response.errors.length > 0) {
+                message += `. ${response.errors.length} error(s) encountered.`;
+              }
+              
+              await showSuccess("Upload Successful", message);
+              setShowUploadModal(false);
+              fetchPayments();
+              fetchStatistics();
+            } catch (err: any) {
+              await showAlert("Upload Failed", err.message || "Failed to upload payment sheet");
+            } finally {
+              setIsSaving(false);
+            }
           }}
         />
       )}
@@ -332,47 +517,44 @@ export default function PaymentsPage() {
       {showMarkPaidModal && (
         <MarkAsPaidModal
           selectedCount={selectedPayments.size}
+          isSaving={isSaving}
           onClose={() => setShowMarkPaidModal(false)}
-          onSave={(date, mode) => {
-            setPayments((prev) =>
-              prev.map((p) =>
-                selectedPayments.has(p.id)
-                  ? {
-                      ...p,
-                      paymentStatus: "Paid" as const,
-                      paymentCompletionDate: date,
-                      paymentMode: mode,
-                    }
-                  : p
-              )
-            );
-            setShowMarkPaidModal(false);
-            setSelectedPayments(new Set());
-            showSuccess("Payments Updated", `${selectedPayments.size} payments marked as paid`);
-          }}
+          onSave={handleBulkMarkPaidSubmit}
         />
       )}
     </DashboardLayout>
   );
 }
 
+export default function PaymentsPage() {
+  return (
+    <ProtectedRoute>
+      <Suspense fallback={<DashboardLayout title="Payment Tracking"><div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-sky-600" /></div></DashboardLayout>}>
+        <PaymentsPageContent />
+      </Suspense>
+    </ProtectedRoute>
+  );
+}
+
 function UploadSheetModal({
+  isSaving,
   onClose,
   onUpload,
 }: {
+  isSaving: boolean;
   onClose: () => void;
-  onUpload: (data: ContractWorkerPayment[], month: string, year: number) => void;
+  onUpload: (month: number, year: number, file: File) => Promise<void>;
 }) {
   const currentDate = new Date();
   const months = [
     "January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December"
   ];
-  const currentMonth = months[currentDate.getMonth()];
+  const currentMonthNum = currentDate.getMonth() + 1;
   const currentYear = currentDate.getFullYear();
 
-  const [selectedMonth, setSelectedMonth] = useState(currentMonth);
-  const [selectedYear, setSelectedYear] = useState(currentYear);
+  const [selectedMonth, setSelectedMonth] = useState<number>(currentMonthNum);
+  const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [file, setFile] = useState<File | null>(null);
 
   const years = Array.from({ length: 10 }, (_, i) => currentYear - 5 + i);
@@ -385,34 +567,11 @@ function UploadSheetModal({
 
   const handleUpload = async () => {
     if (!file) {
-      showError("No File Selected", "Please select an Excel file to upload");
+      await showError("No File Selected", "Please select an Excel file to upload");
       return;
     }
 
-    try {
-      const data = await file.arrayBuffer();
-      const workbook = XLSX.read(data);
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
-
-      const payments: ContractWorkerPayment[] = jsonData.map((row, index) => ({
-        id: Date.now() + index,
-        month: selectedMonth,
-        year: selectedYear,
-        placeOfWork: row["Place of work"] || row["Place of Work"] || "",
-        workerName: row["Worker Name"] || "",
-        mobileNumber: String(row["Mobile Number"] || ""),
-        netSalaryPayable: Number(row["Net Salary Payable"] || 0),
-        bankName: row["Bank Name"] || "",
-        bankAccountNumber: String(row["Bank Account Number"] || ""),
-        ifscCode: row["IFSC Code"] || "",
-        paymentStatus: "Pending",
-      }));
-
-      onUpload(payments, selectedMonth, selectedYear);
-    } catch (error) {
-      showError("Upload Failed", "Failed to parse Excel file. Please check the format.");
-    }
+    await onUpload(selectedMonth, selectedYear, file);
   };
 
   return (
@@ -432,11 +591,12 @@ function UploadSheetModal({
             </label>
             <select
               value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+              onChange={(e) => setSelectedMonth(Number(e.target.value))}
+              disabled={isSaving}
+              className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {months.map(month => (
-                <option key={month} value={month}>{month}</option>
+              {months.map((month, index) => (
+                <option key={month} value={index + 1}>{month}</option>
               ))}
             </select>
           </div>
@@ -448,7 +608,8 @@ function UploadSheetModal({
             <select
               value={selectedYear}
               onChange={(e) => setSelectedYear(Number(e.target.value))}
-              className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+              disabled={isSaving}
+              className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {years.map(year => (
                 <option key={year} value={year}>{year}</option>
@@ -464,20 +625,30 @@ function UploadSheetModal({
               type="file"
               accept=".xlsx,.xls"
               onChange={handleFileChange}
-              className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100 dark:file:bg-sky-900/30 dark:file:text-sky-400"
+              disabled={isSaving}
+              className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100 dark:file:bg-sky-900/30 dark:file:text-sky-400 disabled:opacity-50 disabled:cursor-not-allowed"
             />
             <p className="text-xs text-gray-500 mt-2">
-              Excel file should contain: Place of work, Worker Name, Mobile Number, Net Salary Payable, Bank Name, Bank Account Number, IFSC Code
+              Excel file should contain columns: Sr. No., Worker Name, Place Of Work, Mobile Number, Net Salary, Bank Name, Account Number, IFSC Code
             </p>
           </div>
 
           <div className="flex justify-end gap-3 pt-4">
-            <Button variant="outline" onClick={onClose}>
+            <Button variant="outline" onClick={onClose} disabled={isSaving}>
               Cancel
             </Button>
-            <Button onClick={handleUpload}>
-              <Upload className="h-4 w-4 mr-2" />
-              Upload
+            <Button onClick={handleUpload} disabled={isSaving}>
+              {isSaving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload
+                </>
+              )}
             </Button>
           </div>
         </div>
@@ -488,12 +659,14 @@ function UploadSheetModal({
 
 function MarkAsPaidModal({
   selectedCount,
+  isSaving,
   onClose,
   onSave,
 }: {
   selectedCount: number;
+  isSaving: boolean;
   onClose: () => void;
-  onSave: (date: string, mode: string) => void;
+  onSave: (date: string, mode: string) => Promise<void>;
 }) {
   const [paymentDate, setPaymentDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [paymentMode, setPaymentMode] = useState("Bank Transfer");
@@ -502,9 +675,9 @@ function MarkAsPaidModal({
     setPaymentDate(format(new Date(), "yyyy-MM-dd"));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(new Date(paymentDate).toISOString(), paymentMode);
+    await onSave(paymentDate, paymentMode);
   };
 
   return (
@@ -532,9 +705,10 @@ function MarkAsPaidModal({
                 value={paymentDate}
                 onChange={(e) => setPaymentDate(e.target.value)}
                 required
+                disabled={isSaving}
                 className="flex-1"
               />
-              <Button type="button" variant="outline" onClick={handleTodayDate}>
+              <Button type="button" variant="outline" onClick={handleTodayDate} disabled={isSaving}>
                 <Calendar className="h-4 w-4 mr-2" />
                 Today
               </Button>
@@ -548,24 +722,33 @@ function MarkAsPaidModal({
             <select
               value={paymentMode}
               onChange={(e) => setPaymentMode(e.target.value)}
-              className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+              disabled={isSaving}
+              className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               required
             >
               <option value="Cash">Cash</option>
               <option value="Cheque">Cheque</option>
               <option value="Bank Transfer">Bank Transfer</option>
               <option value="UPI">UPI</option>
-              <option value="NEFT/RTGS">NEFT/RTGS</option>
             </select>
           </div>
 
           <div className="flex justify-end gap-3 pt-4">
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>
               Cancel
             </Button>
-            <Button type="submit">
-              <CheckCircle className="h-4 w-4 mr-2" />
-              Mark as Paid
+            <Button type="submit" disabled={isSaving}>
+              {isSaving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Marking...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Mark as Paid
+                </>
+              )}
             </Button>
           </div>
         </form>

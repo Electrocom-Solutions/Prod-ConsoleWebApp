@@ -830,6 +830,91 @@ export interface BulkMarkPayrollPaidResponse {
   errors: string[] | null;
 }
 
+/**
+ * Payment Tracker (Contract Worker Payment Tracking) Interfaces
+ */
+
+export interface PaymentTrackerStatisticsResponse {
+  total_payable: number;
+  pending_payment_count: number;
+  pending_payment_amount: number;
+  total_paid: number;
+}
+
+export interface BackendPaymentTrackerListItem {
+  id: number;
+  worker_name: string;
+  mobile_number: string;
+  place_of_work: string;
+  net_salary: string;
+  bank_name: string | null;
+  account_number: string | null;
+  ifsc_code: string | null;
+  payment_status: 'Paid' | 'Pending';
+  payment_date: string | null;
+  payment_mode: 'Cash' | 'Bank Transfer' | 'Cheque' | 'UPI' | null;
+  sheet_period: string; // YYYY-MM-DD (first day of month)
+  created_at: string;
+}
+
+export interface PaymentTrackerListResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: BackendPaymentTrackerListItem[];
+}
+
+export interface PaymentTrackerDetail {
+  id: number;
+  worker_name: string;
+  mobile_number: string;
+  place_of_work: string;
+  net_salary: string;
+  bank_name: string | null;
+  account_number: string | null;
+  ifsc_code: string | null;
+  payment_status: 'Paid' | 'Pending';
+  payment_date: string | null;
+  payment_mode: 'Cash' | 'Bank Transfer' | 'Cheque' | 'UPI' | null;
+  sheet_period: string;
+  sheet_attachment: string | null;
+  sheet_attachment_url: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: number | null;
+  updated_by: number | null;
+}
+
+export interface PaymentTrackerUploadRequest {
+  month: number; // 1-12
+  year: number; // YYYY
+  excel_file: File;
+}
+
+export interface PaymentTrackerUploadResponse {
+  message: string;
+  records_created: number;
+  records_replaced: number;
+  errors: string[] | null;
+}
+
+export interface PaymentTrackerMarkPaidRequest {
+  payment_date: string; // YYYY-MM-DD
+  payment_mode: 'Cash' | 'Bank Transfer' | 'Cheque' | 'UPI';
+}
+
+export interface BulkMarkPaymentTrackerPaidRequest {
+  payment_ids: number[];
+  payment_date: string; // YYYY-MM-DD
+  payment_mode: 'Cash' | 'Bank Transfer' | 'Cheque' | 'UPI';
+}
+
+export interface BulkMarkPaymentTrackerPaidResponse {
+  updated_count: number;
+  skipped_count: number;
+  errors: string[] | null;
+}
+
 class ApiClient {
   private baseURL: string;
 
@@ -2731,6 +2816,120 @@ Please verify:
       headers: {
         'Content-Type': 'application/json',
       },
+    });
+  }
+
+  /**
+   * Payment Tracker (Contract Worker Payment Tracking) API Methods
+   */
+
+  /**
+   * Get payment tracker statistics
+   */
+  async getPaymentTrackerStatistics(params?: {
+    month?: number;
+    year?: number;
+  }): Promise<PaymentTrackerStatisticsResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.month) queryParams.append('month', params.month.toString());
+    if (params?.year) queryParams.append('year', params.year.toString());
+
+    const queryString = queryParams.toString();
+    const endpoint = `/api/payment-tracker/statistics/${queryString ? `?${queryString}` : ''}`;
+    return this.request<PaymentTrackerStatisticsResponse>(endpoint);
+  }
+
+  /**
+   * Get payment tracker records with filters
+   */
+  async getPaymentTrackerRecords(params?: {
+    search?: string;
+    month?: number;
+    year?: number;
+    page?: number;
+  }): Promise<PaymentTrackerListResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.month) queryParams.append('month', params.month.toString());
+    if (params?.year) queryParams.append('year', params.year.toString());
+    if (params?.page) queryParams.append('page', params.page.toString());
+
+    const queryString = queryParams.toString();
+    const endpoint = `/api/payment-tracker/${queryString ? `?${queryString}` : ''}`;
+    return this.request<PaymentTrackerListResponse>(endpoint);
+  }
+
+  /**
+   * Get payment tracker record details
+   */
+  async getPaymentTrackerRecord(id: number): Promise<PaymentTrackerDetail> {
+    return this.request<PaymentTrackerDetail>(`/api/payment-tracker/${id}/`);
+  }
+
+  /**
+   * Upload Excel sheet with payment data
+   */
+  async uploadPaymentTrackerSheet(data: PaymentTrackerUploadRequest): Promise<PaymentTrackerUploadResponse> {
+    await this.ensureCsrfToken();
+
+    const formData = new FormData();
+    formData.append('month', data.month.toString());
+    formData.append('year', data.year.toString());
+    formData.append('excel_file', data.excel_file);
+
+    const csrfToken = this.getCsrfToken();
+    const headers: Record<string, string> = {};
+    if (csrfToken) {
+      headers['X-CSRFToken'] = csrfToken;
+    }
+
+    const response = await fetch(`${this.baseURL}/api/payment-tracker/upload/`, {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Upload failed' }));
+      throw error;
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Mark payment tracker record as paid
+   */
+  async markPaymentTrackerPaid(id: number, data: PaymentTrackerMarkPaidRequest): Promise<PaymentTrackerDetail> {
+    return this.request<PaymentTrackerDetail>(`/api/payment-tracker/${id}/mark-paid/`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+  }
+
+  /**
+   * Bulk mark payment tracker records as paid
+   */
+  async bulkMarkPaymentTrackerPaid(data: BulkMarkPaymentTrackerPaidRequest): Promise<BulkMarkPaymentTrackerPaidResponse> {
+    return this.request<BulkMarkPaymentTrackerPaidResponse>('/api/payment-tracker/bulk-mark-paid/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+  }
+
+  /**
+   * Delete payment tracker record
+   */
+  async deletePaymentTracker(id: number): Promise<void> {
+    await this.request(`/api/payment-tracker/${id}/`, {
+      method: 'DELETE',
     });
   }
 }
