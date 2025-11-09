@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   IndianRupee,
   Users,
@@ -14,32 +15,120 @@ import {
   Plus,
   Edit,
   X,
+  Loader2,
+  Inbox,
+  Trash2,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
-import { mockPayrollRecords } from "@/lib/mock-data/payroll";
 import { PayrollRecord, PaymentStatus, PaymentMode } from "@/types";
 import { format } from "date-fns";
 import { PayslipModal } from "@/components/payroll/payslip-modal";
 import { MarkPaidModal } from "@/components/payroll/mark-paid-modal";
-import { showSuccess, showError } from "@/lib/sweetalert";
+import { showSuccess, showError, showDeleteConfirm, showAlert } from "@/lib/sweetalert";
+import { apiClient, PayrollStatisticsResponse, BackendPayrollListItem, PayrollDetail, PayrollCreateData, BackendEmployeeListItem, EmployeeListResponse } from "@/lib/api";
+import { useDebounce } from "use-debounce";
+import { ProtectedRoute } from "@/components/auth/protected-route";
+
+/**
+ * Map backend payroll list item to frontend PayrollRecord type
+ */
+function mapBackendPayrollListItemToFrontend(backendPayroll: BackendPayrollListItem): PayrollRecord {
+  const netAmount = parseFloat(backendPayroll.net_amount) || 0;
+  
+  return {
+    id: backendPayroll.id,
+    employee_id: backendPayroll.employee,
+    employee_name: backendPayroll.employee_name || '',
+    employee_type: "Employee",
+    period_start: backendPayroll.period_from,
+    period_end: backendPayroll.period_to,
+    working_days: backendPayroll.working_days,
+    days_present: backendPayroll.days_present,
+    days_absent: backendPayroll.working_days - backendPayroll.days_present,
+    base_salary: netAmount,
+    gross_amount: netAmount,
+    deductions: 0,
+    net_amount: netAmount,
+    payment_status: backendPayroll.payroll_status === 'Paid' ? 'Paid' : 'Pending' as PaymentStatus,
+    payment_date: backendPayroll.payment_date || undefined,
+    payment_mode: backendPayroll.payment_mode || undefined,
+    bank_transaction_ref: undefined,
+    created_at: backendPayroll.created_at,
+    updated_at: backendPayroll.created_at,
+    computation_details: {
+      base_salary: netAmount,
+      working_days: backendPayroll.working_days,
+      days_present: backendPayroll.days_present,
+      per_day_rate: netAmount / backendPayroll.working_days,
+      earned_salary: netAmount,
+      gross_amount: netAmount,
+      deductions: [],
+      total_deductions: 0,
+      net_amount: netAmount,
+    },
+  };
+}
+
+/**
+ * Map backend payroll detail to frontend PayrollRecord type
+ */
+function mapBackendPayrollDetailToFrontend(backendPayroll: PayrollDetail): PayrollRecord {
+  const netAmount = parseFloat(backendPayroll.net_amount) || 0;
+  
+  return {
+    id: backendPayroll.id,
+    employee_id: backendPayroll.employee,
+    employee_name: backendPayroll.employee_name || '',
+    employee_type: "Employee",
+    period_start: backendPayroll.period_from,
+    period_end: backendPayroll.period_to,
+    working_days: backendPayroll.working_days,
+    days_present: backendPayroll.days_present,
+    days_absent: backendPayroll.working_days - backendPayroll.days_present,
+    base_salary: netAmount,
+    gross_amount: netAmount,
+    deductions: 0,
+    net_amount: netAmount,
+    payment_status: backendPayroll.payroll_status === 'Paid' ? 'Paid' : 'Pending' as PaymentStatus,
+    payment_date: backendPayroll.payment_date || undefined,
+    payment_mode: backendPayroll.payment_mode || undefined,
+    bank_transaction_ref: backendPayroll.bank_transaction_reference_number || undefined,
+    notes: backendPayroll.notes || undefined,
+    created_at: backendPayroll.created_at,
+    updated_at: backendPayroll.updated_at,
+    computation_details: {
+      base_salary: netAmount,
+      working_days: backendPayroll.working_days,
+      days_present: backendPayroll.days_present,
+      per_day_rate: netAmount / backendPayroll.working_days,
+      earned_salary: netAmount,
+      gross_amount: netAmount,
+      deductions: [],
+      total_deductions: 0,
+      net_amount: netAmount,
+    },
+  };
+}
 
 const months = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December"
 ];
 
-export default function PayrollPage() {
+function PayrollPageContent() {
+  const searchParams = useSearchParams();
   const currentDate = new Date();
-  const currentMonth = months[currentDate.getMonth()];
+  const currentMonthNum = currentDate.getMonth() + 1;
   const currentYear = currentDate.getFullYear();
 
-  const [payrollRecords, setPayrollRecords] = useState<PayrollRecord[]>(
-    mockPayrollRecords.filter(r => r.employee_type === "Employee")
-  );
-  const [selectedMonth, setSelectedMonth] = useState(currentMonth);
+  const [payrollRecords, setPayrollRecords] = useState<PayrollRecord[]>([]);
+  const [statistics, setStatistics] = useState<PayrollStatisticsResponse | null>(null);
+  const [employees, setEmployees] = useState<BackendEmployeeListItem[]>([]);
+  const [selectedMonth, setSelectedMonth] = useState(currentMonthNum);
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [statusFilter, setStatusFilter] = useState<PaymentStatus | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch] = useDebounce(searchQuery, 500);
   const [selectedRecords, setSelectedRecords] = useState<number[]>([]);
   const [selectedPayroll, setSelectedPayroll] = useState<PayrollRecord | null>(null);
   const [showPayslipModal, setShowPayslipModal] = useState(false);
@@ -48,15 +137,11 @@ export default function PayrollPage() {
   const [showCreatePayrollModal, setShowCreatePayrollModal] = useState(false);
   const [showEditPayrollSlideOver, setShowEditPayrollSlideOver] = useState(false);
   const [editingPayroll, setEditingPayroll] = useState<PayrollRecord | null>(null);
-
-  // Mock employees list for payroll creation
-  const mockEmployees = [
-    { id: 101, name: "Rajesh Kumar" },
-    { id: 102, name: "Priya Sharma" },
-    { id: 103, name: "Amit Patel" },
-    { id: 104, name: "Anita Desai" },
-    { id: 105, name: "Deepak Verma" },
-  ];
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   const years = useMemo(() => {
     const startYear = 2020;
@@ -64,35 +149,115 @@ export default function PayrollPage() {
     return Array.from({ length: endYear - startYear + 1 }, (_, i) => startYear + i);
   }, [currentYear]);
 
-  const filteredRecords = useMemo(() => {
-    return payrollRecords.filter((record) => {
-      const recordDate = new Date(record.period_start);
-      const recordMonth = months[recordDate.getMonth()];
-      const recordYear = recordDate.getFullYear();
-      
-      const matchesMonth = recordMonth === selectedMonth;
-      const matchesYear = recordYear === selectedYear;
-      const matchesStatus = statusFilter === "all" || record.payment_status === statusFilter;
-      const matchesSearch =
-        searchQuery === "" ||
-        record.employee_name.toLowerCase().includes(searchQuery.toLowerCase());
+  /**
+   * Fetch statistics from backend
+   */
+  const fetchStatistics = useCallback(async () => {
+    try {
+      const stats = await apiClient.getPayrollStatistics({
+        month: selectedMonth,
+        year: selectedYear,
+      });
+      setStatistics(stats);
+    } catch (err: any) {
+      console.error('Error fetching payroll statistics:', err);
+      setError(err.message || 'Failed to fetch statistics');
+    }
+  }, [selectedMonth, selectedYear]);
 
-      return matchesMonth && matchesYear && matchesStatus && matchesSearch;
-    });
-  }, [payrollRecords, selectedMonth, selectedYear, statusFilter, searchQuery]);
+  /**
+   * Fetch employees from backend
+   */
+  const fetchEmployees = useCallback(async () => {
+    try {
+      const response: EmployeeListResponse = await apiClient.getEmployees({ page: 1 });
+      setEmployees(response.results);
+    } catch (err: any) {
+      console.error('Error fetching employees:', err);
+    }
+  }, []);
+
+  /**
+   * Fetch payroll records from backend
+   */
+  const fetchPayroll = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const params: any = {
+        month: selectedMonth,
+        year: selectedYear,
+        page: currentPage,
+      };
+      
+      if (debouncedSearch) {
+        params.search = debouncedSearch;
+      }
+      
+      if (statusFilter !== "all") {
+        params.payment_status = statusFilter;
+      }
+
+      const response = await apiClient.getPayrollRecords(params);
+      const mappedPayroll = response.results.map(mapBackendPayrollListItemToFrontend);
+      setPayrollRecords(mappedPayroll);
+      setTotalPages(Math.ceil(response.count / 20));
+    } catch (err: any) {
+      console.error('Error fetching payroll records:', err);
+      setError(err.message || 'Failed to fetch payroll records');
+      setPayrollRecords([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [selectedMonth, selectedYear, debouncedSearch, statusFilter, currentPage]);
+
+  // Fetch statistics and employees on mount
+  useEffect(() => {
+    fetchStatistics();
+    fetchEmployees();
+  }, [fetchStatistics, fetchEmployees]);
+
+  // Fetch payroll records when filters change
+  useEffect(() => {
+    fetchPayroll();
+  }, [fetchPayroll]);
+
+  // Handle action=new URL parameter
+  useEffect(() => {
+    const action = searchParams.get('action');
+    if (action === 'new') {
+      setEditingPayroll(null);
+      setShowCreatePayrollModal(true);
+    }
+  }, [searchParams]);
 
   const stats = useMemo(() => {
+    if (!statistics) {
+      return {
+        totalPayrollCost: 0,
+        employeeCount: 0,
+        pendingCount: 0,
+        paidCount: 0,
+      };
+    }
+    
     return {
-      totalPayrollCost: filteredRecords.reduce((sum, r) => sum + (r.computation_details?.net_amount || 0), 0),
-      employeeCount: filteredRecords.length,
-      pendingCount: filteredRecords.filter((r) => r.payment_status === "Pending").length,
-      paidCount: filteredRecords.filter((r) => r.payment_status === "Paid").length,
+      totalPayrollCost: statistics.total_payroll,
+      employeeCount: statistics.employees_count,
+      pendingCount: statistics.total_payment_pending,
+      paidCount: statistics.total_payment_paid,
     };
-  }, [filteredRecords]);
+  }, [statistics]);
 
-  const handleViewPayslip = (record: PayrollRecord) => {
-    setSelectedPayroll(record);
-    setShowPayslipModal(true);
+  const handleViewPayslip = async (record: PayrollRecord) => {
+    try {
+      const payrollDetail = await apiClient.getPayrollRecord(record.id);
+      const mappedPayroll = mapBackendPayrollDetailToFrontend(payrollDetail);
+      setSelectedPayroll(mappedPayroll);
+      setShowPayslipModal(true);
+    } catch (err: any) {
+      await showAlert("Error", err.message || "Failed to fetch payroll details");
+    }
   };
 
   const handleMarkPaid = (record: PayrollRecord) => {
@@ -103,42 +268,66 @@ export default function PayrollPage() {
   const handleMarkPaidSubmit = async (paymentMode: PaymentMode, paymentDate: string, bankTransactionRef?: string) => {
     if (!selectedPayroll) return;
 
-    setPayrollRecords((prev) =>
-      prev.map((record) =>
-        record.id === selectedPayroll.id
-          ? {
-              ...record,
-              payment_status: "Paid" as PaymentStatus,
-              payment_mode: paymentMode,
-              payment_date: paymentDate,
-              bank_transaction_ref: bankTransactionRef || record.bank_transaction_ref,
-            }
-          : record
-      )
-    );
-
-    setShowMarkPaidModal(false);
-    await showSuccess("Payment Marked", `Payroll for ${selectedPayroll.employee_name} marked as paid!`);
+    setIsSaving(true);
+    try {
+      await apiClient.markPayrollPaid(selectedPayroll.id, {
+        payment_date: paymentDate,
+        payment_mode: paymentMode,
+        bank_transaction_reference_number: bankTransactionRef,
+      });
+      
+      await showSuccess("Payment Marked", `Payroll for ${selectedPayroll.employee_name} marked as paid!`);
+      setShowMarkPaidModal(false);
+      fetchPayroll();
+      fetchStatistics();
+    } catch (err: any) {
+      await showAlert("Error", err.message || "Failed to mark payroll as paid");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleBulkMarkPaidSubmit = async (paymentMode: PaymentMode, paymentDate: string) => {
-    setPayrollRecords((prev) =>
-      prev.map((record) =>
-        selectedRecords.includes(record.id)
-          ? {
-              ...record,
-              payment_status: "Paid" as PaymentStatus,
-              payment_mode: paymentMode,
-              payment_date: paymentDate,
-            }
-          : record
-      )
+  const handleBulkMarkPaidSubmit = async (paymentMode: PaymentMode, paymentDate: string, bankTransactionRef?: string) => {
+    if (selectedRecords.length === 0) return;
+
+    setIsSaving(true);
+    try {
+      await apiClient.bulkMarkPayrollPaid({
+        payroll_ids: selectedRecords,
+        payment_date: paymentDate,
+        payment_mode: paymentMode,
+        bank_transaction_reference_number: bankTransactionRef,
+      });
+
+      const count = selectedRecords.length;
+      setSelectedRecords([]);
+      setShowBulkMarkPaidModal(false);
+      await showSuccess("Payments Updated", `Successfully marked ${count} payroll record(s) as paid!`);
+      fetchPayroll();
+      fetchStatistics();
+    } catch (err: any) {
+      await showAlert("Error", err.message || "Failed to mark payroll as paid");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async (record: PayrollRecord) => {
+    const confirmed = await showDeleteConfirm(
+      "Delete Payroll",
+      `Are you sure you want to delete payroll for ${record.employee_name}?`
     );
 
-    const count = selectedRecords.length;
-    setSelectedRecords([]);
-    setShowBulkMarkPaidModal(false);
-    await showSuccess("Payments Updated", `Successfully marked ${count} payroll record(s) as paid!`);
+    if (!confirmed) return;
+
+    try {
+      await apiClient.deletePayroll(record.id);
+      await showSuccess("Payroll deleted successfully");
+      fetchPayroll();
+      fetchStatistics();
+    } catch (err: any) {
+      await showAlert("Error", err.message || "Failed to delete payroll");
+    }
   };
 
   const handleToggleSelect = (recordId: number) => {
@@ -150,10 +339,10 @@ export default function PayrollPage() {
   };
 
   const handleSelectAll = () => {
-    if (selectedRecords.length === filteredRecords.length) {
+    if (selectedRecords.length === payrollRecords.length && payrollRecords.length > 0) {
       setSelectedRecords([]);
     } else {
-      setSelectedRecords(filteredRecords.map((r) => r.id));
+      setSelectedRecords(payrollRecords.map((r) => r.id));
     }
   };
 
@@ -166,6 +355,11 @@ export default function PayrollPage() {
   };
 
   const handleExportCSV = () => {
+    if (payrollRecords.length === 0) {
+      showError("No Data", "No payroll records to export");
+      return;
+    }
+
     const escapeCSV = (value: any) => {
       const str = String(value);
       if (str.includes(",") || str.includes('"') || str.includes("\n")) {
@@ -175,12 +369,12 @@ export default function PayrollPage() {
     };
 
     const headers = ["Period", "Employee", "Working Days", "Present", "Net Amount", "Status", "Payment Mode", "Payment Date"];
-    const rows = filteredRecords.map((record) => [
+    const rows = payrollRecords.map((record) => [
       format(new Date(record.period_start), "MMM yyyy"),
       record.employee_name,
       record.working_days,
       record.days_present,
-      record.computation_details?.net_amount || 0,
+      record.net_amount,
       record.payment_status,
       record.payment_mode || "-",
       record.payment_date ? format(new Date(record.payment_date), "dd/MM/yyyy") : "-",
@@ -195,7 +389,7 @@ export default function PayrollPage() {
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `payroll-${selectedMonth}-${selectedYear}.csv`;
+    link.download = `payroll-${months[selectedMonth - 1]}-${selectedYear}.csv`;
     link.click();
     window.URL.revokeObjectURL(url);
   };
@@ -219,6 +413,12 @@ export default function PayrollPage() {
           </p>
         </div>
 
+        {error && (
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+            <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+          </div>
+        )}
+
         {/* Summary Cards */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
           <div className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
@@ -230,7 +430,7 @@ export default function PayrollPage() {
               ₹{(stats.totalPayrollCost / 100000).toFixed(2)}L
             </p>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              {selectedMonth} {selectedYear}
+              {months[selectedMonth - 1]} {selectedYear}
             </p>
           </div>
 
@@ -273,16 +473,22 @@ export default function PayrollPage() {
           <div className="flex flex-wrap items-center gap-3">
             <select
               value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
+              onChange={(e) => {
+                setSelectedMonth(Number(e.target.value));
+                setCurrentPage(1);
+              }}
               className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white"
             >
-              {months.map(month => (
-                <option key={month} value={month}>{month}</option>
+              {months.map((month, index) => (
+                <option key={month} value={index + 1}>{month}</option>
               ))}
             </select>
             <select
               value={selectedYear}
-              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              onChange={(e) => {
+                setSelectedYear(Number(e.target.value));
+                setCurrentPage(1);
+              }}
               className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white"
             >
               {years.map(year => (
@@ -291,13 +497,15 @@ export default function PayrollPage() {
             </select>
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as PaymentStatus | "all")}
+              onChange={(e) => {
+                setStatusFilter(e.target.value as PaymentStatus | "all");
+                setCurrentPage(1);
+              }}
               className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white"
             >
               <option value="all">All Status</option>
               <option value="Pending">Pending</option>
               <option value="Paid">Paid</option>
-              <option value="Hold">Hold</option>
             </select>
           </div>
 
@@ -361,7 +569,7 @@ export default function PayrollPage() {
                   <th scope="col" className="px-4 py-3 text-left">
                     <input
                       type="checkbox"
-                      checked={selectedRecords.length === filteredRecords.length && filteredRecords.length > 0}
+                      checked={selectedRecords.length === payrollRecords.length && payrollRecords.length > 0}
                       onChange={handleSelectAll}
                       className="h-4 w-4 rounded border-gray-300 text-sky-500 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700"
                     />
@@ -387,7 +595,27 @@ export default function PayrollPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-800">
-                {filteredRecords.map((record) => (
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-8 text-center">
+                      <div className="flex items-center justify-center">
+                        <Loader2 className="h-6 w-6 animate-spin text-sky-600" />
+                        <span className="ml-2 text-gray-500 dark:text-gray-400">Loading payroll records...</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : payrollRecords.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-8 text-center">
+                      <div className="flex flex-col items-center justify-center">
+                        <Inbox className="h-12 w-12 text-gray-400 mb-4" />
+                        <p className="text-gray-500 dark:text-gray-400">No payroll records found</p>
+                        <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">Try adjusting your filters or create a new payroll entry</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  payrollRecords.map((record) => (
                   <tr key={record.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                     <td className="px-4 py-4">
                       <input
@@ -406,7 +634,7 @@ export default function PayrollPage() {
                       </div>
                     </td>
                     <td className="px-4 py-4 text-right text-sm font-bold text-gray-900 dark:text-white">
-                      ₹{record.computation_details?.net_amount?.toLocaleString("en-IN") || 0}
+                      ₹{record.net_amount?.toLocaleString("en-IN") || 0}
                     </td>
                     <td className="px-4 py-4 text-center">
                       <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${getStatusColor(record.payment_status)}`}>
@@ -429,9 +657,15 @@ export default function PayrollPage() {
                           <Eye className="h-4 w-4" />
                         </button>
                         <button
-                          onClick={() => {
-                            setEditingPayroll(record);
-                            setShowEditPayrollSlideOver(true);
+                          onClick={async () => {
+                            try {
+                              const payrollDetail = await apiClient.getPayrollRecord(record.id);
+                              const mappedPayroll = mapBackendPayrollDetailToFrontend(payrollDetail);
+                              setEditingPayroll(mappedPayroll);
+                              setShowEditPayrollSlideOver(true);
+                            } catch (err: any) {
+                              await showAlert("Error", err.message || "Failed to fetch payroll details");
+                            }
                           }}
                           className="rounded p-1 text-sky-600 hover:bg-sky-50 hover:text-sky-900 dark:text-sky-400 dark:hover:bg-sky-900/30"
                           title="Edit Payroll"
@@ -447,21 +681,43 @@ export default function PayrollPage() {
                             <Check className="h-4 w-4" />
                           </button>
                         )}
+                        <button
+                          onClick={() => handleDelete(record)}
+                          className="rounded p-1 text-red-600 hover:bg-red-50 hover:text-red-900 dark:text-red-400 dark:hover:bg-red-900/30"
+                          title="Delete"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
                       </div>
                     </td>
                   </tr>
-                ))}
+                  ))
+                )}
               </tbody>
             </table>
           </div>
 
-          {filteredRecords.length === 0 && (
-            <div className="py-12 text-center">
-              <FileText className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No payroll records found</h3>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                No records for {selectedMonth} {selectedYear}.
-              </p>
+          {payrollRecords.length > 0 && totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-gray-700">
+              <div className="text-sm text-gray-500 dark:text-gray-400">
+                Page {currentPage} of {totalPages}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1 || isLoading}
+                  className="rounded-lg border border-gray-300 bg-white px-3 py-1 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                >
+                  Previous
+                </button>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages || isLoading}
+                  className="rounded-lg border border-gray-300 bg-white px-3 py-1 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                >
+                  Next
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -480,6 +736,7 @@ export default function PayrollPage() {
       {selectedPayroll && (
         <MarkPaidModal
           payroll={selectedPayroll}
+          isSaving={isSaving}
           isOpen={showMarkPaidModal}
           onClose={() => setShowMarkPaidModal(false)}
           onSubmit={handleMarkPaidSubmit}
@@ -489,6 +746,7 @@ export default function PayrollPage() {
       {/* Bulk Mark Paid Modal */}
       <BulkMarkPaidModal
         selectedCount={selectedRecords.length}
+        isSaving={isSaving}
         isOpen={showBulkMarkPaidModal}
         onClose={() => setShowBulkMarkPaidModal(false)}
         onSubmit={handleBulkMarkPaidSubmit}
@@ -497,12 +755,36 @@ export default function PayrollPage() {
       {/* Create Payroll Modal */}
       {showCreatePayrollModal && (
         <CreatePayrollModal
-          employees={mockEmployees}
+          employees={employees.map(emp => ({ id: emp.id, name: emp.full_name || '' }))}
+          isSaving={isSaving}
           onClose={() => setShowCreatePayrollModal(false)}
-          onSave={(payroll) => {
-            setPayrollRecords((prev) => [payroll, ...prev]);
-            setShowCreatePayrollModal(false);
-            showSuccess("Payroll Created", `Payroll entry created for ${payroll.employee_name}`);
+          onSave={async (payrollData) => {
+            setIsSaving(true);
+            try {
+              const payrollCreateData: PayrollCreateData = {
+                employee: payrollData.employee_id!,
+                payroll_status: payrollData.payment_status === 'Paid' ? 'Paid' : 'Pending',
+                period_from: payrollData.period_start,
+                period_to: payrollData.period_end,
+                working_days: payrollData.working_days,
+                days_present: payrollData.days_present,
+                net_amount: payrollData.net_amount,
+                payment_date: payrollData.payment_date,
+                payment_mode: payrollData.payment_mode,
+                bank_transaction_reference_number: payrollData.bank_transaction_ref,
+                notes: payrollData.notes,
+              };
+              
+              await apiClient.createPayroll(payrollCreateData);
+              await showSuccess("Payroll Created", `Payroll entry created for ${payrollData.employee_name}`);
+              setShowCreatePayrollModal(false);
+              fetchPayroll();
+              fetchStatistics();
+            } catch (err: any) {
+              await showAlert("Error", err.message || "Failed to create payroll");
+            } finally {
+              setIsSaving(false);
+            }
           }}
         />
       )}
@@ -511,21 +793,41 @@ export default function PayrollPage() {
       {editingPayroll && (
         <EditPayrollSlideOver
           payroll={editingPayroll}
-          employees={mockEmployees}
+          employees={employees.map(emp => ({ id: emp.id, name: emp.full_name || '' }))}
+          isSaving={isSaving}
           isOpen={showEditPayrollSlideOver}
           onClose={() => {
             setShowEditPayrollSlideOver(false);
             setEditingPayroll(null);
           }}
-          onSave={(updatedPayroll) => {
-            setPayrollRecords((prev) =>
-              prev.map((record) =>
-                record.id === updatedPayroll.id ? updatedPayroll : record
-              )
-            );
-            setShowEditPayrollSlideOver(false);
-            setEditingPayroll(null);
-            showSuccess("Payroll Updated", `Payroll entry updated for ${updatedPayroll.employee_name}`);
+          onSave={async (updatedPayrollData) => {
+            setIsSaving(true);
+            try {
+              const payrollUpdateData: Partial<PayrollCreateData> = {
+                employee: updatedPayrollData.employee_id!,
+                payroll_status: updatedPayrollData.payment_status === 'Paid' ? 'Paid' : 'Pending',
+                period_from: updatedPayrollData.period_start,
+                period_to: updatedPayrollData.period_end,
+                working_days: updatedPayrollData.working_days,
+                days_present: updatedPayrollData.days_present,
+                net_amount: updatedPayrollData.net_amount,
+                payment_date: updatedPayrollData.payment_date,
+                payment_mode: updatedPayrollData.payment_mode,
+                bank_transaction_reference_number: updatedPayrollData.bank_transaction_ref,
+                notes: updatedPayrollData.notes,
+              };
+              
+              await apiClient.updatePayroll(editingPayroll.id, payrollUpdateData);
+              await showSuccess("Payroll Updated", `Payroll entry updated for ${updatedPayrollData.employee_name}`);
+              setShowEditPayrollSlideOver(false);
+              setEditingPayroll(null);
+              fetchPayroll();
+              fetchStatistics();
+            } catch (err: any) {
+              await showAlert("Error", err.message || "Failed to update payroll");
+            } finally {
+              setIsSaving(false);
+            }
           }}
         />
       )}
@@ -533,19 +835,32 @@ export default function PayrollPage() {
   );
 }
 
+export default function PayrollPage() {
+  return (
+    <ProtectedRoute>
+      <Suspense fallback={<DashboardLayout title="Payroll" breadcrumbs={["Home", "Payroll"]}><div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-sky-600" /></div></DashboardLayout>}>
+        <PayrollPageContent />
+      </Suspense>
+    </ProtectedRoute>
+  );
+}
+
 function BulkMarkPaidModal({
   selectedCount,
+  isSaving,
   isOpen,
   onClose,
   onSubmit,
 }: {
   selectedCount: number;
+  isSaving: boolean;
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (paymentMode: PaymentMode, paymentDate: string) => void;
+  onSubmit: (paymentMode: PaymentMode, paymentDate: string, bankTransactionRef?: string) => Promise<void>;
 }) {
   const [paymentMode, setPaymentMode] = useState<PaymentMode>("Bank Transfer");
   const [paymentDate, setPaymentDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [bankTransactionRef, setBankTransactionRef] = useState("");
 
   if (!isOpen) return null;
 
@@ -553,9 +868,9 @@ function BulkMarkPaidModal({
     setPaymentDate(format(new Date(), "yyyy-MM-dd"));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(paymentMode, paymentDate);
+    await onSubmit(paymentMode, paymentDate, bankTransactionRef || undefined);
   };
 
   return (
@@ -614,6 +929,7 @@ function BulkMarkPaidModal({
                 onChange={(e) => setPaymentMode(e.target.value as PaymentMode)}
                 className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                 required
+                disabled={isSaving}
               >
                 <option value="Cash">Cash</option>
                 <option value="Cheque">Cheque</option>
@@ -622,20 +938,45 @@ function BulkMarkPaidModal({
               </select>
             </div>
 
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Bank Transaction Reference Number
+              </label>
+              <input
+                type="text"
+                value={bankTransactionRef}
+                onChange={(e) => setBankTransactionRef(e.target.value)}
+                placeholder="Enter transaction reference number (optional)"
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                disabled={isSaving}
+              />
+            </div>
+
             <div className="flex justify-end gap-3 pt-4">
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                disabled={isSaving}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+                disabled={isSaving}
+                className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Check className="h-4 w-4" />
-                Mark as Paid
+                {isSaving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Marking...
+                  </>
+                ) : (
+                  <>
+                    <Check className="h-4 w-4" />
+                    Mark as Paid
+                  </>
+                )}
               </button>
             </div>
           </form>
@@ -648,12 +989,14 @@ function BulkMarkPaidModal({
 // Create Payroll Modal Component
 function CreatePayrollModal({
   employees,
+  isSaving,
   onClose,
   onSave,
 }: {
   employees: { id: number; name: string }[];
+  isSaving: boolean;
   onClose: () => void;
-  onSave: (payroll: PayrollRecord) => void;
+  onSave: (payroll: PayrollRecord) => Promise<void>;
 }) {
   const [formData, setFormData] = useState({
     employee_id: 0,
@@ -707,11 +1050,11 @@ function CreatePayrollModal({
     setShowEmployeeDropdown(false);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.employee_id) {
-      showError("Validation Error", "Please select an employee");
+      await showError("Validation Error", "Please select an employee");
       return;
     }
 
@@ -744,7 +1087,7 @@ function CreatePayrollModal({
       updated_at: new Date().toISOString(),
     };
 
-    onSave(newPayroll);
+    await onSave(newPayroll);
   };
 
   return (
@@ -961,16 +1304,27 @@ function CreatePayrollModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                disabled={isSaving}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="inline-flex items-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600"
+                disabled={isSaving}
+                className="inline-flex items-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Plus className="h-4 w-4" />
-                Create Payroll
+                {isSaving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4" />
+                    Create Payroll
+                  </>
+                )}
               </button>
             </div>
           </form>
@@ -984,15 +1338,17 @@ function CreatePayrollModal({
 function EditPayrollSlideOver({
   payroll,
   employees,
+  isSaving,
   isOpen,
   onClose,
   onSave,
 }: {
   payroll: PayrollRecord;
   employees: { id: number; name: string }[];
+  isSaving: boolean;
   isOpen: boolean;
   onClose: () => void;
-  onSave: (payroll: PayrollRecord) => void;
+  onSave: (payroll: PayrollRecord) => Promise<void>;
 }) {
   const [formData, setFormData] = useState({
     employee_id: payroll.employee_id || 0,
@@ -1028,11 +1384,11 @@ function EditPayrollSlideOver({
     }
   }, [isOpen, payroll]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.employee_id) {
-      showError("Validation Error", "Please select an employee");
+      await showError("Validation Error", "Please select an employee");
       return;
     }
 
@@ -1057,7 +1413,7 @@ function EditPayrollSlideOver({
       updated_at: new Date().toISOString(),
     };
 
-    onSave(updatedPayroll);
+    await onSave(updatedPayroll);
   };
 
   if (!isOpen) return null;
@@ -1260,16 +1616,27 @@ function EditPayrollSlideOver({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                  disabled={isSaving}
+                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="inline-flex items-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600"
+                  disabled={isSaving}
+                  className="inline-flex items-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Check className="h-4 w-4" />
-                  Save Changes
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="h-4 w-4" />
+                      Save Changes
+                    </>
+                  )}
                 </button>
               </div>
             </form>

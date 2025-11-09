@@ -1,18 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { X, Check, Calendar } from "lucide-react";
+import { X, Check, Calendar, Loader2 } from "lucide-react";
 import { PayrollRecord, PaymentMode } from "@/types";
 import { format } from "date-fns";
 
 interface MarkPaidModalProps {
   payroll: PayrollRecord;
+  isSaving?: boolean;
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (paymentMode: PaymentMode, paymentDate: string, bankTransactionRef?: string) => void;
+  onSubmit: (paymentMode: PaymentMode, paymentDate: string, bankTransactionRef?: string) => Promise<void>;
 }
 
-export function MarkPaidModal({ payroll, isOpen, onClose, onSubmit }: MarkPaidModalProps) {
+export function MarkPaidModal({ payroll, isSaving = false, isOpen, onClose, onSubmit }: MarkPaidModalProps) {
   const [paymentMode, setPaymentMode] = useState<PaymentMode>("Bank Transfer");
   const [paymentDate, setPaymentDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [bankTransactionRef, setBankTransactionRef] = useState("");
@@ -23,9 +24,9 @@ export function MarkPaidModal({ payroll, isOpen, onClose, onSubmit }: MarkPaidMo
     setPaymentDate(format(new Date(), "yyyy-MM-dd"));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(paymentMode, paymentDate, bankTransactionRef || undefined);
+    await onSubmit(paymentMode, paymentDate, bankTransactionRef || undefined);
   };
 
   return (
@@ -57,7 +58,7 @@ export function MarkPaidModal({ payroll, isOpen, onClose, onSubmit }: MarkPaidMo
               </p>
               <p className="mt-2 text-sm font-medium text-gray-600 dark:text-gray-400">Net Amount</p>
               <p className="mt-1 text-xl font-bold text-sky-600 dark:text-sky-400">
-                ₹{payroll.computation_details?.net_amount?.toLocaleString("en-IN") || 0}
+                ₹{payroll.net_amount?.toLocaleString("en-IN") || 0}
               </p>
             </div>
 
@@ -73,12 +74,14 @@ export function MarkPaidModal({ payroll, isOpen, onClose, onSubmit }: MarkPaidMo
                     value={paymentDate}
                     onChange={(e) => setPaymentDate(e.target.value)}
                     required
-                    className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                    disabled={isSaving}
+                    className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                   />
                   <button
                     type="button"
                     onClick={handleTodayDate}
-                    className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                    disabled={isSaving}
+                    className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
                   >
                     <Calendar className="h-4 w-4" />
                     Today
@@ -95,7 +98,8 @@ export function MarkPaidModal({ payroll, isOpen, onClose, onSubmit }: MarkPaidMo
                   value={paymentMode}
                   onChange={(e) => setPaymentMode(e.target.value as PaymentMode)}
                   required
-                  className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  disabled={isSaving}
+                  className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                 >
                   <option value="Cash">Cash</option>
                   <option value="Cheque">Cheque</option>
@@ -114,7 +118,8 @@ export function MarkPaidModal({ payroll, isOpen, onClose, onSubmit }: MarkPaidMo
                   value={bankTransactionRef}
                   onChange={(e) => setBankTransactionRef(e.target.value)}
                   placeholder="Enter transaction reference number (optional)"
-                  className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  disabled={isSaving}
+                  className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                 />
               </div>
             </div>
@@ -124,16 +129,27 @@ export function MarkPaidModal({ payroll, isOpen, onClose, onSubmit }: MarkPaidMo
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                disabled={isSaving}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+                disabled={isSaving}
+                className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Check className="h-4 w-4" />
-                Mark as Paid
+                {isSaving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Marking...
+                  </>
+                ) : (
+                  <>
+                    <Check className="h-4 w-4" />
+                    Mark as Paid
+                  </>
+                )}
               </button>
             </div>
           </form>

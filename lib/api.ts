@@ -742,6 +742,94 @@ export interface BulkApproveAttendanceResponse {
   errors: string[] | null;
 }
 
+/**
+ * Payroll Management Interfaces
+ */
+
+export interface PayrollStatisticsResponse {
+  total_payroll: number;
+  employees_count: number;
+  total_payment_pending: number;
+  total_payment_paid: number;
+}
+
+export interface BackendPayrollListItem {
+  id: number;
+  employee: number;
+  employee_name: string;
+  employee_code: string;
+  payroll_status: 'Paid' | 'Pending';
+  period_from: string;
+  period_to: string;
+  working_days: number;
+  days_present: number;
+  net_amount: string;
+  payment_date: string | null;
+  payment_mode: 'Cash' | 'Bank Transfer' | 'Cheque' | 'UPI' | null;
+  created_at: string;
+}
+
+export interface PayrollListResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: BackendPayrollListItem[];
+}
+
+export interface PayrollDetail {
+  id: number;
+  employee: number;
+  employee_name: string;
+  employee_code: string;
+  payroll_status: 'Paid' | 'Pending';
+  period_from: string;
+  period_to: string;
+  working_days: number;
+  days_present: number;
+  net_amount: string;
+  payment_date: string | null;
+  payment_mode: 'Cash' | 'Bank Transfer' | 'Cheque' | 'UPI' | null;
+  bank_transaction_reference_number: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: number | null;
+  updated_by: number | null;
+}
+
+export interface PayrollCreateData {
+  employee: number;
+  payroll_status: 'Paid' | 'Pending';
+  period_from: string; // YYYY-MM-DD
+  period_to: string; // YYYY-MM-DD
+  working_days: number;
+  days_present: number;
+  net_amount: number;
+  payment_date?: string; // YYYY-MM-DD (required if payroll_status is "Paid")
+  payment_mode?: 'Cash' | 'Bank Transfer' | 'Cheque' | 'UPI'; // required if payroll_status is "Paid"
+  bank_transaction_reference_number?: string;
+  notes?: string;
+}
+
+export interface PayrollMarkPaidRequest {
+  payment_date: string; // YYYY-MM-DD
+  payment_mode: 'Cash' | 'Bank Transfer' | 'Cheque' | 'UPI';
+  bank_transaction_reference_number?: string;
+}
+
+export interface BulkMarkPayrollPaidRequest {
+  payroll_ids: number[];
+  payment_date: string; // YYYY-MM-DD
+  payment_mode: 'Cash' | 'Bank Transfer' | 'Cheque' | 'UPI';
+  bank_transaction_reference_number?: string;
+}
+
+export interface BulkMarkPayrollPaidResponse {
+  updated_count: number;
+  skipped_count: number;
+  errors: string[] | null;
+}
+
 class ApiClient {
   private baseURL: string;
 
@@ -2528,6 +2616,116 @@ Please verify:
    */
   async bulkApproveAttendance(data: BulkApproveAttendanceRequest): Promise<BulkApproveAttendanceResponse> {
     return this.request<BulkApproveAttendanceResponse>('/api/attendance/bulk-approve/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+  }
+
+  /**
+   * Payroll Management APIs
+   */
+
+  /**
+   * Get payroll statistics
+   */
+  async getPayrollStatistics(params?: {
+    month?: number;
+    year?: number;
+  }): Promise<PayrollStatisticsResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.month) queryParams.append('month', params.month.toString());
+    if (params?.year) queryParams.append('year', params.year.toString());
+
+    const queryString = queryParams.toString();
+    const endpoint = `/api/payroll/statistics/${queryString ? `?${queryString}` : ''}`;
+    return this.request<PayrollStatisticsResponse>(endpoint);
+  }
+
+  /**
+   * Get payroll records with filters
+   */
+  async getPayrollRecords(params?: {
+    search?: string;
+    month?: number;
+    year?: number;
+    payment_status?: 'Paid' | 'Pending';
+    page?: number;
+  }): Promise<PayrollListResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.month) queryParams.append('month', params.month.toString());
+    if (params?.year) queryParams.append('year', params.year.toString());
+    if (params?.payment_status) queryParams.append('payment_status', params.payment_status);
+    if (params?.page) queryParams.append('page', params.page.toString());
+
+    const queryString = queryParams.toString();
+    const endpoint = `/api/payroll/${queryString ? `?${queryString}` : ''}`;
+    return this.request<PayrollListResponse>(endpoint);
+  }
+
+  /**
+   * Get payroll record details
+   */
+  async getPayrollRecord(id: number): Promise<PayrollDetail> {
+    return this.request<PayrollDetail>(`/api/payroll/${id}/`);
+  }
+
+  /**
+   * Create payroll record
+   */
+  async createPayroll(data: PayrollCreateData): Promise<PayrollDetail> {
+    return this.request<PayrollDetail>('/api/payroll/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+  }
+
+  /**
+   * Update payroll record
+   */
+  async updatePayroll(id: number, data: Partial<PayrollCreateData>): Promise<PayrollDetail> {
+    return this.request<PayrollDetail>(`/api/payroll/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+  }
+
+  /**
+   * Delete payroll record
+   */
+  async deletePayroll(id: number): Promise<void> {
+    await this.request(`/api/payroll/${id}/`, {
+      method: 'DELETE',
+    });
+  }
+
+  /**
+   * Mark payroll record as paid
+   */
+  async markPayrollPaid(id: number, data: PayrollMarkPaidRequest): Promise<PayrollDetail> {
+    return this.request<PayrollDetail>(`/api/payroll/${id}/mark-paid/`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+  }
+
+  /**
+   * Bulk mark payroll records as paid
+   */
+  async bulkMarkPayrollPaid(data: BulkMarkPayrollPaidRequest): Promise<BulkMarkPayrollPaidResponse> {
+    return this.request<BulkMarkPayrollPaidResponse>('/api/payroll/bulk-mark-paid/', {
       method: 'POST',
       body: JSON.stringify(data),
       headers: {
