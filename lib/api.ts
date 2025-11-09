@@ -2064,26 +2064,17 @@ Please verify:
     if (data.notes) formData.append('notes', data.notes);
     if (data.profile) formData.append('profile', data.profile.toString());
 
-    const csrfToken = this.getCsrfToken();
-    const headers: Record<string, string> = {};
-    if (csrfToken) {
-      headers['X-CSRFToken'] = csrfToken;
-    }
-
-    const response = await fetch(`${this.baseURL}/api/clients/`, {
-      method: 'POST',
-      headers,
-      credentials: 'include',
-      body: formData,
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Create failed' }));
+    // Use the request method which handles CSRF tokens properly
+    try {
+      return await this.request<BackendClientDetail>('/api/clients/', {
+        method: 'POST',
+        body: formData,
+      });
+    } catch (error: any) {
       // Handle Django REST Framework validation errors
-      if (errorData && typeof errorData === 'object') {
-        // Format validation errors for display
+      if (error?.response && typeof error.response === 'object') {
         const errorMessages: string[] = [];
-        for (const [field, messages] of Object.entries(errorData)) {
+        for (const [field, messages] of Object.entries(error.response)) {
           if (Array.isArray(messages)) {
             errorMessages.push(`${field}: ${messages.join(', ')}`);
           } else if (typeof messages === 'string') {
@@ -2092,14 +2083,12 @@ Please verify:
             errorMessages.push(`${field}: ${JSON.stringify(messages)}`);
           }
         }
-        const error = new Error(errorMessages.length > 0 ? errorMessages.join('\n') : 'Failed to create client');
-        (error as any).response = errorData;
-        throw error;
+        const formattedError = new Error(errorMessages.length > 0 ? errorMessages.join('\n') : 'Failed to create client');
+        (formattedError as any).response = error.response;
+        throw formattedError;
       }
-      throw new Error(errorData.error || errorData.message || 'Failed to create client');
+      throw error;
     }
-
-    return response.json();
   }
 
   /**
@@ -2141,25 +2130,11 @@ Please verify:
     if (data.notes) formData.append('notes', data.notes);
     if (data.profile) formData.append('profile', data.profile.toString());
 
-    const csrfToken = this.getCsrfToken();
-    const headers: Record<string, string> = {};
-    if (csrfToken) {
-      headers['X-CSRFToken'] = csrfToken;
-    }
-
-    const response = await fetch(`${this.baseURL}/api/clients/${id}/`, {
+    // Use the request method which handles CSRF tokens properly
+    return this.request<BackendClientDetail>(`/api/clients/${id}/`, {
       method: 'PATCH',
-      headers,
-      credentials: 'include',
       body: formData,
     });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Update failed' }));
-      throw error;
-    }
-
-    return response.json();
   }
 
   /**
