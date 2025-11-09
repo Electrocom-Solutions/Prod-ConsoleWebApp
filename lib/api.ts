@@ -503,6 +503,7 @@ export interface EmployeeStatisticsResponse {
 export interface BackendEmployeeListItem {
   id: number;
   employee_code: string;
+  profile_id: number;
   full_name: string | null;
   email: string | null;
   phone_number: string | null;
@@ -1144,6 +1145,56 @@ export interface EmailTemplateSendResponse {
   scheduled_at?: string | null;
   sent_at?: string | null;
   errors?: string[];
+}
+
+/**
+ * Bank Accounts Interfaces
+ */
+
+export interface BackendBankAccountListItem {
+  id: number;
+  profile_id: number;
+  profile_name: string | null;
+  account_holder_name: string | null;
+  bank_name: string;
+  account_number: string;
+  ifsc_code: string;
+  branch: string | null;
+  created_at: string;
+  created_by: number | null;
+  created_by_username: string | null;
+}
+
+export interface BankAccountListResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: BackendBankAccountListItem[];
+}
+
+export interface BankAccountDetail {
+  id: number;
+  profile_id: number;
+  profile_name: string | null;
+  account_holder_name: string | null;
+  bank_name: string;
+  account_number: string;
+  ifsc_code: string;
+  branch: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: number | null;
+  created_by_username: string | null;
+  updated_by: number | null;
+  updated_by_username: string | null;
+}
+
+export interface BankAccountCreateData {
+  profile_id: number;
+  bank_name: string;
+  account_number: string;
+  ifsc_code: string;
+  branch?: string | null;
 }
 
 class ApiClient {
@@ -3434,6 +3485,72 @@ Please verify:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(data),
+    });
+  }
+
+  /**
+   * Bank Accounts API Methods
+   */
+
+  /**
+   * Get bank accounts list with search and filters
+   */
+  async getBankAccounts(params?: {
+    search?: string;
+    profile_id?: number;
+    bank_name?: string;
+    page?: number;
+  }): Promise<BankAccountListResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.profile_id) queryParams.append('profile_id', params.profile_id.toString());
+    if (params?.bank_name) queryParams.append('bank_name', params.bank_name);
+    if (params?.page) queryParams.append('page', params.page.toString());
+
+    const queryString = queryParams.toString();
+    const endpoint = `/api/bank-accounts/${queryString ? `?${queryString}` : ''}`;
+    return this.request<BankAccountListResponse>(endpoint);
+  }
+
+  /**
+   * Get bank account details
+   */
+  async getBankAccount(id: number): Promise<BankAccountDetail> {
+    return this.request<BankAccountDetail>(`/api/bank-accounts/${id}/`);
+  }
+
+  /**
+   * Create bank account
+   */
+  async createBankAccount(data: BankAccountCreateData): Promise<BankAccountDetail> {
+    return this.request<BankAccountDetail>('/api/bank-accounts/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+  }
+
+  /**
+   * Update bank account
+   */
+  async updateBankAccount(id: number, data: Partial<BankAccountCreateData>): Promise<BankAccountDetail> {
+    return this.request<BankAccountDetail>(`/api/bank-accounts/${id}/`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+  }
+
+  /**
+   * Delete bank account
+   */
+  async deleteBankAccount(id: number): Promise<void> {
+    await this.request(`/api/bank-accounts/${id}/`, {
+      method: 'DELETE',
     });
   }
 }
