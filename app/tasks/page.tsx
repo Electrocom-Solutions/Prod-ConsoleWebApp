@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import {
   Search,
   Filter,
@@ -53,14 +53,22 @@ function TaskHubPageContent() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isSlideOverOpen, setIsSlideOverOpen] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const router = useRouter();
 
-  // Check for project filter in URL query params on mount
+  // Check for project filter and action=new in URL query params on mount
   useEffect(() => {
     const projectParam = searchParams.get("project");
     if (projectParam) {
       setProjectFilter(projectParam);
     }
-  }, [searchParams]);
+    
+    const action = searchParams.get("action");
+    if (action === "new") {
+      setShowCreateModal(true);
+      // Remove the query parameter from URL
+      router.replace("/tasks");
+    }
+  }, [searchParams, router]);
 
   // Helper to get resources for a task from state
   const getTaskResources = (taskId: number): TaskResource[] => {

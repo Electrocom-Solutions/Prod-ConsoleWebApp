@@ -247,7 +247,7 @@ function DashboardContent() {
               </Button>
               <Button
                 className="h-20 flex-col gap-2"
-                onClick={() => router.push("/amc?action=new")}
+                onClick={() => router.push("/amcs?action=new")}
               >
                 <Plus className="h-5 w-5" />
                 New AMC

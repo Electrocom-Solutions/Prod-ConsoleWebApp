@@ -6,9 +6,15 @@
 // Get API URL from environment variable or use default
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-// Log API URL in development for debugging
-if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-  console.log('[API Client] Base URL:', API_BASE_URL);
+// Log API URL for debugging (in both development and production if needed)
+if (typeof window !== 'undefined') {
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[API Client] Base URL:', API_BASE_URL);
+  }
+  // In production, log if API URL is still localhost (indicates misconfiguration)
+  if (process.env.NODE_ENV === 'production' && API_BASE_URL.includes('localhost')) {
+    console.error('[API Client] WARNING: Using localhost URL in production! Check NEXT_PUBLIC_API_URL environment variable.');
+  }
 }
 
 export interface ApiError {
@@ -315,8 +321,10 @@ class ApiClient {
           error: 'Network Error',
           message: `Cannot connect to API server at ${this.baseURL}. Please check:
 1. Is the Django server running?
-2. Is the API URL correct in .env.local?
-3. Are CORS settings configured?`,
+2. Is the API URL correct? (Current: ${this.baseURL})
+3. Are CORS settings configured on the backend?
+4. For production: Is NEXT_PUBLIC_API_URL set in Vercel environment variables?
+5. If using HTTPS, ensure the backend supports SSL/TLS`,
         };
         throw networkError;
       }

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import {
   Plus,
@@ -21,7 +22,9 @@ import TenderFormModal from "@/components/tenders/tender-form-modal";
 import { mockTenders as initialTenders } from "@/lib/mock-data/tenders";
 import { showDeleteConfirm, showConfirm } from "@/lib/sweetalert";
 
-export default function TendersPage() {
+function TendersPageContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [tenders, setTenders] = useState<Tender[]>(initialTenders);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("All");
@@ -56,6 +59,17 @@ export default function TendersPage() {
     setSelectedTender(null);
     setIsTenderModalOpen(true);
   };
+
+  // Check for action=new in URL params and open modal
+  useEffect(() => {
+    const action = searchParams.get("action");
+    if (action === "new") {
+      handleNewTender();
+      // Remove the query parameter from URL
+      router.replace("/tenders");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const handleEditTender = (tender: Tender) => {
     setSelectedTender(tender);
@@ -679,5 +693,19 @@ export default function TendersPage() {
         />
       </div>
     </DashboardLayout>
+  );
+}
+
+export default function TendersPage() {
+  return (
+    <Suspense fallback={
+      <DashboardLayout title="Tenders">
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-gray-500">Loading...</div>
+        </div>
+      </DashboardLayout>
+    }>
+      <TendersPageContent />
+    </Suspense>
   );
 }

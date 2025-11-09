@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { AMC, AMCBilling, Client } from '@/types';
 import {
@@ -168,7 +169,9 @@ const mockBillings: AMCBilling[] = [
   },
 ];
 
-export default function AMCsPage() {
+function AMCsPageContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [amcs, setAmcs] = useState<AMC[]>(mockAMCs);
   const [billings, setBillings] = useState<AMCBilling[]>(mockBillings);
   const [searchQuery, setSearchQuery] = useState('');
@@ -270,6 +273,17 @@ export default function AMCsPage() {
     setSelectedAMC(null);
     setIsAMCModalOpen(true);
   };
+
+  // Check for action=new in URL params and open modal
+  useEffect(() => {
+    const action = searchParams.get("action");
+    if (action === "new") {
+      handleNewAMC();
+      // Remove the query parameter from URL
+      router.replace("/amcs");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const handleEditAMC = (amc: AMC) => {
     setSelectedAMC(amc);
@@ -696,6 +710,20 @@ export default function AMCsPage() {
         )}
       </div>
     </DashboardLayout>
+  );
+}
+
+export default function AMCsPage() {
+  return (
+    <Suspense fallback={
+      <DashboardLayout title="AMCs">
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-gray-500">Loading...</div>
+        </div>
+      </DashboardLayout>
+    }>
+      <AMCsPageContent />
+    </Suspense>
   );
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { ClientFormModal } from "@/components/clients/client-form-modal";
 import {
@@ -21,7 +22,9 @@ import type { Client } from "@/types";
 import { format } from "date-fns";
 import { showDeleteConfirm, showConfirm, showAlert } from "@/lib/sweetalert";
 
-export default function ClientsPage() {
+function ClientsPageContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [clients, setClients] = useState<Client[]>([
     {
       id: 1,
@@ -157,6 +160,17 @@ export default function ClientsPage() {
     setEditingClient(undefined);
     setFormModalOpen(true);
   };
+
+  // Check for action=new in URL params and open modal
+  useEffect(() => {
+    const action = searchParams.get("action");
+    if (action === "new") {
+      handleCreateClient();
+      // Remove the query parameter from URL
+      router.replace("/clients");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const handleEditClient = (client: Client) => {
     setFormMode("edit");
@@ -715,5 +729,19 @@ export default function ClientsPage() {
         mode={formMode}
       />
     </DashboardLayout>
+  );
+}
+
+export default function ClientsPage() {
+  return (
+    <Suspense fallback={
+      <DashboardLayout title="Clients">
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-gray-500">Loading...</div>
+        </div>
+      </DashboardLayout>
+    }>
+      <ClientsPageContent />
+    </Suspense>
   );
 }
