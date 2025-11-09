@@ -1,0 +1,95 @@
+Employee Task Tracking (Tasks, TaskAttachment, TaskResource)
+Purpose
+Owner dashboard for reviewing, editing, assigning and approving field tasks submitted by employees. Provide fast, actionable summaries (day/week/month), let owner enter UNIT_COST for resources used, create tasks for staff, and export or act on task evidence (attachments).
+CORE FEATURES (Owner actions)
+Task Inbox
+See all tasks submitted by employees(new tasks highlighted).
+Quick filters: Today / This Week / This Month / Custom Date Range.
+Search by employee, client, project, location, or task ID.
+Summaries & Analytics
+Summary cards for selected period: Total Tasks, Completed, Pending, Total Time (hrs), Total Resource Cost (est.).
+Charts: tasks by status, tasks per employee, time logged over time.
+Export summary as CSV / PDF.
+Task List & Drilldown
+Compact list/table of tasks with key columns: Date, Employee, Client/Project, Location, Short Description, Time (mins), Status, Resource Cost (computed).
+Row actions: View, Edit, Assign/Reassign, Approve, Reject, Export Task (PDF).
+Inline expand to show attachments and resource lines.
+Edit Task (Owner)
+Full edit slide-over/modal enabling owner to:
+Update Status (Open, In Progress, Completed, Approved, Rejected).
+Add internal notes.
+Edit Resources used: for each resource line owner can enter UNIT_COST (owner-entered), update quantity, and the UI recalculates TOTAL_COST = UNIT_COST * QUANTITY.
+Add or remove resource lines.
+Add/replace attachments and view images/documents.
+Approve task (marks final, locks certain fields) with optional signature/note.
+Assign / Create Task
+Owner can create a new task and assign it to any employee:
+Fields: Client, Project, Location, Date, Description, Estimated Time, Resources (name + qty), Attachments, Priority.
+Assign/Reassign existing tasks to different employees via a quick action (dropdown with search).
+Bulk Actions
+Select multiple tasks to mark as Approved, Export, Assign, or Add internal note.
+Notifications
+Alerts for new tasks, tasks pending approval over X days, tasks with missing unit costs, and high-cost resource usage.
+UI / UX (Screens + Component Behavior)
+Global layout expectations
+Use the existing AppLayout with Sidebar + Header. Add a Task Hub icon in Sidebar labeled “Tasks (Field)”.
+Page title: Task Hub — Owner Console with date filter pill and quick action buttons: + Create Task, Bulk Actions, Export.
+Top area — Period Controls & Summaries
+Left: Date range selector with quick chips: Today | Week | Month | Custom. When clicked update all lists/charts.
+Middle: Summary cards (horizontal):
+Total Tasks (number)
+Pending Approval (number + red badge)
+Completed (number)
+Total Time (hrs) (sum of Time_Taken_Minutes / 60)
+Estimated Resource Cost (sum of resource totals using available unit costs; show "—" when unit cost missing)
+Right: Small chart preview (sparkline) showing tasks over selected period.
+
+
+Main area — Two-column responsive layout
+Left column (65%): Task Table / Feed
+ Right column (35%): Context Pane / Preview
+Task Table / Feed
+Defaults to table view on desktop with columns: Date | Employee | Client | Project | Short Desc (2 lines) | Time | Status | Resource Cost | Actions.
+Row visuals:
+New/unread tasks have a subtle blue dot.
+High-priority flagged with a small red tag.
+Resource cost cell shows computed amount; if unit costs missing show an amber pill “Unit cost missing” and link to “Edit”.
+Row actions (icons inline): View (eye), Assign (person +), Edit (pencil), Approve (check), More (⋯).
+Clicking a row expands inline or opens the Task Detail Slide-Over.
+Task Detail Slide-Over (Owner Edit)
+Header: Task #ID — Short Title with employee avatar and client tag.
+Sections (stacked, sticky header inside modal):
+Task Info: date, time taken, location, project, attachments preview (thumbnails).
+Resources Used: editable table with columns: Resource Name | Quantity | Unit (uom) | UNIT_COST (editable) | TOTAL_COST (computed) | Notes | Actions.
+
+
+UNIT_COST input: inline numeric input with currency prefix (₹). On change, recalculates TOTAL_COST instantly.
+If UNIT_COST empty, show subtle CTA link “Set unit cost”
+Owner Actions: Approve / Reject (with reason), Assign / Reassign dropdown (searchable employee list), Add Internal Note.
+Activity Feed: chronological entries (created, employee edits, owner edits, approvals).
+Bottom sticky bar: Save Changes (primary) + Approve & Close (success) + Export Task.
+Behavior & Micro-interactions
+When owner edits unit cost, show small inline tooltip: “Unit cost saved locally — click Save to persist.” On Save, show optimistic update with toast.
+Approve flow prompts confirm modal requiring optional payment confirmation if resource cost > threshold (configurable).
+When approving, lock resource UNIT_COST fields and append approval entry to activity.
+Context Pane / Preview (Right column)
+Quick filters and stats by employee (mini leaderboard): top employees by tasks, avg time.
+Recent unapproved tasks list (compact).
+Quick create widget (small form) to create & assign a task fast: Client, Project, Assignee, Short Desc, Est Time — used for urgent assignments.
+Create Task Modal (Owner)
+Full form with grouped inputs:
+Header: Create Task → selects Assignee (searchable), Priority.
+Left column: Client (autocomplete) → Project (dependent) → Location (text or map pin) → Date & Time → Estimated Time.
+Right column: Description (multiline), Resources (add row button), Attachments (drag & drop).
+Bottom: Create & Notify (sends push/email to assignee) and Create (no notify).
+List Filters & Saved Views
+Save filter sets as “Saved Views” (e.g., “My Pending Approvals”, “Week Summary — Site A”).
+Column toggles to show/hide Resource Cost, Attachments, etc.
+Bulk Actions UI
+When checkboxes selected, show sticky bulk action bar: Assign, Mark Approved.
+Attachment Viewer
+Masonry grid thumbnails; click to open Full-screen lightbox with left/right navigation, metadata panel (uploader, date, notes), download button and flag/report button.
+
+Empty & Error States
+If no tasks in selected period: show friendly state: “No field tasks for this period — create a task or expand the date range.” CTA: + Create Task.
+If owner tries to approve with missing resource unit costs, show amber warning: “Some resources have no unit cost — totals may be inaccurate. Continue?” with link to set costs.

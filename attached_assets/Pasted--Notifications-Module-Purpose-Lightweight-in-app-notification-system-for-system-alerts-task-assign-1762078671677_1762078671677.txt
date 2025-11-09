@@ -1,0 +1,68 @@
+ Notifications Module
+Purpose: Lightweight in-app notification system for system alerts (task assigned, bill due, tender reminders). Fast access from the header bell and a dedicated history page.
+Core features
+Real-time/unread count (polling or websocket-friendly).
+Notification types: Task, Bill, Tender, System, Reminder.
+Store: Id, Recipient_Id, Title, Message, Type, Is_Read, Created_At, Meta (optional JSON).
+Quick actions: Mark as Read / Mark All Read / Open Related Resource (link).
+Filters: All / Unread / By Type; search by text.
+Optional scheduling for system reminders (admin-only).
+UI / UX (concise)
+Bell in Header: circular bell icon, unread count badge (red). Clicking opens a dropdown (max height 360px, scrollable) showing latest 8 notifications grouped by time (Today / Yesterday / Older). Each item: icon (type), title (bold), short message, timestamp, small action button (Mark Read) and link arrow to open the resource.
+Dropdown controls: top row shows Mark all read and filter chip (All / Unread). Footer link View all notifications navigates to full page.
+Full page notifications: title + bulk controls (Mark all read, Filter by type, Search), Card view.
+Micro-interactions: optimistic mark-read (show spinner while persisting), toasts on failures, skeleton loaders while fetching.
+Components for creating new notification (send right now or schedule) which can be sent to the employees 
+
+
+
+Email Templates Module 
+Purpose: Manage reusable email templates with placeholders and provide a simple send/preview UI (send now or schedule).
+Core features
+CRUD for templates: Id, Name, Subject, Body (HTML), Placeholders (list of allowed variables), Created_At, Updated_At.
+WYSIWYG editor (HTML) with a placeholders dropdown for injecting tokens like {{client_name}}, {{amc_number}}, {{period_from}}, {{amount}}.
+Preview mode shows template rendered with sample/example data.
+Send modal: choose recipients (client/employee/custom emails), pick template, fill placeholder values (auto-filled from selected resource), preview, Send Now / Schedule.
+UI / UX 
+Templates List: compact table/cards with Name | Subject | Placeholders | Actions (Preview / Edit / Send). Quick search at top.
+Editor slide-over / page: Title input, Subject input, HTML WYSIWYG body, Placeholders helper panel on the right with copy-to-clipboard tokens and short descriptions. Save / Save as New / Delete actions.
+Preview: toggle between Raw HTML and Rendered Preview (renders sample JSON). Includes a “Use sample data” dropdown to switch contexts (Client sample / Employee sample / Custom).
+Send Modal: select recipients (autocomplete from clients/employees or paste emails), template dropdown (preselect current if invoked from template), list placeholder inputs (pre-filled if resource selected), schedule option (date/time picker). Preview rendered email and Send. Show success toast and log entry.
+Projects & Resources
+Purpose: Project master, resources inventory, and linking resources to Tasks.
+Core features
+Project CRUD: Name, Client_Id, Start/End, Status.
+Resource master: Resource name, unit_of_measure, stock_count (optional), price.
+TaskResource: add consumption, compute cost.
+Project-level dashboards for resource consumption & cost.
+UI / UX
+Projects page
+Table: Project name, Client, Start, End, Status, Actions.
+Project detail: tasks, resource consumption, cost summary.
+Resource page
+Master grid with add/edit resource flow. Quick stock adjust modal.
+
+
+
+Reports & Exports
+Purpose: Centralized report generator for finance, tasks, attendance, payroll, tenders.
+Core features
+Prebuilt reports: AMC Billing Summary, Outstanding Receivables, Payroll Summary, Tasks by Employee, Tender Pipeline.
+Custom report builder: pick dataset, filters, group by, aggregate.
+Export to CSV / PDF, schedule export.
+UI / UX
+Reports hub
+Cards for each prebuilt report with quick filters.
+Report viewer: table + chart + export buttons.
+Schedule export modal: email results to owner on schedule.
+
+Settings (Bank Account, Holiday Calendar, System)
+Purpose: Store company bank accounts, holiday calendar, global configs.
+Core features
+Bank account CRUD used for payment references.
+Holiday calendar management (date, name, type).
+System settings: billing defaults, reminder windows, currency, timezone.
+UI / UX
+Settings area
+Tabs: Company, Bank Accounts, Holiday Calendar, Email & Notifications, Integrations.
+Holiday calendar: calendar view and list edit.

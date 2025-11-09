@@ -1,0 +1,78 @@
+AMC Management
+Purpose: Manage AMCs as a separate module — create AMC contracts, automate billing rows, track payments and renewals, send reminders, and allow manual overrides.
+CORE FEATURES (Functional)
+AMC CRUD
+Create / Read / Update / Cancel AMCs.
+Fields: AMC_Number, Client_Id (link to Client), Start_Date, End_Date, Billing_Cycle (Monthly/Quarterly/Half-Yearly/Yearly), Amount, Status (Active / Expired / Cancelled / Pending), Description, Notes.
+Billing Generation
+Auto-generate AMC_Billing rows based on Billing_Cycle across the AMC period.
+Billing row fields: Bill_Number, AMC_Id, Period_From, Period_To, Amount, Paid (boolean), Payment_Date, Payment_Mode, Notes.
+Ability to generate Billings manually, too.
+Billing Management
+List generated bills and pending bills, mark bills as Paid (set date & mode), edit/cancel bills, and generate PDF via Document Management templates.
+Alerts & Renewals
+Alerts for AMCs expiring within configurable windows (7/15/30 days).
+Dashboard card for AMCs expiring soon, Pending Bills, Unbilled Periods.
+Email Reminders
+Send reminder emails using EmailTemplate placeholders auto-filled.
+Options: Send Now or Schedule.
+Email preview & logs.
+Manual Overrides
+Owner can manually create/edit/cancel billing rows, change amounts, or mark refunds.
+UI / UX SPEC (visual & behavior)
+Global Module Entry
+Page title: AMCs + + New AMC CTA.
+Top filter bar: Search by AMC Number/Client, Status filter, Billing Cycle filter, Expiry preset chips (7/15/30), and Generate Missing Bills button.
+AMC List / Table
+Columns:
+AMC Number (link to AMC Detail)
+Client Name (click goes to Client Profile)
+Start Date
+End Date
+Billing Cycle
+Amount
+Status 
+Next Bill Due (date + days left)
+Outstanding (sum of unpaid)
+Actions (View Billing, Generate Bill, Send Reminder, Edit)
+Sorting on End Date, Next Bill Due, Outstanding.
+AMC Detail View (primary workspace)
+Header card
+Prominent card with AMC_Number, Client (link), Start → End, Billing Cycle, Amount, Status, Edit & Renew buttons.
+Quick stats: Total Bills Generated, Paid, Pending Amount, Next Bill Due.
+Tabs under header
+Billing | Overview | Reminders / Activity | Documents
+Billing Tab
+Two sections: Pending Bills (top) and All Bills / History (below).
+Pending Bills: summarized card showing count & total outstanding and a CTA Collect Now / Generate Invoice.
+Billing Table (All Bills): columns: Bill Number | Period From | Period To | Amount | Paid | Payment Date | Mode | Actions.
+Inline Paid toggle: when marking paid, open small confirmation popover to set Payment Mode and Payment Date. Require input before confirming.
+Actions per bill: View PDF, Edit, Cancel, Send Reminder.
+Ability to multi-select bills and mark paid or export.
+Generate Bill flow
+Generate Bill button opens modal:
+Auto-filled: Period_From & Period_To (based on Billing_Cycle & last generated period), Amount (AMC.Amount / cycles), Suggested Bill_Number.
+Options: “Auto-generate next N periods” (numeric input), “Force generate if exists” (checkbox with strong warning).
+Preview computed list before submit.
+On submit: show progress and toast on completion.
+Timeline view
+Visual horizontal timeline showing billing periods as chips — color-coded by Paid / Pending / Cancelled; click chip opens bill detail.
+Overview Tab
+AMC description, linked documents, historical summary, renewal suggestions (renewal modal prefilled with previous terms).
+Reminders / Activity Tab
+Log of scheduled/sent reminders, emails, bill generation events. Button to Send Reminder (opens template chooser & preview).
+Documents Tab
+Link templates from Document Management for bill/PDF generation; show uploaded scanned copies.
+Create / Edit AMC
+Use slide-over form:
+Fields grouped: Basic (AMC_Number, Client select), Period (Start, End), Billing (Cycle, Amount), Status, Notes.
+Client select has quick-add (opens Client slide-over if client missing).
+Validation: End > Start; Amount > 0.
+Buttons: Save, Save & Generate Initial Bills (open next modal).
+Notifications & Alerts
+Notification bell shows unread AMC alerts (expiring soon, unpaid). In-list colored badges highlight expiring AMCs.
+Banner on AMC list when filtered results have expiring items: “X AMCs expiring in next 30 days — Review”.
+Micro-interactions
+Confirm modals for destructive actions (cancel AMC, delete/cancel bill).
+Skeletons while loading, toasts for success/fail.
+Inline help tooltips for Billing_Cycle and Auto-generate logic.

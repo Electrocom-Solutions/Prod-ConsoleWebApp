@@ -1,0 +1,63 @@
+ Client Management 
+Purpose: Master CRUD for clients — clean searchable directory used across the console. Keep it lightweight, fast, and dependable.
+
+CORE FEATURES (Functional)
+Client CRUD
+Create / Read / Update / Delete clients.
+Fields: Name, Business Name (optional), Address, City, State, Pin_Code, Country, Primary Contact Name, Primary Contact Email, Primary Contact Phone, Secondary Contact, Notes, Tags.
+
+
+Validation: email format, phone format, required name.
+
+
+Search & Filters
+Global search by name, city, state, contact.
+Filters: City, State, Has Active AMC (yes/no), Tag(s).
+
+
+Bulk Actions
+Select multiple clients → Export CSV, Send Bulk Email (choose template), Delete.
+
+
+Profile Page
+Client profile with contact details, address map link (optional), list of linked AMCs, projects, and recent activity.
+Quick actions: Edit client, Add AMC (shortcut), Send Email.
+UI / UX (visual & behavior)
+Global Layout
+Page title: Clients + primary CTA + New Client (prominent, teal/sky accent).
+Use a two-column responsive layout on large screens: Left = filters & quick stats, Right = list/details.
+Top Controls
+Search bar (placeholder: “Search clients, city, state, contact…”).
+Filter chips: City dropdown, State dropdown, Has Active AMC toggle, Tag multi-select.
+View toggle: Card grid / Compact table.
+Clients List — Table View (desktop default)
+Columns:
+Client Name (clickable → opens Client Profile)
+City
+State
+Primary Contact
+AMC Count (badge)
+Outstanding (amount & count)
+Last Activity (date)
+Actions (View / Edit / Quick Email)
+Rows show subtle hover elevation and actionable icons.
+AMC Count click directly navigates to AMC Management filtered for that client.
+Clients List — Card Grid (alternate)
+Card shows: Client name, small map/address line, primary contact, AMCs (count), small action buttons (email, view).
+Cards rearrange responsively; support keyboard focus.
+Client Profile / Detail
+Top header card: Name, full address, contact buttons (Call / Email), business tags, quick stats: Total AMCs, Open Projects, Outstanding Bills.
+Tabs under header: Overview | AMCs | Projects | Billing History | Activity Log.
+Overview tab: Address (map link), notes, documents (attach PDFs like GST).
+AMCs Tab: embedded list of AMCs for this client (link to AMC module).
+Activity log: chronological feed (task created, bill generated, email sent).
+Create / Edit Client
+Use slide-over form (right side) for Create/Edit:
+Fields grouped: Basic (Name, Business Name), Contacts (primary/secondary), Address, Meta (tags, notes).
+Inline validation and helpful microcopy under phone/email inputs.
+Save & Save+Add AMC buttons.
+Empty States
+Friendly illustration + copy: “No clients yet — Add your first client” + CTA.
+Micro-interactions
+Toasts for success/failure, skeleton loaders for lists, optimistic UI for quick toggles.
+Confirm modal for delete (show consequences: “Deleting will unlink AMCs — this action is irreversible.”).

@@ -1,0 +1,116 @@
+NOTE: replace all alerts with proper sweet alerts in dark theme.
+
+Document Managment
+	Filter based on firm all documents belong to a particular firm
+	Categories names: "work order", "experience certificate", "tender document", "affidavit"
+
+AMCs  
+	- when i click on AMC Number column link or eye button then the AMC_Billing related to that AMC are coming but the owner should get a toggle to mark them as paid or pending.
+
+Tenders
+	- Add a 6th Tile: Pending EMD Amount – This tile should display the total pending EMD amount that needs to be collected. Remove the EMD amount value that was previously being shown in the 5th tile (Pending EMDs).
+	- Security deposit 1 and security deposit 2 should be given as input fields which will be manually entered by the owner.
+	- DD Details input section should be present in edit slideover and create new tenderslideover. 
+		DD Date (date when dd was created)
+		DD number
+		DD amount
+		DD Benificiary Name
+		DD Bank Name
+	- In Fnancials and Deposits section add 3 cards in single row. SD1, SD2, Total EMD, next row should contain DD Details.
+	- In Tender Details page remove "Basic Details" section as all its details are already shown in above card.
+	- The Attach Documents button on the Tender Details page is currently not working.
+	This section should allow uploading all documents that were used or submitted during the tender process.
+	It is independent of the Document Management module — here, only final (sealed and completed) tender documents should be uploaded.
+
+Tasks
+	- by default "Today" filter should be applied instead of "This Week"
+	- A filter should be present for a particular project showing all tasks related to that particular project
+	- instead of showing client/project column show just -> project column
+	- when any task eye button is pressed, then a slideover appears, in that slideover attachments should be previewable on click (those attachments will be mostly photos and pdfs), make sure preview is working.
+	- also in Tasks actions remove edit icon, assign icon (person +) and more (...) icon as they are useless.
+	- in task slideover remove assign button and export task button.
+	- create task button not working.
+	- In main Task Tab, there is a button at top for creating Task "+ Create Task", make that working such that owner can create new tasks and can assign it to his employees.
+	- Export button next to create Task button should also be made working, whatever tasks we see on screen after applying all filters and all those should be exported in excel sheet with all details related to tasks.
+
+Projects
+	- when we edit any project or add a new project then we should get a dropdown of client whose project is it.
+	- when clicked on eye button then owner should be redirected to tasks tab where filter for that corresponding project is applied
+	- on clicking on delete icon instead of showing browser alert,  owner should get sweet alert confirming deletion
+
+
+ContractWorkers
+	- Replace skill dropdown ->  designation dropdown
+	- Replace Daily Rate → Monthly salary
+	- Assigned To → should be a dropdown listing all available projects.
+	- Add fields for: UAN Number, Aadhar Card Number.
+
+
+Attendance
+	Attendance of Employees only will be recorded here:
+	Total working days - 26
+	1. Attendance Recording:
+		Attendance is recorded only for employees (not for contractors or others)
+		Each employee will use the mobile app to mark attendance by taking a selfie and sharing their GPS location. (No need to write any code related to mobile app)
+		Employees will have two actions:
+			Punch In (with selfie + location)
+			Punch Out  (with selfie + location)
+		The system will automatically log their attendance details for that day, and in this attendance module owner just will see attendance requests for the day and will approve them
+
+	2. Approval Workflow:
+		All daily attendances will remain in Pending status until approved by the Owner/Admin.
+		The owner can approve or reject attendance entries on a daily basis.
+		If any employee fails to register attendance on a given day, they will automatically be marked as Absent for that date.
+
+	3. Manual Override (Owner Access):
+		The owner will have the ability to manually mark or modify attendance for any employee on any date if required.
+	
+	4. Filters & Views:
+		Date Filter: View attendance records per day, with the current date shown by default.
+		Pending Attendance Filter: Quickly view all attendances that are pending approval.
+		Search by Employee: Optional filter to locate all attendance of a specific employee in sorted order.
+	
+	5. Summary Metrics:
+		Total Working Days: Default set to 26 days per month.
+		Display summary such as:
+			Total employees present
+			Total absent
+			Total pending approvals
+			Total Employees on Leave
+			Total Working Days (in that month)
+	6. Export Report button should first open a modal which has a dropdown of month and year, and once selected and clicked on export button then attendance corresponding to that month and year will be downloaded.
+
+
+Payment Tracking
+	- Create this new Module just below Payroll, this will be tracking all the payments for contract workers.
+	- There should be a filter by month  (january, february ...)
+	- By Default all payments related to current month will be displayed.
+	- owner will get a button to track payment, clicking on which opens a modal to select the month and year for which payment needs to be tracked then owner will be uploading excel sheet containing all the contract workers whose payment needs to be tracked, sheet will contain these details
+		Place of work
+		Worker Name
+		Mobile Number
+		Net Salary Payable 
+		Bank Name
+		Bank Account Number
+		IFSC Code
+	- As soon as owner upload these detail it will be shown in the Table and there are some bulk actions which he can perform on them.
+		- owner should be able to select multiple contract workers and click on export button -> this will export an excel sheet containing all details of that contract worker(Place of work, Worker Name, Mobile Number, Net Salary Payable, Bank Name, Bank Account Number, IFSC Code)
+		- Owner should be able to mark payment as paid in bulk, he will select multiple employees and click on mark as paid, as soon as we click mark as paid button a modal opens which have a calander input and payment mode dropdown, so owner can select on which date i have paid their payment, and he will be also given with a button take todays Date.
+	- In Table shown to owner he should also get a column for payment date, payment mode, and payment status.
+	- owner should be able to sort employees by clicking on its column.
+	- add all relevant important tiles for statistics.
+
+Payroll 
+	- This module only considers Employees (not contract workers)
+	- remove from and to date filter and replace it with Month and Year filters, by default current month and year should be selected.
+	- remove columns: Employee Type, Gross, deductions, there will be only Net Amount column which have that employee salary, there are no deductions here
+	- remove recalculate icon from Actions column.
+	- actions column will have only 2 actions per row
+		- when we click on mark as paid button then modal opens with payment date, payment mode input.
+		- eye icon to show breakdown
+			NOTE: we pay our employees (whole salary - leave) amount, no other deductions
+		- remove Allowances, Deductions sections from payment detail modal, also in payment details section in that modal we need payment mode and payment date only, no need for transaction reference.
+	- bulk action to mark multiple employees as paid (this will also open modal to capture payment date and payment mode).
+	- in table view payment date and payment mode columns should also be shown.
+		
+

@@ -1,0 +1,292 @@
+import { Tender, TenderFinancials, TenderDocument, TenderActivity } from "@/types";
+
+export const mockTenders: Tender[] = [
+  {
+    id: 1,
+    name: "Smart City Infrastructure Project",
+    reference_number: "TND/2024/001",
+    description: "Development of smart city infrastructure including traffic management and surveillance systems across 15 zones with integrated command center",
+    filed_date: "2024-10-15",
+    start_date: "2024-11-01",
+    end_date: "2025-10-31",
+    estimated_value: 10000000,
+    status: "Filed",
+    created_at: "2024-10-10T10:00:00Z",
+    updated_at: "2024-10-15T14:30:00Z",
+  },
+  {
+    id: 2,
+    name: "Municipal Office Networking",
+    reference_number: "TND/2024/002",
+    description: "Complete networking solution for 5 municipal office buildings",
+    filed_date: "2024-09-20",
+    start_date: "2024-10-01",
+    end_date: "2025-03-31",
+    estimated_value: 2500000,
+    status: "Awarded",
+    created_at: "2024-09-15T09:00:00Z",
+    updated_at: "2024-10-25T11:00:00Z",
+  },
+  {
+    id: 3,
+    name: "State Highway CCTV Installation",
+    reference_number: "TND/2024/003",
+    description: "Installation of CCTV cameras along 50km state highway stretch",
+    filed_date: "2024-08-10",
+    start_date: "2024-09-01",
+    end_date: "2024-12-31",
+    estimated_value: 5000000,
+    status: "Lost",
+    created_at: "2024-08-05T10:00:00Z",
+    updated_at: "2024-09-15T16:00:00Z",
+  },
+  {
+    id: 4,
+    name: "Healthcare IT Modernization",
+    reference_number: "TND/2024/004",
+    description: "IT infrastructure upgrade for district hospitals",
+    filed_date: undefined,
+    start_date: "2025-01-01",
+    end_date: "2025-12-31",
+    estimated_value: 8000000,
+    status: "Draft",
+    created_at: "2024-11-01T10:00:00Z",
+    updated_at: "2024-11-01T10:00:00Z",
+  },
+  {
+    id: 5,
+    name: "Public WiFi Network Deployment",
+    reference_number: "TND/2024/005",
+    description: "Deployment of public WiFi across 20 city locations",
+    filed_date: "2024-07-15",
+    start_date: "2024-08-01",
+    end_date: "2024-11-30",
+    estimated_value: 3000000,
+    status: "Closed",
+    created_at: "2024-07-10T10:00:00Z",
+    updated_at: "2024-11-20T15:00:00Z",
+  },
+];
+
+export const mockTenderFinancials: TenderFinancials[] = [
+  {
+    id: 1,
+    tender_id: 1,
+    emd_amount: 500000,
+    emd_dd_number: "DD123456",
+    emd_dd_date: "2024-10-14",
+    emd_bank: "State Bank of India",
+    emd_refundable: true,
+    sd1_amount: 200000,
+    sd1_dd_number: undefined,
+    sd1_dd_date: undefined,
+    sd1_bank: undefined,
+    sd1_refundable: false,
+    sd2_amount: 300000,
+    sd2_dd_number: undefined,
+    sd2_dd_date: undefined,
+    sd2_bank: undefined,
+    sd2_refundable: false,
+    notes: "EMD submitted via DD. SD1 and SD2 will be submitted after tender award.",
+  },
+  {
+    id: 2,
+    tender_id: 2,
+    emd_amount: 125000,
+    emd_dd_number: "DD789012",
+    emd_dd_date: "2024-09-18",
+    emd_bank: "HDFC Bank",
+    emd_refundable: false,
+    emd_refund_date: "2024-10-20",
+    sd1_amount: 50000,
+    sd1_dd_number: "DD456789",
+    sd1_dd_date: "2024-10-26",
+    sd1_bank: "ICICI Bank",
+    sd1_refundable: false,
+    sd2_amount: 75000,
+    sd2_dd_number: "DD654321",
+    sd2_dd_date: "2024-10-26",
+    sd2_bank: "ICICI Bank",
+    sd2_refundable: false,
+    notes: "All deposits submitted. Tender awarded successfully.",
+  },
+  {
+    id: 3,
+    tender_id: 3,
+    emd_amount: 250000,
+    emd_dd_number: "DD345678",
+    emd_dd_date: "2024-08-08",
+    emd_bank: "Punjab National Bank",
+    emd_refundable: true,
+    emd_refund_date: "2024-09-20",
+    sd1_amount: 100000,
+    sd1_refundable: false,
+    sd2_amount: 150000,
+    sd2_refundable: false,
+    notes: "EMD refunded after tender was lost.",
+  },
+  {
+    id: 4,
+    tender_id: 4,
+    emd_amount: 400000,
+    emd_refundable: true,
+    sd1_amount: 160000,
+    sd1_refundable: false,
+    sd2_amount: 240000,
+    sd2_refundable: false,
+    notes: "Tender in draft status. Financial details pending submission.",
+  },
+  {
+    id: 5,
+    tender_id: 5,
+    emd_amount: 150000,
+    emd_dd_number: "DD987654",
+    emd_dd_date: "2024-07-12",
+    emd_bank: "Axis Bank",
+    emd_refundable: false,
+    emd_refund_date: "2024-12-01",
+    sd1_amount: 60000,
+    sd1_refundable: false,
+    sd2_amount: 90000,
+    sd2_refundable: false,
+    notes: "Tender closed. All deposits refunded.",
+  },
+];
+
+export const mockTenderDocuments: TenderDocument[] = [
+  {
+    id: 1,
+    tender_id: 1,
+    document_id: 101,
+    document_title: "Technical Proposal - Smart City Infrastructure",
+    attached_at: "2024-10-12T14:00:00Z",
+    attached_by: "Admin User",
+  },
+  {
+    id: 2,
+    tender_id: 1,
+    document_id: 102,
+    document_title: "Financial Bid Document",
+    attached_at: "2024-10-12T14:30:00Z",
+    attached_by: "Admin User",
+  },
+  {
+    id: 3,
+    tender_id: 1,
+    document_id: 103,
+    document_title: "EMD Demand Draft Copy",
+    attached_at: "2024-10-14T10:00:00Z",
+    attached_by: "Finance Team",
+  },
+  {
+    id: 4,
+    tender_id: 2,
+    document_id: 104,
+    document_title: "Technical Bid - Municipal Networking",
+    attached_at: "2024-09-18T10:00:00Z",
+    attached_by: "Admin User",
+  },
+  {
+    id: 5,
+    tender_id: 2,
+    document_id: 105,
+    document_title: "Award Letter",
+    attached_at: "2024-10-25T15:00:00Z",
+    attached_by: "Admin User",
+  },
+];
+
+export const mockTenderActivities: TenderActivity[] = [
+  {
+    id: 1,
+    tender_id: 1,
+    type: "Status Changed",
+    description: "Tender status changed to Filed",
+    performed_by: "Admin User",
+    timestamp: "2024-10-15T14:30:00Z",
+  },
+  {
+    id: 2,
+    tender_id: 1,
+    type: "Financial Updated",
+    description: "EMD details updated with DD information",
+    performed_by: "Finance Team",
+    timestamp: "2024-10-14T16:00:00Z",
+  },
+  {
+    id: 3,
+    tender_id: 1,
+    type: "Document Attached",
+    description: "Attached EMD Demand Draft Copy",
+    performed_by: "Finance Team",
+    timestamp: "2024-10-14T10:00:00Z",
+  },
+  {
+    id: 4,
+    tender_id: 1,
+    type: "Document Attached",
+    description: "Attached Financial Bid Document",
+    performed_by: "Admin User",
+    timestamp: "2024-10-12T14:30:00Z",
+  },
+  {
+    id: 5,
+    tender_id: 1,
+    type: "Document Attached",
+    description: "Attached Technical Proposal - Smart City Infrastructure",
+    performed_by: "Admin User",
+    timestamp: "2024-10-12T14:00:00Z",
+  },
+  {
+    id: 6,
+    tender_id: 2,
+    type: "Status Changed",
+    description: "Tender status changed to Awarded",
+    performed_by: "Admin User",
+    timestamp: "2024-10-25T11:00:00Z",
+  },
+  {
+    id: 7,
+    tender_id: 2,
+    type: "Document Attached",
+    description: "Attached Award Letter",
+    performed_by: "Admin User",
+    timestamp: "2024-10-25T15:00:00Z",
+  },
+  {
+    id: 8,
+    tender_id: 3,
+    type: "Status Changed",
+    description: "Tender status changed to Lost",
+    performed_by: "Admin User",
+    timestamp: "2024-09-15T16:00:00Z",
+  },
+  {
+    id: 9,
+    tender_id: 3,
+    type: "Refund Marked",
+    description: "EMD refund processed",
+    performed_by: "Finance Team",
+    timestamp: "2024-09-20T10:00:00Z",
+  },
+];
+
+// Helper function to get tender by ID
+export function getTenderById(id: number): Tender | undefined {
+  return mockTenders.find((t) => t.id === id);
+}
+
+// Helper function to get financials by tender ID
+export function getFinancialsByTenderId(tenderId: number): TenderFinancials | undefined {
+  return mockTenderFinancials.find((f) => f.tender_id === tenderId);
+}
+
+// Helper function to get documents by tender ID
+export function getDocumentsByTenderId(tenderId: number): TenderDocument[] {
+  return mockTenderDocuments.filter((d) => d.tender_id === tenderId);
+}
+
+// Helper function to get activities by tender ID
+export function getActivitiesByTenderId(tenderId: number): TenderActivity[] {
+  return mockTenderActivities.filter((a) => a.tender_id === tenderId);
+}

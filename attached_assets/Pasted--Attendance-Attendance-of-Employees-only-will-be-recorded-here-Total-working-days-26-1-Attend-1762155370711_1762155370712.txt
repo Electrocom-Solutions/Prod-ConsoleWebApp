@@ -1,0 +1,36 @@
+
+Attendance
+	Attendance of Employees only will be recorded here:
+	Total working days - 26
+	1. Attendance Recording:
+		Attendance is recorded only for employees (not for contractors or others)
+		Each employee will use the mobile app to mark attendance by taking a selfie and sharing their GPS location. (No need to write any code related to mobile app)
+		Employees will have two actions:
+			Punch In (with selfie + location)
+			Punch Out  (with selfie + location)
+		The system will automatically log their attendance details for that day, and in this attendance module owner just will see attendance requests for the day and will approve them
+
+	2. Approval Workflow:
+		All daily attendances will remain in Pending status until approved by the Owner.
+		The owner can approve or reject attendance entries on a daily basis.
+		If any employee fails to register attendance on a given day, then there will be no entry for him on that day, so he will be automatically be marked as Absent for that date (this will be done by a cronjob in backend you just make related frontend).
+		Leaves should also be approved by owner
+
+	3. Manual Override (Owner Access):
+		The owner will have the ability to manually mark or modify attendance for any employee on any date if required, he should get edit button for each record to modify attendance.
+		when i click on mark attendance button then it opens a modal, in that modal employee name should be a dropdown, and if for that particular date a record already exists then it should be replace with this one.
+	
+	4. Filters & Views:
+		Date Filter: View attendance records per day, with the current date shown by default.
+		Pending Attendance Filter: Quickly view all attendances that are pending approval.
+		Search by Employee: Optional filter to locate all attendance of a specific employee in sorted order.
+	
+	5. Summary Metrics:
+		Total Working Days: Default set to 26 days per month.
+		Display summary such as:
+			Total employees present
+			Total absent
+			Total pending approvals
+			Total Employees on Leave
+			Total Working Days (in that month)
+	6. Export Report button should first open a modal which has a dropdown of month and year, and once selected and clicked on export button then attendance corresponding to that month and year will be downloaded.

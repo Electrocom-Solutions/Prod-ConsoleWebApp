@@ -1,0 +1,41 @@
+Global Layout (how the whole console should look)
+Purpose: Single admin console that hosts all modules. Clean, consistent, modular, accessible.
+Core features
+Persistent Sidebar (collapsible) with top logo (⚡ Electrocom) and module links: Dashboard, Documents, Clients, AMC, Tenders, Projects, Tasks, Employees & Contract Workers, Attendance, Payroll, Reports, Settings, Notifications.
+Header: page title, breadcrumb, global search (universal across modules), notification bell (unread count), quick toggles (date-range picker), user avatar dropdown (profile, preferences, logout), light and dark theme toggler.
+Main area: consistent grid-based content region. Each module uses cards, tables, forms, modals, slide-overs. Use responsive breakpoints.
+Global utilities: theme (light/dark toggle), toast notifications, skeleton loaders, server-side pagination and filtering.
+Recommended Sidebar Structure
+Top area: Logo + App name (Electrocom)
+Primary navigation (most-used / day-to-day):
+Dashboard — overview cards & quick actions
+Documents — Document Management (templates & versions)
+Clients — Client master & quick AMC summary
+AMCs — AMC listing & billing (direct module for quick access)
+Tenders — Tender pipeline & EMD tracking
+Projects — Projects list & project-level dashboards
+Tasks — Employee tasks & field work tracking
+People & payroll:
+ 8. Employees — Employee master & profiles
+ 9. Contract Workers — Contract worker master & bulk import
+ 10. Attendance — Daily attendance & approvals
+ 11. Payroll — Payroll generation & payslips
+Inventory & resources:
+ 12. Resources — Resource master & stock adjustments
+ 13. Task Resources — resource consumption per task (link view)
+Reporting & automation:
+ 14. Reports — Pre-built reports & custom report builder
+ 15. Notifications — In-app / system notifications center
+ 16. Email Templates — Manage email templates & placeholders
+System & admin:
+ 17. Bank Accounts — Company bank accounts for payments
+ 18. Holiday Calendar — Holiday entries & calendar view
+ 19. Settings — System-wide settings, integrations, billing defaults
+Footer (small):
+Help / Docs — Link to user guide / in-app help
+Logout
+Visual / Interaction
+Tailwind tokens: rounded-lg cards, soft shadows, neutral gray backgrounds, primary accent sky-500. Use Lucid icons.
+Sidebar collapses to icons on mobile; mobile uses bottom navigation for main modules.
+All tables support sortable columns, column toggles (show/hide).
+Provide “quick create” sticky CTA for adding clients, AMCs, tenders, tasks.
