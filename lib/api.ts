@@ -314,20 +314,47 @@ class ApiClient {
       }
       
       return data;
-    } catch (error) {
+    } catch (error: any) {
       // Enhanced error handling for network issues
-      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+      if (error instanceof TypeError && (error.message === 'Failed to fetch' || error.message?.includes('fetch'))) {
+        // Get hostname safely
+        let hostname = 'unknown';
+        try {
+          hostname = new URL(this.baseURL).hostname;
+        } catch (e) {
+          // Invalid URL, use baseURL as-is
+          hostname = this.baseURL;
+        }
+        
+        // Get current origin for CORS check
+        const frontendOrigin = typeof window !== 'undefined' ? window.location.origin : 'your frontend domain';
+        
         const networkError: ApiError = {
           error: 'Network Error',
-          message: `Cannot connect to API server at ${this.baseURL}. Please check:
-1. Is the Django server running?
-2. Is the API URL correct? (Current: ${this.baseURL})
-3. Are CORS settings configured on the backend?
-4. For production: Is NEXT_PUBLIC_API_URL set in Vercel environment variables?
-5. If using HTTPS, ensure the backend supports SSL/TLS`,
+          message: `Cannot connect to API server at ${this.baseURL}.\n\nPossible causes:
+- Backend server is not running or not accessible
+- DNS cannot resolve the domain: ${hostname}
+- SSL/TLS certificate issue (check if backend has valid SSL certificate)
+- Firewall or network blocking the connection
+- Backend is on a different port or path
+- CORS preflight request is failing
+
+Please verify:
+1. Backend server is running and accessible
+2. Backend URL is correct: ${this.baseURL}
+3. DNS resolves correctly (try: ping ${hostname} or curl ${this.baseURL}/api/)
+4. Backend has valid SSL certificate (for HTTPS)
+5. CORS settings in backend .env include: ${frontendOrigin}
+6. For production: NEXT_PUBLIC_API_URL is set in Vercel environment variables`,
         };
         throw networkError;
       }
+      
+      // Handle other fetch errors
+      if (error instanceof Error) {
+        throw error;
+      }
+      
       throw error;
     }
   }
