@@ -29,10 +29,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const currentUser = await apiClient.getCurrentUser();
       if (currentUser && (currentUser.is_staff || currentUser.is_superuser)) {
         setUser(currentUser);
-        console.log('[Auth] User authenticated:', currentUser);
+        // Log only non-sensitive user information
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[Auth] User authenticated:', {
+            id: currentUser.id,
+            username: currentUser.username,
+            is_staff: currentUser.is_staff,
+            is_superuser: currentUser.is_superuser,
+          });
+        }
       } else {
         // User is not staff or superuser, clear user state
-        console.log('[Auth] User not authorized or not found');
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[Auth] User not authorized or not found');
+        }
         setUser(null);
       }
     } catch (error) {
@@ -112,7 +122,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // If user is authorized and on login page, immediately redirect to dashboard
     if (isAuthorized && pathname === "/login") {
-      console.log('[Auth] User already authenticated, redirecting to dashboard');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Auth] User already authenticated, redirecting to dashboard');
+      }
       router.replace("/dashboard");
     }
   }, [user, isLoading, pathname, router]);

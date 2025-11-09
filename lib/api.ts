@@ -1572,16 +1572,13 @@ class ApiClient {
       if (!csrfToken) {
         console.error('[API] CRITICAL ERROR: No CSRF token available for', method, 'request to', endpoint);
         console.error('[API] This request will fail with a CSRF error');
-        console.error('[API] Available cookies:', typeof document !== 'undefined' ? document.cookie : 'N/A (SSR)');
-        console.error('[API] Cookie parsing test:');
-        if (typeof document !== 'undefined') {
-          const cookies = document.cookie.split(';');
-          cookies.forEach(cookie => {
-            const trimmed = cookie.trim();
-            if (trimmed.toLowerCase().includes('csrf')) {
-              console.error('[API] Found CSRF-related cookie:', trimmed.substring(0, 50) + '...');
-            }
-          });
+        // Never log full cookies as they may contain sensitive session data
+        if (process.env.NODE_ENV === 'development') {
+          // Only log cookie names, not values
+          if (typeof document !== 'undefined') {
+            const cookieNames = document.cookie.split(';').map(c => c.trim().split('=')[0]);
+            console.error('[API] Available cookie names:', cookieNames);
+          }
         }
       } else {
         if (process.env.NODE_ENV === 'development') {
@@ -2040,8 +2037,14 @@ Please verify:
       const response = await this.request<{ user: LoginResponse['user'] }>('/api/user/', {
         method: 'GET',
       });
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[API] Current user response:', response);
+      if (process.env.NODE_ENV === 'development' && response.user) {
+        // Log only non-sensitive user information
+        console.log('[API] Current user retrieved:', {
+          id: response.user.id,
+          username: response.user.username,
+          is_staff: response.user.is_staff,
+          is_superuser: response.user.is_superuser,
+        });
       }
       return response.user;
     } catch (error: any) {
