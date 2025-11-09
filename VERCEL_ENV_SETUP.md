@@ -46,19 +46,20 @@ Or in `settings.py`, ensure:
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(',') if os.getenv('ALLOWED_HOSTS') else []
 ```
 
-#### 2. CORS Configuration
+#### 2. CORS and CSRF Configuration
 
-```python
-CORS_ALLOWED_ORIGINS = [
-    # ... other origins ...
-    "https://console.electrocomsolutions.in",
-]
+In your Django `.env` file, set the following environment variables:
 
-CSRF_TRUSTED_ORIGINS = [
-    # ... other origins ...
-    "https://console.electrocomsolutions.in",
-]
 ```
+CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5000,http://localhost:5001,https://console.electrocomsolutions.in
+CSRF_TRUSTED_ORIGINS=http://localhost:3000,http://localhost:5000,http://localhost:5001,https://console.electrocomsolutions.in
+```
+
+**Note:**
+- Use comma-separated values (no spaces around commas, or spaces will be trimmed)
+- Both variables should include the same origins
+- If these are not set in `.env`, default development origins will be used
+- Make sure to include your production frontend domain: `https://console.electrocomsolutions.in`
 
 #### 3. Session Cookie Security (for HTTPS)
 
@@ -97,10 +98,11 @@ After setting up:
 #### Issue: CORS errors in browser console
 
 **Solution:**
-1. Verify that `https://console.electrocomsolutions.in` is in `CORS_ALLOWED_ORIGINS` on the backend
-2. Verify that `https://console.electrocomsolutions.in` is in `CSRF_TRUSTED_ORIGINS` on the backend
-3. Restart the Django server after updating CORS settings
-4. Check that `CORS_ALLOW_CREDENTIALS = True` is set
+1. Verify that `CORS_ALLOWED_ORIGINS` in backend `.env` includes `https://console.electrocomsolutions.in`
+2. Verify that `CSRF_TRUSTED_ORIGINS` in backend `.env` includes `https://console.electrocomsolutions.in`
+3. Format: Comma-separated list, e.g., `CORS_ALLOWED_ORIGINS=http://localhost:3000,https://console.electrocomsolutions.in`
+4. Restart the Django server after updating `.env` file
+5. Check that `CORS_ALLOW_CREDENTIALS = True` is set in settings (it should be by default)
 
 #### Issue: Session/Cookie issues
 
@@ -113,10 +115,12 @@ After setting up:
 
 - [ ] Set `NEXT_PUBLIC_API_URL` in Vercel (Production environment)
 - [ ] Redeploy the application on Vercel
-- [ ] Update backend `ALLOWED_HOSTS` to include `consoleapi.electrocomsolutions.in`
-- [ ] Update backend `CORS_ALLOWED_ORIGINS` to include `https://console.electrocomsolutions.in`
-- [ ] Update backend `CSRF_TRUSTED_ORIGINS` to include `https://console.electrocomsolutions.in`
-- [ ] Restart Django server after backend changes
+- [ ] Update backend `.env` file:
+  - [ ] Set `ALLOWED_HOSTS` to include `consoleapi.electrocomsolutions.in`
+  - [ ] Set `CORS_ALLOWED_ORIGINS` to include `https://console.electrocomsolutions.in` (comma-separated)
+  - [ ] Set `CSRF_TRUSTED_ORIGINS` to include `https://console.electrocomsolutions.in` (comma-separated)
+  - [ ] Set `SESSION_COOKIE_SECURE=True` if using HTTPS
+- [ ] Restart Django server after updating `.env` file
 - [ ] Verify API URL in browser console (should show production URL, not localhost)
 - [ ] Test login functionality
 
