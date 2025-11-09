@@ -1471,8 +1471,14 @@ class ApiClient {
           } else {
             console.warn('[API] CSRF token not found after fetch');
             console.warn('[API] Response status:', response.status);
-            console.warn('[API] Response headers:', Array.from(response.headers.entries()));
-            console.warn('[API] All cookies:', document.cookie);
+            // Never log full cookies or headers as they may contain sensitive data
+            if (process.env.NODE_ENV === 'development') {
+              // Only log cookie names, not values
+              if (typeof document !== 'undefined') {
+                const cookieNames = document.cookie.split(';').map(c => c.trim().split('=')[0]);
+                console.warn('[API] Available cookie names:', cookieNames);
+              }
+            }
             console.warn('[API] Cookie domain/path issues might prevent reading the token');
           }
         }
@@ -1614,7 +1620,11 @@ class ApiClient {
     } else if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method) && !csrfToken) {
       // This is a critical error - we need a token for state-changing requests
       console.error('[API] ERROR: Making', method, 'request to', endpoint, 'without CSRF token. This will fail.');
-      console.error('[API] Available cookies:', typeof document !== 'undefined' ? document.cookie : 'N/A (SSR)');
+      // Never log full cookies as they may contain sensitive session data
+      if (process.env.NODE_ENV === 'development' && typeof document !== 'undefined') {
+        const cookieNames = document.cookie.split(';').map(c => c.trim().split('=')[0]);
+        console.error('[API] Available cookie names:', cookieNames);
+      }
     }
 
     const config: RequestInit = {
@@ -1971,7 +1981,11 @@ class ApiClient {
           } else {
             console.warn('[API] WARNING: Could not get CSRF token after login. Future requests may fail.');
             if (typeof document !== 'undefined') {
-              console.warn('[API] Available cookies:', document.cookie);
+              // Never log full cookies as they may contain sensitive session data
+              if (process.env.NODE_ENV === 'development') {
+                const cookieNames = document.cookie.split(';').map(c => c.trim().split('=')[0]);
+                console.warn('[API] Available cookie names:', cookieNames);
+              }
             }
           }
         } catch (error) {
@@ -2539,6 +2553,8 @@ Please verify:
     formData.append('file', file);
     if (description) formData.append('description', description);
 
+    // Ensure we have a CSRF token before making the request
+    await this.ensureCsrfToken();
     const csrfToken = this.getCsrfToken();
     const headers: Record<string, string> = {};
     if (csrfToken) {
@@ -2813,6 +2829,8 @@ Please verify:
     formData.append('file', file);
     if (notes) formData.append('notes', notes);
 
+    // Ensure we have a CSRF token before making the request
+    await this.ensureCsrfToken();
     const csrfToken = this.getCsrfToken();
     const headers: Record<string, string> = {};
     if (csrfToken) {
@@ -2985,9 +3003,9 @@ Please verify:
     formData.append('upload_file', data.upload_file);
     if (data.notes) formData.append('notes', data.notes);
 
-    // Get CSRF token
+    // Ensure we have a CSRF token before making the request
+    await this.ensureCsrfToken();
     const csrfToken = this.getCsrfToken();
-    
     const headers: Record<string, string> = {};
     if (csrfToken) {
       headers['X-CSRFToken'] = csrfToken;
@@ -3061,6 +3079,8 @@ Please verify:
    * Bulk download documents
    */
   async bulkDownloadDocuments(data: BulkDownloadRequest): Promise<Blob> {
+    // Ensure we have a CSRF token before making the request
+    await this.ensureCsrfToken();
     const csrfToken = this.getCsrfToken();
     
     const headers: Record<string, string> = {
@@ -3223,6 +3243,8 @@ Please verify:
     if (data.aadhar_card) formData.append('aadhar_card', data.aadhar_card);
     if (data.pan_card) formData.append('pan_card', data.pan_card);
 
+    // Ensure we have a CSRF token before making the request
+    await this.ensureCsrfToken();
     const csrfToken = this.getCsrfToken();
     const headers: Record<string, string> = {};
     if (csrfToken) {
@@ -3274,6 +3296,8 @@ Please verify:
     if (data.aadhar_card) formData.append('aadhar_card', data.aadhar_card);
     if (data.pan_card) formData.append('pan_card', data.pan_card);
 
+    // Ensure we have a CSRF token before making the request
+    await this.ensureCsrfToken();
     const csrfToken = this.getCsrfToken();
     const headers: Record<string, string> = {};
     if (csrfToken) {
@@ -3380,6 +3404,8 @@ Please verify:
     if (data.ifsc_code) formData.append('ifsc_code', data.ifsc_code);
     if (data.bank_branch) formData.append('bank_branch', data.bank_branch);
 
+    // Ensure we have a CSRF token before making the request
+    await this.ensureCsrfToken();
     const csrfToken = this.getCsrfToken();
     const headers: Record<string, string> = {};
     if (csrfToken) {
@@ -3432,6 +3458,8 @@ Please verify:
     if (data.ifsc_code) formData.append('ifsc_code', data.ifsc_code);
     if (data.bank_branch) formData.append('bank_branch', data.bank_branch);
 
+    // Ensure we have a CSRF token before making the request
+    await this.ensureCsrfToken();
     const csrfToken = this.getCsrfToken();
     const headers: Record<string, string> = {};
     if (csrfToken) {
@@ -3469,6 +3497,8 @@ Please verify:
     const formData = new FormData();
     formData.append('excel_file', file);
 
+    // Ensure we have a CSRF token before making the request
+    await this.ensureCsrfToken();
     const csrfToken = this.getCsrfToken();
     const headers: Record<string, string> = {};
     if (csrfToken) {
@@ -3552,6 +3582,8 @@ Please verify:
     if (data.check_out_time) formData.append('check_out_time', data.check_out_time);
     if (data.notes) formData.append('notes', data.notes);
 
+    // Ensure we have a CSRF token before making the request
+    await this.ensureCsrfToken();
     const csrfToken = this.getCsrfToken();
     const headers: Record<string, string> = {};
     if (csrfToken) {
@@ -3585,6 +3617,8 @@ Please verify:
     if (data.check_out_time !== undefined) formData.append('check_out_time', data.check_out_time || '');
     if (data.notes !== undefined) formData.append('notes', data.notes || '');
 
+    // Ensure we have a CSRF token before making the request
+    await this.ensureCsrfToken();
     const csrfToken = this.getCsrfToken();
     const headers: Record<string, string> = {};
     if (csrfToken) {
