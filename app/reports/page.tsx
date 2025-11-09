@@ -118,43 +118,14 @@ function ReportModal({ reportId, onClose }: { reportId: string; onClose: () => v
   const handleExport = async () => {
     await showAlert(
       "Report Generated!",
-      `Report: ${report?.title}\nFormat: ${format.toUpperCase()}\nDate Range: ${dateRange}\n\nIn production, this would generate the report and download it automatically.`,
+      `Report: ${report?.title}\nFormat: ${format.toUpperCase()}\nDate Range: ${dateRange}\n\nThis feature will be integrated with backend APIs to generate real reports.`,
       "success"
     );
     onClose();
   };
 
-  const mockData = {
-    "amc-billing": [
-      { client: "BSNL", amount: 125000, status: "Paid" },
-      { client: "DataNet Solutions", amount: 45000, status: "Pending" },
-      { client: "PowerGrid", amount: 89000, status: "Paid" },
-      { client: "TechCorp", amount: 67000, status: "Overdue" },
-    ],
-    payroll: [
-      { employee: "Rajesh Kumar", amount: 38221, status: "Paid" },
-      { employee: "Priya Sharma", amount: 28328, status: "Pending" },
-      { employee: "Amit Patel", amount: 48760, status: "Pending" },
-      { employee: "Suresh Reddy", amount: 22000, status: "Paid" },
-    ],
-    tasks: [
-      { employee: "Rajesh Kumar", completed: 24, pending: 3, rate: "89%" },
-      { employee: "Amit Patel", completed: 18, pending: 5, rate: "78%" },
-      { employee: "Suresh Reddy", completed: 21, pending: 2, rate: "91%" },
-    ],
-    tender: [
-      { name: "BSNL Network Expansion", status: "Awarded", value: 2500000 },
-      { name: "Railway Signaling", status: "Filed", value: 1800000 },
-      { name: "Airport Infrastructure", status: "Lost", value: 3200000 },
-    ],
-    outstanding: [
-      { client: "DataNet Solutions", amount: 45000, days: 15 },
-      { client: "TechCorp", amount: 67000, days: 45 },
-      { client: "GlobalNet Inc", amount: 32000, days: 7 },
-    ],
-  };
-
-  const data = mockData[reportId as keyof typeof mockData] || [];
+  // Empty data - reports will be fetched from backend APIs when implemented
+  const data: any[] = [];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -205,30 +176,37 @@ function ReportModal({ reportId, onClose }: { reportId: string; onClose: () => v
             <div>
               <h3 className="font-semibold mb-3">Report Preview</h3>
               <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead>
-                    <tr className="border-b dark:border-gray-700">
-                      {Object.keys(data[0] || {}).map((key) => (
-                        <th key={key} className="text-left p-2 font-medium capitalize">
-                          {key.replace("_", " ")}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.map((row: any, idx) => (
-                      <tr key={idx} className="border-b dark:border-gray-700">
-                        {Object.values(row).map((value: any, i) => (
-                          <td key={i} className="p-2">
-                            {typeof value === "number" && value > 1000
-                              ? `₹${value.toLocaleString()}`
-                              : value}
-                          </td>
+                {data.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                    <p>Report preview will be available once backend integration is complete.</p>
+                    <p className="text-sm mt-2">This feature will fetch real data from the API.</p>
+                  </div>
+                ) : (
+                  <table className="min-w-full text-sm">
+                    <thead>
+                      <tr className="border-b dark:border-gray-700">
+                        {Object.keys(data[0] || {}).map((key) => (
+                          <th key={key} className="text-left p-2 font-medium capitalize">
+                            {key.replace("_", " ")}
+                          </th>
                         ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {data.map((row: any, idx) => (
+                        <tr key={idx} className="border-b dark:border-gray-700">
+                          {Object.values(row).map((value: any, i) => (
+                            <td key={i} className="p-2">
+                              {typeof value === "number" && value > 1000
+                                ? `₹${value.toLocaleString()}`
+                                : value}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
             </div>
           </div>
