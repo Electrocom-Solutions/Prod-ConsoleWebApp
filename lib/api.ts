@@ -1649,7 +1649,10 @@ class ApiClient {
       ...options,
       method,
       headers,
-      credentials: 'include', // Important for session cookies
+      // CRITICAL: Always include credentials to send cookies (sessionid, csrftoken)
+      // This is required for Django session authentication and CSRF protection
+      // Must be set after spreading options to ensure it's never overridden
+      credentials: 'include',
     };
 
     try {
@@ -1748,6 +1751,7 @@ class ApiClient {
               const retryConfig: RequestInit = {
                 ...config,
                 headers: retryHeaders,
+                credentials: 'include', // CRITICAL: Always include credentials for cookies
               };
               
               // Mark that we've retried to avoid infinite loops
@@ -1940,10 +1944,12 @@ class ApiClient {
     }
     
     try {
+      // CRITICAL: credentials: 'include' is required to send/receive cookies (sessionid, csrftoken)
+      // Without this, Django won't receive the session cookie and CSRF validation will fail
       const response = await fetch(url, {
         method: 'POST',
         headers,
-        credentials: 'include',
+        credentials: 'include', // Required for cookies and CSRF protection
         body: JSON.stringify({
           login_identifier: loginIdentifier,
           password,
@@ -2579,10 +2585,12 @@ Please verify:
       headers['X-CSRFToken'] = csrfToken;
     }
 
+    // CRITICAL: credentials: 'include' is required to send cookies (sessionid, csrftoken)
+    // Without this, Django won't receive the session cookie and CSRF validation will fail
     const response = await fetch(`${this.baseURL}/api/tenders/${tenderId}/attach-document/`, {
       method: 'POST',
       headers,
-      credentials: 'include',
+      credentials: 'include', // Required for cookies and CSRF protection
       body: formData,
     });
 
@@ -2855,10 +2863,12 @@ Please verify:
       headers['X-CSRFToken'] = csrfToken;
     }
 
+    // CRITICAL: credentials: 'include' is required to send cookies (sessionid, csrftoken)
+    // Without this, Django won't receive the session cookie and CSRF validation will fail
     const response = await fetch(`${this.baseURL}/api/tasks/${taskId}/attach-document/`, {
       method: 'POST',
       headers,
-      credentials: 'include',
+      credentials: 'include', // Required for cookies and CSRF protection
       body: formData,
     });
 
@@ -3029,10 +3039,12 @@ Please verify:
       headers['X-CSRFToken'] = csrfToken;
     }
 
+    // CRITICAL: credentials: 'include' is required to send cookies (sessionid, csrftoken)
+    // Without this, Django won't receive the session cookie and CSRF validation will fail
     const response = await fetch(`${this.baseURL}/api/documents/templates/upload-template/`, {
       method: 'POST',
       headers,
-      credentials: 'include',
+      credentials: 'include', // Required for cookies and CSRF protection
       body: formData,
     });
 
@@ -3108,10 +3120,12 @@ Please verify:
       headers['X-CSRFToken'] = csrfToken;
     }
 
+    // CRITICAL: credentials: 'include' is required to send cookies (sessionid, csrftoken)
+    // Without this, Django won't receive the session cookie and CSRF validation will fail
     const response = await fetch(`${this.baseURL}/api/documents/templates/bulk-download/`, {
       method: 'POST',
       headers,
-      credentials: 'include',
+      credentials: 'include', // Required for cookies and CSRF protection
       body: JSON.stringify(data),
     });
 
@@ -3269,10 +3283,12 @@ Please verify:
       headers['X-CSRFToken'] = csrfToken;
     }
 
+    // CRITICAL: credentials: 'include' is required to send cookies (sessionid, csrftoken)
+    // Without this, Django won't receive the session cookie and CSRF validation will fail
     const response = await fetch(`${this.baseURL}/api/employees/`, {
       method: 'POST',
       headers,
-      credentials: 'include',
+      credentials: 'include', // Required for cookies and CSRF protection
       body: formData,
     });
 
@@ -3322,10 +3338,12 @@ Please verify:
       headers['X-CSRFToken'] = csrfToken;
     }
 
+    // CRITICAL: credentials: 'include' is required to send cookies (sessionid, csrftoken)
+    // Without this, Django won't receive the session cookie and CSRF validation will fail
     const response = await fetch(`${this.baseURL}/api/employees/${id}/`, {
       method: 'PATCH',
       headers,
-      credentials: 'include',
+      credentials: 'include', // Required for cookies and CSRF protection
       body: formData,
     });
 
@@ -3430,10 +3448,12 @@ Please verify:
       headers['X-CSRFToken'] = csrfToken;
     }
 
+    // CRITICAL: credentials: 'include' is required to send cookies (sessionid, csrftoken)
+    // Without this, Django won't receive the session cookie and CSRF validation will fail
     const response = await fetch(`${this.baseURL}/api/contract-workers/`, {
       method: 'POST',
       headers,
-      credentials: 'include',
+      credentials: 'include', // Required for cookies and CSRF protection
       body: formData,
     });
 
@@ -3484,10 +3504,12 @@ Please verify:
       headers['X-CSRFToken'] = csrfToken;
     }
 
+    // CRITICAL: credentials: 'include' is required to send cookies (sessionid, csrftoken)
+    // Without this, Django won't receive the session cookie and CSRF validation will fail
     const response = await fetch(`${this.baseURL}/api/contract-workers/${id}/`, {
       method: 'PATCH',
       headers,
-      credentials: 'include',
+      credentials: 'include', // Required for cookies and CSRF protection
       body: formData,
     });
 
@@ -3523,10 +3545,12 @@ Please verify:
       headers['X-CSRFToken'] = csrfToken;
     }
 
+    // CRITICAL: credentials: 'include' is required to send cookies (sessionid, csrftoken)
+    // Without this, Django won't receive the session cookie and CSRF validation will fail
     const response = await fetch(`${this.baseURL}/api/contract-workers/bulk-upload/`, {
       method: 'POST',
       headers,
-      credentials: 'include',
+      credentials: 'include', // Required for cookies and CSRF protection
       body: formData,
     });
 
@@ -3608,10 +3632,12 @@ Please verify:
       headers['X-CSRFToken'] = csrfToken;
     }
 
+    // CRITICAL: credentials: 'include' is required to send cookies (sessionid, csrftoken)
+    // Without this, Django won't receive the session cookie and CSRF validation will fail
     const response = await fetch(`${this.baseURL}/api/attendance/`, {
       method: 'POST',
       headers,
-      credentials: 'include',
+      credentials: 'include', // Required for cookies and CSRF protection
       body: formData,
     });
 
@@ -3643,10 +3669,12 @@ Please verify:
       headers['X-CSRFToken'] = csrfToken;
     }
 
+    // CRITICAL: credentials: 'include' is required to send cookies (sessionid, csrftoken)
+    // Without this, Django won't receive the session cookie and CSRF validation will fail
     const response = await fetch(`${this.baseURL}/api/attendance/${id}/`, {
       method: 'PATCH',
       headers,
-      credentials: 'include',
+      credentials: 'include', // Required for cookies and CSRF protection
       body: formData,
     });
 
@@ -3854,10 +3882,12 @@ Please verify:
       headers['X-CSRFToken'] = csrfToken;
     }
 
+    // CRITICAL: credentials: 'include' is required to send cookies (sessionid, csrftoken)
+    // Without this, Django won't receive the session cookie and CSRF validation will fail
     const response = await fetch(`${this.baseURL}/api/payment-tracker/upload/`, {
       method: 'POST',
       headers,
-      credentials: 'include',
+      credentials: 'include', // Required for cookies and CSRF protection
       body: formData,
     });
 
