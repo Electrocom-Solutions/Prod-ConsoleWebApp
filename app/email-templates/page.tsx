@@ -263,7 +263,10 @@ function EmailTemplatesPageContent() {
                       <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                         <span className="font-medium">Subject:</span> {template.subject}
                       </p>
-                      {template.placeholders && template.placeholders.length > 0 && (
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Created: {new Date(template.created_at).toLocaleDateString()}
+                      </p>
+                      {template.placeholders && template.placeholders.length > 0 ? (
                         <div className="flex flex-wrap gap-1 mt-2">
                           {template.placeholders.slice(0, 5).map((placeholder) => (
                             <span
@@ -279,6 +282,10 @@ function EmailTemplatesPageContent() {
                             </span>
                           )}
                         </div>
+                      ) : (
+                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+                          Click Preview or Edit to see template details
+                        </p>
                       )}
                     </div>
                     <div className="flex items-center gap-2">
