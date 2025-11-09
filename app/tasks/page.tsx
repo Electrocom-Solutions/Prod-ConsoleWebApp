@@ -272,7 +272,7 @@ function TaskHubPageContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [currentPage, debouncedSearchQuery, projectFilter, statusFilter, periodFilter, projects]);
+  }, [currentPage, debouncedSearchQuery, projectFilter, statusFilter, periodFilter, projects.length]); // Use projects.length to avoid recreating when projects array reference changes
 
   // Initial data fetch - run once on mount
   useEffect(() => {
