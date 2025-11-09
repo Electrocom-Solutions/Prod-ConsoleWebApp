@@ -291,6 +291,56 @@ export interface BackendTenderDetail {
   updated_by?: number;
 }
 
+/**
+ * Project Management Interfaces
+ */
+
+export interface ProjectStatisticsResponse {
+  total_projects: number;
+  planned_projects: number;
+  in_progress_projects: number;
+  completed_projects: number;
+  on_hold_projects: number;
+  canceled_projects: number;
+}
+
+export interface BackendProjectListItem {
+  id: number;
+  name: string;
+  client: number;
+  client_name: string;
+  tender: number | null;
+  tender_name: string | null;
+  start_date: string;
+  end_date: string;
+  status: 'Planned' | 'In Progress' | 'On Hold' | 'Completed' | 'Canceled';
+  created_at: string;
+}
+
+export interface BackendProjectListResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: BackendProjectListItem[];
+}
+
+export interface BackendProjectDetail {
+  id: number;
+  name: string;
+  description?: string;
+  client: number;
+  client_name: string;
+  tender: number | null;
+  tender_name: string | null;
+  start_date: string;
+  end_date: string;
+  status: 'Planned' | 'In Progress' | 'On Hold' | 'Completed' | 'Canceled';
+  created_at: string;
+  updated_at: string;
+  created_by?: number;
+  updated_by?: number;
+}
+
 // Document Management Interfaces
 export interface DocumentTemplateVersion {
   id: number;
@@ -1151,6 +1201,94 @@ Please verify:
    */
   async deleteTenderDocument(tenderId: number, documentId: number): Promise<void> {
     await this.request(`/api/tenders/${tenderId}/delete-document/${documentId}/`, {
+      method: 'DELETE',
+    });
+  }
+
+  /**
+   * Project Management APIs
+   */
+
+  /**
+   * Get project statistics
+   */
+  async getProjectStatistics(): Promise<ProjectStatisticsResponse> {
+    return this.request<ProjectStatisticsResponse>('/api/projects/statistics/', {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * Get all projects with optional filters
+   */
+  async getProjects(params?: {
+    search?: string;
+    status?: 'Planned' | 'In Progress' | 'On Hold' | 'Completed' | 'Canceled';
+    page?: number;
+  }): Promise<BackendProjectListResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.page) queryParams.append('page', params.page.toString());
+
+    const queryString = queryParams.toString();
+    const endpoint = `/api/projects/${queryString ? `?${queryString}` : ''}`;
+
+    return this.request<BackendProjectListResponse>(endpoint, {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * Get a specific project by ID
+   */
+  async getProject(id: number): Promise<BackendProjectDetail> {
+    return this.request<BackendProjectDetail>(`/api/projects/${id}/`, {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * Create a new project
+   */
+  async createProject(data: {
+    name: string;
+    client: number;
+    tender?: number | null;
+    description?: string;
+    start_date?: string;
+    end_date?: string;
+    status?: 'Planned' | 'In Progress' | 'On Hold' | 'Completed' | 'Canceled';
+  }): Promise<BackendProjectDetail> {
+    return this.request<BackendProjectDetail>('/api/projects/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  /**
+   * Update a project
+   */
+  async updateProject(id: number, data: Partial<{
+    name: string;
+    client: number;
+    tender: number | null;
+    description: string;
+    start_date: string;
+    end_date: string;
+    status: 'Planned' | 'In Progress' | 'On Hold' | 'Completed' | 'Canceled';
+  }>): Promise<BackendProjectDetail> {
+    return this.request<BackendProjectDetail>(`/api/projects/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  /**
+   * Delete a project
+   */
+  async deleteProject(id: number): Promise<void> {
+    await this.request(`/api/projects/${id}/`, {
       method: 'DELETE',
     });
   }
