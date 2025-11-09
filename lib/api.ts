@@ -1197,6 +1197,53 @@ export interface BankAccountCreateData {
   branch?: string | null;
 }
 
+/**
+ * Holiday Calendar Interfaces
+ */
+
+export interface HolidayCalendarStatisticsResponse {
+  total_holidays: number;
+  public_holidays: number;
+  optional_holidays: number;
+}
+
+export interface BackendHolidayCalendarListItem {
+  id: number;
+  name: string;
+  date: string;
+  type: 'National' | 'Festival' | 'Company';
+  type_display: string;
+  created_at: string;
+  created_by: number | null;
+  created_by_username: string | null;
+}
+
+export interface HolidayCalendarListResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: BackendHolidayCalendarListItem[];
+}
+
+export interface HolidayCalendarDetail {
+  id: number;
+  name: string;
+  date: string;
+  type: 'National' | 'Festival' | 'Company';
+  created_at: string;
+  updated_at: string;
+  created_by: number | null;
+  created_by_username: string | null;
+  updated_by: number | null;
+  updated_by_username: string | null;
+}
+
+export interface HolidayCalendarCreateData {
+  name: string;
+  date: string; // YYYY-MM-DD
+  type: 'National' | 'Festival' | 'Company';
+}
+
 class ApiClient {
   private baseURL: string;
 
@@ -3550,6 +3597,79 @@ Please verify:
    */
   async deleteBankAccount(id: number): Promise<void> {
     await this.request(`/api/bank-accounts/${id}/`, {
+      method: 'DELETE',
+    });
+  }
+
+  /**
+   * Holiday Calendar API Methods
+   */
+
+  /**
+   * Get holiday calendar statistics
+   */
+  async getHolidayCalendarStatistics(): Promise<HolidayCalendarStatisticsResponse> {
+    return this.request<HolidayCalendarStatisticsResponse>('/api/holidays/statistics/');
+  }
+
+  /**
+   * Get holidays list with search and filters
+   */
+  async getHolidays(params?: {
+    search?: string;
+    type?: 'National' | 'Festival' | 'Company';
+    year?: number;
+    page?: number;
+  }): Promise<HolidayCalendarListResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.type) queryParams.append('type', params.type);
+    if (params?.year) queryParams.append('year', params.year.toString());
+    if (params?.page) queryParams.append('page', params.page.toString());
+
+    const queryString = queryParams.toString();
+    const endpoint = `/api/holidays/${queryString ? `?${queryString}` : ''}`;
+    return this.request<HolidayCalendarListResponse>(endpoint);
+  }
+
+  /**
+   * Get holiday details
+   */
+  async getHoliday(id: number): Promise<HolidayCalendarDetail> {
+    return this.request<HolidayCalendarDetail>(`/api/holidays/${id}/`);
+  }
+
+  /**
+   * Create holiday
+   */
+  async createHoliday(data: HolidayCalendarCreateData): Promise<HolidayCalendarDetail> {
+    return this.request<HolidayCalendarDetail>('/api/holidays/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+  }
+
+  /**
+   * Update holiday
+   */
+  async updateHoliday(id: number, data: Partial<HolidayCalendarCreateData>): Promise<HolidayCalendarDetail> {
+    return this.request<HolidayCalendarDetail>(`/api/holidays/${id}/`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+  }
+
+  /**
+   * Delete holiday
+   */
+  async deleteHoliday(id: number): Promise<void> {
+    await this.request(`/api/holidays/${id}/`, {
       method: 'DELETE',
     });
   }
