@@ -339,7 +339,7 @@ export type Payment = {
   updated_at: string;
 };
 
-export type NotificationType = "Task" | "Bill" | "Tender" | "Payroll" | "System" | "Reminder";
+export type NotificationType = "Task" | "AMC" | "Tender" | "Payroll" | "System" | "Other";
 
 export type NotificationRecord = {
   id: number;
@@ -353,6 +353,9 @@ export type NotificationRecord = {
   meta?: Record<string, any>;
   created_at: string;
   read_at?: string;
+  scheduled_at?: string | null;
+  sent_at?: string | null;
+  channel?: string;
 };
 
 export type EmailTemplate = {

@@ -2,13 +2,13 @@
 
 import { Bell, Moon, Sun, User, Settings, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { NotificationsDropdown } from "@/components/notifications/notifications-dropdown";
-import { mockNotifications } from "@/lib/mock-data/notifications";
 import { showConfirm } from "@/lib/sweetalert";
 import { useAuth } from "@/components/providers/auth-provider";
+import { apiClient } from "@/lib/api";
 
 export function Header({ title, breadcrumbs }: { title: string; breadcrumbs?: string[] }) {
   const router = useRouter();
@@ -20,10 +20,28 @@ export function Header({ title, breadcrumbs }: { title: string; breadcrumbs?: st
   const userMenuRef = useRef<HTMLDivElement>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const count = mockNotifications.filter(n => !n.is_read).length;
-    setUnreadCount(count);
+  /**
+   * Fetch unread notification count from backend
+   */
+  const fetchUnreadCount = useCallback(async () => {
+    try {
+      const stats = await apiClient.getNotificationStatistics();
+      setUnreadCount(stats.unread_count);
+    } catch (err) {
+      console.error('Error fetching unread count:', err);
+      // Silently fail - don't show error in header
+    }
   }, []);
+
+  // Fetch unread count on mount and set up polling
+  useEffect(() => {
+    fetchUnreadCount();
+    
+    // Poll for new notifications every 30 seconds
+    const interval = setInterval(fetchUnreadCount, 30000);
+    
+    return () => clearInterval(interval);
+  }, [fetchUnreadCount]);
 
   useEffect(() => {
     const stored = localStorage.getItem("theme") as "light" | "dark";
@@ -101,7 +119,7 @@ export function Header({ title, breadcrumbs }: { title: string; breadcrumbs?: st
 
             {showNotifications && (
               <div className="absolute right-0 top-12 z-50">
-                <NotificationsDropdown />
+                <NotificationsDropdown onNotificationUpdate={fetchUnreadCount} />
               </div>
             )}
           </div>

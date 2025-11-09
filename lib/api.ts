@@ -1018,6 +1018,78 @@ export interface TaskResourceDetail {
   resource_breakdown: BackendTaskResourceBreakdown[];
 }
 
+/**
+ * Notifications Interfaces
+ */
+
+export interface NotificationStatisticsResponse {
+  total_notifications: number;
+  unread_count: number;
+  read_count: number;
+}
+
+export interface BackendNotificationListItem {
+  id: number;
+  title: string;
+  message: string;
+  type: string;
+  type_display: string;
+  channel: string;
+  channel_display: string;
+  is_read: boolean;
+  scheduled_at: string | null;
+  sent_at: string | null;
+  created_at: string;
+  created_by: number | null;
+  created_by_username: string | null;
+}
+
+export interface NotificationListResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: BackendNotificationListItem[];
+}
+
+export interface NotificationDetail {
+  id: number;
+  recipient: number;
+  recipient_username: string;
+  title: string;
+  message: string;
+  type: string;
+  type_display: string;
+  channel: string;
+  channel_display: string;
+  is_read: boolean;
+  scheduled_at: string | null;
+  sent_at: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: number | null;
+  created_by_username: string | null;
+  updated_by: number | null;
+}
+
+export interface NotificationCreateData {
+  title: string;
+  message: string;
+  type: string;
+  channel?: string;
+  scheduled_at?: string | null;
+}
+
+export interface BulkMarkReadRequest {
+  notification_ids?: number[];
+  mark_all?: boolean;
+}
+
+export interface BulkMarkReadResponse {
+  marked_count: number;
+  skipped_count: number;
+  errors: string[] | null;
+}
+
 class ApiClient {
   private baseURL: string;
 
@@ -3150,6 +3222,88 @@ Please verify:
    */
   async getTaskResource(id: number): Promise<TaskResourceDetail> {
     return this.request<TaskResourceDetail>(`/api/task-resources/${id}/`);
+  }
+
+  /**
+   * Notifications API Methods
+   */
+
+  /**
+   * Get notification statistics
+   */
+  async getNotificationStatistics(): Promise<NotificationStatisticsResponse> {
+    return this.request<NotificationStatisticsResponse>('/api/notifications/statistics/');
+  }
+
+  /**
+   * Get notifications list with filters
+   */
+  async getNotifications(params?: {
+    search?: string;
+    type?: string;
+    is_read?: boolean;
+    page?: number;
+  }): Promise<NotificationListResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.type) queryParams.append('type', params.type);
+    if (params?.is_read !== undefined) queryParams.append('is_read', params.is_read.toString());
+    if (params?.page) queryParams.append('page', params.page.toString());
+
+    const queryString = queryParams.toString();
+    const endpoint = `/api/notifications/${queryString ? `?${queryString}` : ''}`;
+    return this.request<NotificationListResponse>(endpoint);
+  }
+
+  /**
+   * Get notification details
+   */
+  async getNotification(id: number): Promise<NotificationDetail> {
+    return this.request<NotificationDetail>(`/api/notifications/${id}/`);
+  }
+
+  /**
+   * Create notification (owner only - sends to all employees)
+   */
+  async createNotification(data: NotificationCreateData): Promise<NotificationDetail> {
+    return this.request<NotificationDetail>('/api/notifications/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+  }
+
+  /**
+   * Mark notification as read
+   */
+  async markNotificationAsRead(id: number): Promise<NotificationDetail> {
+    return this.request<NotificationDetail>(`/api/notifications/${id}/mark-read/`, {
+      method: 'POST',
+    });
+  }
+
+  /**
+   * Bulk mark notifications as read
+   */
+  async bulkMarkNotificationsAsRead(data: BulkMarkReadRequest): Promise<BulkMarkReadResponse> {
+    return this.request<BulkMarkReadResponse>('/api/notifications/bulk-mark-read/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+  }
+
+  /**
+   * Delete notification
+   */
+  async deleteNotification(id: number): Promise<void> {
+    await this.request(`/api/notifications/${id}/`, {
+      method: 'DELETE',
+    });
   }
 }
 

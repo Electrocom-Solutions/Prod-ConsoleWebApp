@@ -1,19 +1,38 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Bell, Check, CheckCheck, ArrowRight, X } from "lucide-react";
+import { Bell, Check, CheckCheck, ArrowRight } from "lucide-react";
 import { NotificationRecord } from "@/types";
-import { mockNotifications } from "@/lib/mock-data/notifications";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
+import { apiClient, BackendNotificationListItem } from "@/lib/api";
+
+/**
+ * Map backend notification to frontend NotificationRecord
+ */
+function mapBackendNotificationToFrontend(backendNotif: BackendNotificationListItem): NotificationRecord {
+  return {
+    id: backendNotif.id,
+    recipient_id: 0,
+    recipient_name: undefined,
+    title: backendNotif.title,
+    message: backendNotif.message,
+    type: backendNotif.type as any,
+    is_read: backendNotif.is_read,
+    created_at: backendNotif.created_at,
+    scheduled_at: backendNotif.scheduled_at,
+    sent_at: backendNotif.sent_at,
+    channel: backendNotif.channel,
+  };
+}
 
 const getNotificationIcon = (type: string) => {
   const iconClass = "h-5 w-5";
   switch (type) {
     case "Task":
       return <div className={cn(iconClass, "text-blue-500")}>📋</div>;
-    case "Bill":
+    case "AMC":
       return <div className={cn(iconClass, "text-green-500")}>💰</div>;
     case "Tender":
       return <div className={cn(iconClass, "text-purple-500")}>📄</div>;
@@ -21,7 +40,7 @@ const getNotificationIcon = (type: string) => {
       return <div className={cn(iconClass, "text-orange-500")}>💼</div>;
     case "System":
       return <div className={cn(iconClass, "text-gray-500")}>⚙️</div>;
-    case "Reminder":
+    case "Other":
       return <div className={cn(iconClass, "text-red-500")}>⏰</div>;
     default:
       return <Bell className={iconClass} />;
@@ -60,9 +79,36 @@ const groupNotificationsByTime = (notifications: NotificationRecord[]) => {
   return groups;
 };
 
-export function NotificationsDropdown() {
-  const [notifications, setNotifications] = useState<NotificationRecord[]>(mockNotifications);
+export function NotificationsDropdown({ onNotificationUpdate }: { onNotificationUpdate?: () => void }) {
+  const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
   const [filter, setFilter] = useState<"All" | "Unread">("All");
+  const [isLoading, setIsLoading] = useState(true);
+
+  /**
+   * Fetch notifications from backend
+   */
+  const fetchNotifications = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const params: any = {};
+      if (filter === "Unread") {
+        params.is_read = false;
+      }
+      // Limit to latest 8 notifications
+      const response = await apiClient.getNotifications(params);
+      const mappedNotifications = response.results.slice(0, 8).map(mapBackendNotificationToFrontend);
+      setNotifications(mappedNotifications);
+    } catch (err) {
+      console.error('Error fetching notifications:', err);
+      setNotifications([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [filter]);
+
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
@@ -74,24 +120,38 @@ export function NotificationsDropdown() {
   const latestNotifications = filteredNotifications.slice(0, 8);
   const groups = groupNotificationsByTime(latestNotifications);
 
-  const handleMarkAsRead = (id: number) => {
-    setNotifications((prev) =>
-      prev.map((n) =>
-        n.id === id
-          ? { ...n, is_read: true, read_at: new Date().toISOString() }
-          : n
-      )
-    );
+  const handleMarkAsRead = async (id: number) => {
+    try {
+      await apiClient.markNotificationAsRead(id);
+      // Update local state
+      setNotifications(prev =>
+        prev.map(n => n.id === id ? { ...n, is_read: true } : n)
+      );
+      // Notify parent to refresh count
+      if (onNotificationUpdate) {
+        onNotificationUpdate();
+      }
+    } catch (err) {
+      console.error('Error marking notification as read:', err);
+    }
   };
 
-  const handleMarkAllAsRead = () => {
-    setNotifications((prev) =>
-      prev.map((n) => ({
-        ...n,
-        is_read: true,
-        read_at: n.read_at || new Date().toISOString(),
-      }))
-    );
+  const handleMarkAllAsRead = async () => {
+    try {
+      await apiClient.bulkMarkNotificationsAsRead({ mark_all: true });
+      // Update local state
+      setNotifications(prev =>
+        prev.map(n => ({ ...n, is_read: true }))
+      );
+      // Notify parent to refresh count
+      if (onNotificationUpdate) {
+        onNotificationUpdate();
+      }
+      // Refetch to get updated list
+      fetchNotifications();
+    } catch (err) {
+      console.error('Error marking all notifications as read:', err);
+    }
   };
 
   const renderNotification = (notification: NotificationRecord) => (
@@ -129,14 +189,6 @@ export function NotificationsDropdown() {
               addSuffix: true,
             })}
           </p>
-          {notification.link && (
-            <Link
-              href={notification.link}
-              className="text-xs text-sky-600 hover:text-sky-700 dark:text-sky-400 flex items-center gap-1"
-            >
-              Open <ArrowRight className="h-3 w-3" />
-            </Link>
-          )}
         </div>
       </div>
     </div>
@@ -186,7 +238,11 @@ export function NotificationsDropdown() {
 
       {/* Notifications List */}
       <div className="max-h-96 overflow-y-auto">
-        {latestNotifications.length === 0 ? (
+        {isLoading ? (
+          <div className="p-8 text-center text-sm text-gray-500">
+            Loading notifications...
+          </div>
+        ) : latestNotifications.length === 0 ? (
           <div className="p-8 text-center text-sm text-gray-500">
             No notifications
           </div>
