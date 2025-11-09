@@ -222,17 +222,46 @@ function ClientsPageContent() {
     try {
       if (formMode === "create") {
         // Map frontend Client to backend format
-        const nameParts = (clientData.name || "").split(" ");
+        const name = (clientData.name || "").trim();
+        if (!name) {
+          showAlert("Error", "Client name is required.", "error");
+          setIsSaving(false);
+          return;
+        }
+        
+        // Split name into first and last name
+        const nameParts = name.split(/\s+/).filter(part => part.length > 0);
         const first_name = nameParts[0] || "";
-        const last_name = nameParts.slice(1).join(" ") || "";
+        // Use rest of name as last name, or use first name again if only one word
+        const last_name = nameParts.length > 1 ? nameParts.slice(1).join(" ") : first_name;
 
-        const backendData = {
+        if (!first_name) {
+          showAlert("Error", "Client name is required.", "error");
+          setIsSaving(false);
+          return;
+        }
+
+        const backendData: {
+          first_name: string;
+          last_name: string;
+          email?: string;
+          phone_number?: string;
+          notes?: string;
+        } = {
           first_name,
           last_name,
-          email: clientData.primary_contact_email,
-          phone_number: clientData.primary_contact_phone,
-          notes: clientData.notes,
         };
+
+        // Add optional fields only if they have values
+        if (clientData.primary_contact_email?.trim()) {
+          backendData.email = clientData.primary_contact_email.trim();
+        }
+        if (clientData.primary_contact_phone?.trim()) {
+          backendData.phone_number = clientData.primary_contact_phone.trim();
+        }
+        if (clientData.notes?.trim()) {
+          backendData.notes = clientData.notes.trim();
+        }
 
         await apiClient.createClient(backendData);
         showAlert("Success", "Client created successfully.", "success");
@@ -267,7 +296,30 @@ function ClientsPageContent() {
       }
     } catch (err: any) {
       console.error("Failed to save client:", err);
-      showAlert("Error", err.message || "Failed to save client.", "error");
+      // Extract error message - handle both Error objects and plain objects
+      let errorMessage = "Failed to save client.";
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      } else if (err?.message) {
+        errorMessage = err.message;
+      } else if (err?.error) {
+        errorMessage = err.error;
+      } else if (typeof err === 'string') {
+        errorMessage = err;
+      }
+      // If there are validation errors, show them
+      if (err?.response) {
+        const validationErrors = Object.entries(err.response)
+          .map(([field, messages]: [string, any]) => {
+            if (Array.isArray(messages)) {
+              return `${field}: ${messages.join(', ')}`;
+            }
+            return `${field}: ${messages}`;
+          })
+          .join('\n');
+        errorMessage = validationErrors || errorMessage;
+      }
+      showAlert("Error", errorMessage, "error");
     } finally {
       setIsSaving(false);
     }

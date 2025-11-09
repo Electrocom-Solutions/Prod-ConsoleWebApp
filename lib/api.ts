@@ -1887,8 +1887,25 @@ Please verify:
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Create failed' }));
-      throw error;
+      const errorData = await response.json().catch(() => ({ error: 'Create failed' }));
+      // Handle Django REST Framework validation errors
+      if (errorData && typeof errorData === 'object') {
+        // Format validation errors for display
+        const errorMessages: string[] = [];
+        for (const [field, messages] of Object.entries(errorData)) {
+          if (Array.isArray(messages)) {
+            errorMessages.push(`${field}: ${messages.join(', ')}`);
+          } else if (typeof messages === 'string') {
+            errorMessages.push(messages);
+          } else if (typeof messages === 'object') {
+            errorMessages.push(`${field}: ${JSON.stringify(messages)}`);
+          }
+        }
+        const error = new Error(errorMessages.length > 0 ? errorMessages.join('\n') : 'Failed to create client');
+        (error as any).response = errorData;
+        throw error;
+      }
+      throw new Error(errorData.error || errorData.message || 'Failed to create client');
     }
 
     return response.json();

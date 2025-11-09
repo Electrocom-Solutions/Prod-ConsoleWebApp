@@ -234,8 +234,15 @@ function TaskHubPageContent() {
 
       if (debouncedSearchQuery) params.search = debouncedSearchQuery;
       if (projectFilter !== "all") {
-        const project = projects.find((p) => p.name === projectFilter);
-        if (project) params.project = project.id;
+        // Try to find project by name if projects are loaded
+        if (projects.length > 0) {
+          const project = projects.find((p) => p.name === projectFilter);
+          if (project) {
+            params.project = project.id;
+          }
+        }
+        // If projects not loaded yet, skip project filter for now
+        // Tasks will be refetched when projects load
       }
       if (statusFilter !== "all") {
         // Map frontend status to backend status
@@ -261,21 +268,22 @@ function TaskHubPageContent() {
     } catch (err: any) {
       console.error("Failed to fetch tasks:", err);
       setError(err.message || "Failed to load tasks.");
+      setTasks([]); // Set empty array on error to prevent infinite loading
     } finally {
       setIsLoading(false);
     }
   }, [currentPage, debouncedSearchQuery, projectFilter, statusFilter, periodFilter, projects]);
 
-  // Initial data fetch
+  // Initial data fetch - run once on mount
   useEffect(() => {
     fetchStatistics();
     fetchProjects();
   }, [fetchStatistics, fetchProjects]);
 
+  // Fetch tasks - run when dependencies change
+  // This will run on mount and whenever filters change
   useEffect(() => {
-    if (projects.length > 0) {
-      fetchTasks();
-    }
+    fetchTasks();
   }, [fetchTasks]);
 
   // Check for project filter and action=new in URL query params on mount
