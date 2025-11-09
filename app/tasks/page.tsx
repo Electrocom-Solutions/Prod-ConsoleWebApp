@@ -181,8 +181,9 @@ function TaskHubPageContent() {
   const [statistics, setStatistics] = useState<TaskStatisticsResponse | null>(null);
   const [projects, setProjects] = useState<BackendProjectListItem[]>([]);
   const [employees, setEmployees] = useState<any[]>([]); // TODO: Add Employee type
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false); // Start as false, will be set to true when fetch starts
   const [error, setError] = useState<string | null>(null);
+  const [hasAttemptedFetch, setHasAttemptedFetch] = useState(false); // Track if we've attempted to fetch at least once
   const [isSaving, setIsSaving] = useState(false);
   
   const [searchQuery, setSearchQuery] = useState("");
@@ -212,17 +213,32 @@ function TaskHubPageContent() {
   // Fetch projects for dropdown
   const fetchProjects = useCallback(async () => {
     try {
+      console.log('[Tasks Page] Fetching projects...');
       const response = await apiClient.getProjects();
-      setProjects(response.results);
+      console.log('[Tasks Page] Projects response:', {
+        hasResponse: !!response,
+        hasResults: !!response?.results,
+        resultsCount: response?.results?.length,
+      });
+      if (response && response.results) {
+        setProjects(response.results);
+      } else {
+        console.warn('[Tasks Page] Invalid projects response, setting empty array');
+        setProjects([]);
+      }
     } catch (err: any) {
       console.error("Failed to fetch projects:", err);
+      // Set empty array on error so tasks can still be fetched (without project filter)
+      setProjects([]);
     }
   }, []);
 
   // Fetch tasks
   const fetchTasks = useCallback(async () => {
+    console.log('[Tasks Page] fetchTasks called', { currentPage, debouncedSearchQuery, projectFilter, statusFilter, periodFilter, projectsLength: projects.length });
     setIsLoading(true);
     setError(null);
+    setHasAttemptedFetch(true);
     try {
       const params: {
         search?: string;
@@ -255,25 +271,41 @@ function TaskHubPageContent() {
 
       console.log('[Tasks Page] Fetching tasks with params:', params);
       const response = await apiClient.getTasks(params);
-      console.log('[Tasks Page] Tasks response:', response);
+      console.log('[Tasks Page] Tasks response received:', {
+        hasResponse: !!response,
+        hasResults: !!response?.results,
+        resultsCount: response?.results?.length,
+        count: response?.count,
+        responseKeys: response ? Object.keys(response) : [],
+      });
       
+      // Handle null/undefined response
       if (!response) {
-        console.error('[Tasks Page] No response received');
-        setError("No response from server.");
+        console.error('[Tasks Page] No response received from API');
+        setError("No response from server. Please try again.");
         setTasks([]);
-        setIsLoading(false);
         return;
       }
       
+      // Handle missing results - treat as empty list rather than error
       if (!response.results) {
-        console.error('[Tasks Page] Invalid response format - missing results:', response);
+        console.warn('[Tasks Page] Response missing results field, treating as empty list:', response);
+        setTasks([]);
+        setTotalPages(1);
+        setError(null);
+        return;
+      }
+      
+      // Handle case where results is not an array
+      if (!Array.isArray(response.results)) {
+        console.error('[Tasks Page] Response results is not an array:', typeof response.results, response.results);
         setError("Invalid response format from server.");
         setTasks([]);
-        setIsLoading(false);
         return;
       }
       
       const mappedTasks = response.results.map(mapBackendTaskListItemToFrontend);
+      console.log('[Tasks Page] Mapped tasks:', mappedTasks.length);
       setTasks(mappedTasks);
       setTotalPages(Math.ceil((response.count || mappedTasks.length) / 20)); // Assuming 20 items per page
       setError(null); // Clear any previous errors
@@ -292,11 +324,30 @@ function TaskHubPageContent() {
         error: err?.error,
         status: err?.status,
         response: err?.response,
+        stack: err?.stack,
       });
-      const errorMessage = err?.message || err?.error || "Failed to load tasks. Please check your connection and try again.";
+      
+      // Extract error message from various possible error formats
+      let errorMessage = "Failed to load tasks. Please check your connection and try again.";
+      if (err?.message) {
+        errorMessage = err.message;
+      } else if (err?.error) {
+        errorMessage = typeof err.error === 'string' ? err.error : JSON.stringify(err.error);
+      } else if (typeof err === 'string') {
+        errorMessage = err;
+      } else if (err?.response) {
+        // Try to extract message from Django REST Framework error response
+        if (err.response.detail) {
+          errorMessage = err.response.detail;
+        } else if (err.response.error) {
+          errorMessage = typeof err.response.error === 'string' ? err.response.error : JSON.stringify(err.response.error);
+        }
+      }
+      
       setError(errorMessage);
       setTasks([]); // Set empty array on error to prevent infinite loading
     } finally {
+      console.log('[Tasks Page] fetchTasks finally block - setting isLoading to false');
       setIsLoading(false);
     }
   }, [currentPage, debouncedSearchQuery, projectFilter, statusFilter, periodFilter, projects.length]); // Use projects.length to avoid recreating when projects array reference changes
@@ -310,7 +361,25 @@ function TaskHubPageContent() {
   // Fetch tasks - run when dependencies change
   // This will run on mount and whenever filters change
   useEffect(() => {
-    fetchTasks();
+    let isMounted = true;
+    
+    const loadTasks = async () => {
+      try {
+        await fetchTasks();
+      } catch (err) {
+        // Error is already handled in fetchTasks, but ensure loading is cleared
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+    
+    loadTasks();
+    
+    // Cleanup function to prevent state updates after unmount
+    return () => {
+      isMounted = false;
+    };
   }, [fetchTasks]);
 
   // Check for project filter and action=new in URL query params on mount
@@ -595,8 +664,9 @@ function TaskHubPageContent() {
     document.body.removeChild(link);
   };
 
-  // Show loading only on initial load (when isLoading is true, no error, and no tasks yet)
-  if (isLoading && tasks.length === 0 && !error) {
+  // Show loading only on initial load (when isLoading is true, no tasks yet, and no error)
+  // Also check hasAttemptedFetch to ensure we've actually started fetching
+  if (isLoading && tasks.length === 0 && !error && hasAttemptedFetch) {
     return (
       <DashboardLayout title="Task Hub" breadcrumbs={["Home", "Tasks"]}>
         <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
