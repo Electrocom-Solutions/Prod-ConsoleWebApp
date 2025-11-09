@@ -1114,7 +1114,7 @@ function BulkMarkPresentModal({
 
           <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md p-3">
             <p className="text-sm text-blue-800 dark:text-blue-200">
-              <strong>Note:</strong> All attendance records will be created with "Pending" approval status and need to be approved by the owner.
+              <strong>Note:</strong> All attendance records will be created with &quot;Pending&quot; approval status and need to be approved by the owner.
             </p>
           </div>
 

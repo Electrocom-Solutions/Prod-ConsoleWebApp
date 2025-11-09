@@ -32,6 +32,13 @@ export default function TenderDetailPage() {
   const params = useParams();
   const tenderId = parseInt(params.id as string, 10);
 
+  // Initialize state first (before any conditional returns)
+  const [expandedSections, setExpandedSections] = useState({
+    financials: true,
+    documents: true,
+    activityFeed: false,
+  });
+
   // Look up tender and related data by ID
   const tender = getTenderById(tenderId);
   const financials = getFinancialsByTenderId(tenderId);
@@ -48,7 +55,7 @@ export default function TenderDetailPage() {
             Tender Not Found
           </h2>
           <p className="mt-2 text-gray-600 dark:text-gray-400">
-            The tender you're looking for doesn't exist or has been removed.
+            The tender you&apos;re looking for doesn&apos;t exist or has been removed.
           </p>
           <Link
             href="/tenders"
@@ -61,12 +68,6 @@ export default function TenderDetailPage() {
       </DashboardLayout>
     );
   }
-
-  const [expandedSections, setExpandedSections] = useState({
-    financials: true,
-    documents: true,
-    activityFeed: false,
-  });
 
   const handleDownloadDocument = (docId: number) => {
     // Find the document and trigger download

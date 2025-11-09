@@ -64,7 +64,7 @@ export function TaskDetailSlideOver({
       setInternalNote(task.internal_notes || "");
       setHasChanges(false);
     }
-  }, [task.id, isOpen, initialResources]);
+  }, [task.id, task.internal_notes, isOpen, initialResources]);
 
   const updateResourceUnitCost = (resourceId: number, unitCost: number | null) => {
     setResources((prev) =>
@@ -575,6 +575,7 @@ export function TaskDetailSlideOver({
             {/* Preview Content */}
             <div className="p-6 max-h-[calc(90vh-120px)] overflow-auto">
               {previewAttachment.file_type === "image" ? (
+                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={previewAttachment.file_url}
                   alt={previewAttachment.file_name}
@@ -591,7 +592,7 @@ export function TaskDetailSlideOver({
                     title={previewAttachment.file_name}
                   />
                   <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
-                    PDF preview. If the document doesn't display, please download it to view.
+                    PDF preview. If the document doesn&apos;t display, please download it to view.
                   </p>
                 </div>
               ) : (

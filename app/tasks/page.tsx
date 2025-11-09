@@ -183,7 +183,10 @@ export default function TaskHubPage() {
     const pending = filteredTasks.filter((t) => t.status === "Completed" && !t.approved_by).length;
     const completed = filteredTasks.filter((t) => t.status === "Approved").length;
     const totalTime = filteredTasks.reduce((sum, t) => sum + t.time_taken_minutes, 0);
-    const totalResourceCost = filteredTasks.reduce((sum, t) => sum + calculateTaskResourceCostFromState(t.id), 0);
+    const totalResourceCost = filteredTasks.reduce((sum, t) => {
+      const resources = taskResources[t.id] || [];
+      return sum + resources.reduce((resourceSum, r) => resourceSum + (r.total_cost || 0), 0);
+    }, 0);
 
     return { total, pending, completed, totalTime, totalResourceCost };
   }, [filteredTasks, taskResources]);

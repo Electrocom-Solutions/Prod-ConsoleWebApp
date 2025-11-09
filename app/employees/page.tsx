@@ -462,6 +462,7 @@ function EmployeeModal({ employee, onClose, onSave }: {
                 </label>
                 <div className="flex items-center gap-4">
                   {formData.photo && (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img src={formData.photo} alt="Preview" className="h-20 w-20 rounded-full object-cover border-2 border-gray-300 dark:border-gray-600" />
                   )}
                   <input

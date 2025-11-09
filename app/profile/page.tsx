@@ -157,6 +157,7 @@ export default function ProfilePage() {
             <div className="flex items-center gap-6">
               <div className="relative">
                 {photoPreview ? (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={photoPreview}
                     alt="Profile"
@@ -367,7 +368,7 @@ export default function ProfilePage() {
               <div className="border-t dark:border-gray-800 pt-4">
                 <h4 className="text-sm font-semibold mb-4 dark:text-white">Change Password</h4>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-                  Leave blank if you don't want to change your password
+                  Leave blank if you don&apos;t want to change your password
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
