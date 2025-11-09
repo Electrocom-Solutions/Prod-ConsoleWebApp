@@ -1448,10 +1448,20 @@ class ApiClient {
     // Get CSRF token for POST, PUT, DELETE, PATCH requests
     const csrfToken = this.getCsrfToken();
 
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      ...(options.headers as Record<string, string>),
-    };
+    // Check if body is FormData - if so, don't set Content-Type (browser will set it with boundary)
+    const isFormData = options.body instanceof FormData;
+    
+    const headers: Record<string, string> = {};
+    
+    // Only set Content-Type if it's not FormData
+    if (!isFormData) {
+      headers['Content-Type'] = 'application/json';
+    }
+    
+    // Merge with any custom headers (but don't override Content-Type for FormData)
+    if (options.headers) {
+      Object.assign(headers, options.headers);
+    }
 
     if (csrfToken && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
       headers['X-CSRFToken'] = csrfToken;
@@ -1701,6 +1711,79 @@ Please verify:
         document.cookie = 'sessionid=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
       }
     }
+  }
+
+  /**
+   * Profile Management APIs
+   */
+
+  /**
+   * Get current user profile
+   */
+  async getCurrentUserProfile(): Promise<CurrentUserProfile> {
+    return this.request<CurrentUserProfile>('/api/profile/', {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * Update current user profile
+   */
+  async updateCurrentUserProfile(data: CurrentUserProfileUpdateData): Promise<CurrentUserProfile> {
+    const formData = new FormData();
+
+    // User fields
+    if (data.username !== undefined) formData.append('username', data.username);
+    if (data.email !== undefined) formData.append('email', data.email);
+    if (data.first_name !== undefined) formData.append('first_name', data.first_name);
+    if (data.last_name !== undefined) formData.append('last_name', data.last_name);
+
+    // Profile fields
+    if (data.photo !== undefined) {
+      if (data.photo instanceof File) {
+        formData.append('photo', data.photo);
+      } else if (data.photo === null) {
+        formData.append('photo', ''); // Empty string to clear
+      }
+    }
+    if (data.date_of_birth !== undefined) formData.append('date_of_birth', data.date_of_birth || '');
+    if (data.gender !== undefined) formData.append('gender', data.gender || '');
+    if (data.address !== undefined) formData.append('address', data.address || '');
+    if (data.city !== undefined) formData.append('city', data.city || '');
+    if (data.state !== undefined) formData.append('state', data.state || '');
+    if (data.pin_code !== undefined) formData.append('pin_code', data.pin_code || '');
+    if (data.country !== undefined) formData.append('country', data.country || '');
+    if (data.aadhar_number !== undefined) formData.append('aadhar_number', data.aadhar_number || '');
+    if (data.pan_number !== undefined) formData.append('pan_number', data.pan_number || '');
+    
+    if (data.aadhar_card !== undefined) {
+      if (data.aadhar_card instanceof File) {
+        formData.append('aadhar_card', data.aadhar_card);
+      } else if (data.aadhar_card === null) {
+        formData.append('aadhar_card', ''); // Empty string to clear
+      }
+    }
+    
+    if (data.pan_card !== undefined) {
+      if (data.pan_card instanceof File) {
+        formData.append('pan_card', data.pan_card);
+      } else if (data.pan_card === null) {
+        formData.append('pan_card', ''); // Empty string to clear
+      }
+    }
+
+    // Phone number
+    if (data.phone_number !== undefined) formData.append('phone_number', data.phone_number || '');
+
+    // Password change
+    if (data.current_password !== undefined) formData.append('current_password', data.current_password || '');
+    if (data.new_password !== undefined) formData.append('new_password', data.new_password || '');
+    if (data.confirm_password !== undefined) formData.append('confirm_password', data.confirm_password || '');
+
+    return this.request<CurrentUserProfile>('/api/profile/update/', {
+      method: 'PATCH',
+      body: formData,
+    });
   }
 
   /**
