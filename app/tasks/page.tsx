@@ -253,10 +253,30 @@ function TaskHubPageContent() {
       }
       params.date_filter = periodFilter === "all" ? "all" : periodFilter;
 
+      console.log('[Tasks Page] Fetching tasks with params:', params);
       const response = await apiClient.getTasks(params);
+      console.log('[Tasks Page] Tasks response:', response);
+      
+      if (!response) {
+        console.error('[Tasks Page] No response received');
+        setError("No response from server.");
+        setTasks([]);
+        setIsLoading(false);
+        return;
+      }
+      
+      if (!response.results) {
+        console.error('[Tasks Page] Invalid response format - missing results:', response);
+        setError("Invalid response format from server.");
+        setTasks([]);
+        setIsLoading(false);
+        return;
+      }
+      
       const mappedTasks = response.results.map(mapBackendTaskListItemToFrontend);
       setTasks(mappedTasks);
-      setTotalPages(Math.ceil(response.count / 20)); // Assuming 20 items per page
+      setTotalPages(Math.ceil((response.count || mappedTasks.length) / 20)); // Assuming 20 items per page
+      setError(null); // Clear any previous errors
 
       // Note: Resources are fetched on-demand when task detail is opened
       // This improves performance by not fetching resources for all tasks upfront
@@ -266,8 +286,15 @@ function TaskHubPageContent() {
       });
       setTaskResources(resourcesMap);
     } catch (err: any) {
-      console.error("Failed to fetch tasks:", err);
-      setError(err.message || "Failed to load tasks.");
+      console.error("[Tasks Page] Failed to fetch tasks:", err);
+      console.error("[Tasks Page] Error details:", {
+        message: err?.message,
+        error: err?.error,
+        status: err?.status,
+        response: err?.response,
+      });
+      const errorMessage = err?.message || err?.error || "Failed to load tasks. Please check your connection and try again.";
+      setError(errorMessage);
       setTasks([]); // Set empty array on error to prevent infinite loading
     } finally {
       setIsLoading(false);
@@ -568,7 +595,8 @@ function TaskHubPageContent() {
     document.body.removeChild(link);
   };
 
-  if (isLoading && tasks.length === 0) {
+  // Show loading only on initial load (when isLoading is true, no error, and no tasks yet)
+  if (isLoading && tasks.length === 0 && !error) {
     return (
       <DashboardLayout title="Task Hub" breadcrumbs={["Home", "Tasks"]}>
         <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">

@@ -66,27 +66,22 @@ export function ClientFormModal({
       newErrors.name = "Client name is required";
     }
 
-    if (!formData.primary_contact_email?.trim()) {
-      newErrors.primary_contact_email = "Email is required";
-    } else if (
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.primary_contact_email)
-    ) {
-      newErrors.primary_contact_email = "Invalid email format";
+    // Email and phone are optional on backend, but we'll validate format if provided
+    if (formData.primary_contact_email?.trim()) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.primary_contact_email)) {
+        newErrors.primary_contact_email = "Invalid email format";
+      }
     }
 
-    if (!formData.primary_contact_phone?.trim()) {
-      newErrors.primary_contact_phone = "Phone is required";
-    } else if (!/^\d{10}$/.test(formData.primary_contact_phone.replace(/\D/g, ""))) {
-      newErrors.primary_contact_phone = "Phone must be 10 digits";
+    if (formData.primary_contact_phone?.trim()) {
+      const phoneDigits = formData.primary_contact_phone.replace(/\D/g, "");
+      if (phoneDigits.length < 10) {
+        newErrors.primary_contact_phone = "Phone must be at least 10 digits";
+      }
     }
 
-    if (!formData.city?.trim()) {
-      newErrors.city = "City is required";
-    }
-
-    if (!formData.state?.trim()) {
-      newErrors.state = "State is required";
-    }
+    // City and state are not required by backend, but validate format if provided
+    // (removed required validation)
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;

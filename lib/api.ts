@@ -2382,9 +2382,15 @@ Please verify:
     const queryString = queryParams.toString();
     const endpoint = `/api/tasks/${queryString ? `?${queryString}` : ''}`;
 
-    return this.request<BackendTaskListResponse>(endpoint, {
-      method: 'GET',
-    });
+    try {
+      return await this.request<BackendTaskListResponse>(endpoint, {
+        method: 'GET',
+      });
+    } catch (error: any) {
+      console.error('[API Client] Error fetching tasks:', error);
+      console.error('[API Client] Endpoint:', endpoint);
+      throw error;
+    }
   }
 
   /**
