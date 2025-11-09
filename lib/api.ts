@@ -569,6 +569,98 @@ export interface EmployeeCreateData {
   pan_card?: File;
 }
 
+// Contract Worker Management Interfaces
+export interface ContractWorkerStatisticsResponse {
+  total_workers: number;
+  total_available: number;
+  total_assigned: number;
+  total_monthly_payroll: number;
+}
+
+export interface BackendContractWorkerListItem {
+  id: number;
+  full_name: string | null;
+  email: string | null;
+  phone_number: string | null;
+  worker_type: 'Unskilled' | 'Semi-Skilled' | 'Skilled';
+  availability_status: string | null; // 'assigned' or 'available'
+  project: number | null;
+  project_name: string | null;
+  monthly_salary: string; // Decimal as string
+  department: string | null;
+  created_at: string;
+}
+
+export interface ContractWorkerListResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: BackendContractWorkerListItem[];
+}
+
+export interface ContractWorkerDetail {
+  id: number;
+  full_name: string | null;
+  email: string | null;
+  phone_number: string | null;
+  date_of_birth: string | null;
+  gender: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  pin_code: string | null;
+  country: string | null;
+  worker_type: 'Unskilled' | 'Semi-Skilled' | 'Skilled';
+  monthly_salary: string; // Decimal as string
+  aadhar_no: string;
+  uan_number: string | null;
+  department: string | null;
+  project: number | null;
+  project_name: string | null;
+  bank_account: {
+    id: number;
+    bank_name: string;
+    account_number: string;
+    ifsc_code: string;
+    branch: string;
+  } | null;
+  profile: number;
+  created_at: string;
+  updated_at: string;
+  created_by?: number;
+  updated_by?: number;
+}
+
+export interface ContractWorkerCreateData {
+  first_name: string;
+  last_name: string;
+  email: string;
+  worker_type: 'Unskilled' | 'Semi-Skilled' | 'Skilled';
+  monthly_salary: number;
+  aadhar_no: string;
+  phone_number?: string;
+  date_of_birth?: string; // YYYY-MM-DD
+  gender?: 'male' | 'female';
+  address?: string;
+  city?: string;
+  state?: string;
+  pin_code?: string;
+  country?: string;
+  uan_number?: string;
+  department?: string;
+  project?: number;
+  bank_name?: string;
+  bank_account_number?: string;
+  ifsc_code?: string;
+  bank_branch?: string;
+}
+
+export interface BulkUploadContractWorkerResponse {
+  success_count: number;
+  failed_count: number;
+  errors: string[];
+}
+
 class ApiClient {
   private baseURL: string;
 
@@ -2037,6 +2129,192 @@ Please verify:
     await this.request(`/api/employees/${id}/`, {
       method: 'DELETE',
     });
+  }
+
+  /**
+   * Contract Worker Management APIs
+   */
+
+  /**
+   * Get contract worker statistics
+   */
+  async getContractWorkerStatistics(): Promise<ContractWorkerStatisticsResponse> {
+    return this.request<ContractWorkerStatisticsResponse>('/api/contract-workers/statistics/', {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * Get all contract workers with optional filters
+   */
+  async getContractWorkers(params?: {
+    search?: string;
+    worker_type?: string;
+    availability?: 'assigned' | 'available';
+    page?: number;
+  }): Promise<ContractWorkerListResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.worker_type) queryParams.append('worker_type', params.worker_type);
+    if (params?.availability) queryParams.append('availability', params.availability);
+    if (params?.page) queryParams.append('page', params.page.toString());
+
+    const queryString = queryParams.toString();
+    const endpoint = `/api/contract-workers/${queryString ? `?${queryString}` : ''}`;
+
+    return this.request<ContractWorkerListResponse>(endpoint, {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * Get a specific contract worker by ID
+   */
+  async getContractWorker(id: number): Promise<ContractWorkerDetail> {
+    return this.request<ContractWorkerDetail>(`/api/contract-workers/${id}/`, {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * Create a new contract worker
+   */
+  async createContractWorker(data: ContractWorkerCreateData): Promise<ContractWorkerDetail> {
+    const formData = new FormData();
+    
+    // Required fields
+    formData.append('first_name', data.first_name);
+    formData.append('last_name', data.last_name);
+    formData.append('email', data.email);
+    formData.append('worker_type', data.worker_type);
+    formData.append('monthly_salary', data.monthly_salary.toString());
+    formData.append('aadhar_no', data.aadhar_no);
+    
+    // Optional fields
+    if (data.phone_number) formData.append('phone_number', data.phone_number);
+    if (data.date_of_birth) formData.append('date_of_birth', data.date_of_birth);
+    if (data.gender) formData.append('gender', data.gender);
+    if (data.address) formData.append('address', data.address);
+    if (data.city) formData.append('city', data.city);
+    if (data.state) formData.append('state', data.state);
+    if (data.pin_code) formData.append('pin_code', data.pin_code);
+    if (data.country) formData.append('country', data.country);
+    if (data.uan_number) formData.append('uan_number', data.uan_number);
+    if (data.department) formData.append('department', data.department);
+    if (data.project) formData.append('project', data.project.toString());
+    if (data.bank_name) formData.append('bank_name', data.bank_name);
+    if (data.bank_account_number) formData.append('bank_account_number', data.bank_account_number);
+    if (data.ifsc_code) formData.append('ifsc_code', data.ifsc_code);
+    if (data.bank_branch) formData.append('bank_branch', data.bank_branch);
+
+    const csrfToken = this.getCsrfToken();
+    const headers: Record<string, string> = {};
+    if (csrfToken) {
+      headers['X-CSRFToken'] = csrfToken;
+    }
+
+    const response = await fetch(`${this.baseURL}/api/contract-workers/`, {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Create failed' }));
+      throw error;
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Update a contract worker
+   */
+  async updateContractWorker(id: number, data: Partial<ContractWorkerCreateData>): Promise<ContractWorkerDetail> {
+    const formData = new FormData();
+    
+    // Required fields (only if provided)
+    if (data.first_name) formData.append('first_name', data.first_name);
+    if (data.last_name) formData.append('last_name', data.last_name);
+    if (data.email) formData.append('email', data.email);
+    if (data.worker_type) formData.append('worker_type', data.worker_type);
+    if (data.monthly_salary !== undefined) formData.append('monthly_salary', data.monthly_salary.toString());
+    if (data.aadhar_no) formData.append('aadhar_no', data.aadhar_no);
+    
+    // Optional fields
+    if (data.phone_number !== undefined) formData.append('phone_number', data.phone_number || '');
+    if (data.date_of_birth) formData.append('date_of_birth', data.date_of_birth);
+    if (data.gender) formData.append('gender', data.gender);
+    if (data.address) formData.append('address', data.address);
+    if (data.city) formData.append('city', data.city);
+    if (data.state) formData.append('state', data.state);
+    if (data.pin_code) formData.append('pin_code', data.pin_code);
+    if (data.country) formData.append('country', data.country);
+    if (data.uan_number !== undefined) formData.append('uan_number', data.uan_number || '');
+    if (data.department) formData.append('department', data.department);
+    if (data.project !== undefined) formData.append('project', data.project ? data.project.toString() : '');
+    if (data.bank_name) formData.append('bank_name', data.bank_name);
+    if (data.bank_account_number) formData.append('bank_account_number', data.bank_account_number);
+    if (data.ifsc_code) formData.append('ifsc_code', data.ifsc_code);
+    if (data.bank_branch) formData.append('bank_branch', data.bank_branch);
+
+    const csrfToken = this.getCsrfToken();
+    const headers: Record<string, string> = {};
+    if (csrfToken) {
+      headers['X-CSRFToken'] = csrfToken;
+    }
+
+    const response = await fetch(`${this.baseURL}/api/contract-workers/${id}/`, {
+      method: 'PATCH',
+      headers,
+      credentials: 'include',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Update failed' }));
+      throw error;
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Delete a contract worker
+   */
+  async deleteContractWorker(id: number): Promise<void> {
+    await this.request(`/api/contract-workers/${id}/`, {
+      method: 'DELETE',
+    });
+  }
+
+  /**
+   * Bulk upload contract workers from Excel file
+   */
+  async bulkUploadContractWorkers(file: File): Promise<BulkUploadContractWorkerResponse> {
+    const formData = new FormData();
+    formData.append('excel_file', file);
+
+    const csrfToken = this.getCsrfToken();
+    const headers: Record<string, string> = {};
+    if (csrfToken) {
+      headers['X-CSRFToken'] = csrfToken;
+    }
+
+    const response = await fetch(`${this.baseURL}/api/contract-workers/bulk-upload/`, {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Bulk upload failed' }));
+      throw error;
+    }
+
+    return response.json();
   }
 }
 
