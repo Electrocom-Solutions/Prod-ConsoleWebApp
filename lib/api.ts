@@ -473,18 +473,69 @@ export interface DocumentUploadResponse {
   version: DocumentTemplateVersion;
 }
 
-export interface Firm {
+export interface BackendFirmListItem {
   id: number;
   firm_name: string;
-  created_at?: string;
-  updated_at?: string;
+  firm_type: 'Proprietorship' | 'Partnership' | 'Pvt Ltd' | 'LLP' | null;
+  type_display: string;
+  firm_owner_profile: number | null;
+  firm_owner_name: string | null;
+  official_email: string | null;
+  official_mobile_number: string | null;
+  address: string | null;
+  gst_number: string | null;
+  pan_number: string | null;
+  created_at: string;
+  created_by: number | null;
+  created_by_username: string | null;
 }
 
 export interface FirmListResponse {
   count: number;
   next: string | null;
   previous: string | null;
-  results: Firm[];
+  results: BackendFirmListItem[];
+}
+
+export interface FirmDetail {
+  id: number;
+  firm_name: string;
+  firm_type: 'Proprietorship' | 'Partnership' | 'Pvt Ltd' | 'LLP' | null;
+  type_display: string;
+  firm_owner_profile: number | null;
+  firm_owner_name: string | null;
+  firm_owner_email: string | null;
+  firm_owner_phone: string | null;
+  official_email: string | null;
+  official_mobile_number: string | null;
+  address: string | null;
+  gst_number: string | null;
+  pan_number: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: number | null;
+  created_by_username: string | null;
+  updated_by: number | null;
+  updated_by_username: string | null;
+}
+
+export interface FirmCreateData {
+  firm_name: string;
+  firm_type?: 'Proprietorship' | 'Partnership' | 'Pvt Ltd' | 'LLP' | null;
+  firm_owner_profile?: number | null;
+  official_email?: string | null;
+  official_mobile_number?: string | null;
+  address?: string | null;
+  gst_number?: string | null;
+  pan_number?: string | null;
+}
+
+// Legacy Firm interface for backward compatibility
+export interface Firm {
+  id: number;
+  firm_name: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface BulkDownloadRequest {
@@ -2540,14 +2591,16 @@ Please verify:
   }
 
   /**
-   * Get all firms (for document template firm selection)
+   * Get all firms (for document template firm selection and settings)
    */
   async getFirms(params?: {
     search?: string;
+    firm_type?: 'Proprietorship' | 'Partnership' | 'Pvt Ltd' | 'LLP';
     page?: number;
   }): Promise<FirmListResponse> {
     const queryParams = new URLSearchParams();
     if (params?.search) queryParams.append('search', params.search);
+    if (params?.firm_type) queryParams.append('firm_type', params.firm_type);
     if (params?.page) queryParams.append('page', params.page.toString());
 
     const queryString = queryParams.toString();
@@ -2555,6 +2608,48 @@ Please verify:
     
     return this.request<FirmListResponse>(endpoint, {
       method: 'GET',
+    });
+  }
+
+  /**
+   * Get firm details
+   */
+  async getFirm(id: number): Promise<FirmDetail> {
+    return this.request<FirmDetail>(`/api/firms/${id}/`);
+  }
+
+  /**
+   * Create firm
+   */
+  async createFirm(data: FirmCreateData): Promise<FirmDetail> {
+    return this.request<FirmDetail>('/api/firms/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+  }
+
+  /**
+   * Update firm
+   */
+  async updateFirm(id: number, data: Partial<FirmCreateData>): Promise<FirmDetail> {
+    return this.request<FirmDetail>(`/api/firms/${id}/`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+  }
+
+  /**
+   * Delete firm
+   */
+  async deleteFirm(id: number): Promise<void> {
+    await this.request(`/api/firms/${id}/`, {
+      method: 'DELETE',
     });
   }
 
