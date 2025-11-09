@@ -538,6 +538,59 @@ export interface Firm {
   updated_at?: string;
 }
 
+/**
+ * Profile Management Interfaces
+ */
+
+export interface CurrentUserProfile {
+  id: number;
+  username: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  photo: string | null;
+  photo_url: string | null;
+  date_of_birth: string | null;
+  gender: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  pin_code: string | null;
+  country: string | null;
+  aadhar_number: string | null;
+  pan_number: string | null;
+  aadhar_card: string | null;
+  aadhar_card_url: string | null;
+  pan_card: string | null;
+  pan_card_url: string | null;
+  phone_number: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CurrentUserProfileUpdateData {
+  username?: string;
+  email?: string;
+  first_name?: string;
+  last_name?: string;
+  photo?: File | null;
+  date_of_birth?: string | null;
+  gender?: string | null;
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  pin_code?: string | null;
+  country?: string | null;
+  aadhar_number?: string | null;
+  pan_number?: string | null;
+  aadhar_card?: File | null;
+  pan_card?: File | null;
+  phone_number?: string | null;
+  current_password?: string;
+  new_password?: string;
+  confirm_password?: string;
+}
+
 export interface BulkDownloadRequest {
   version_ids?: number[];
   template_ids?: number[];
