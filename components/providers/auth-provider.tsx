@@ -8,6 +8,7 @@ import { User } from "@/lib/auth";
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
+  isAuthorized: boolean; // Staff or superuser
   isLoading: boolean;
   login: (loginIdentifier: string, password: string, rememberMe?: boolean) => Promise<void>;
   logout: () => Promise<void>;
@@ -26,8 +27,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setIsLoading(true);
       const currentUser = await apiClient.getCurrentUser();
-      setUser(currentUser);
+      if (currentUser && (currentUser.is_staff || currentUser.is_superuser)) {
+        setUser(currentUser);
+      } else {
+        // User is not staff or superuser, clear user state
+        setUser(null);
+      }
     } catch (error) {
+      // Authentication failed or user is not authorized
       setUser(null);
     } finally {
       setIsLoading(false);
@@ -36,6 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     checkAuth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const login = async (loginIdentifier: string, password: string, rememberMe: boolean = false) => {
@@ -44,6 +52,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const response: LoginResponse = await apiClient.login(loginIdentifier, password, rememberMe);
       
       if (response.success && response.user) {
+        // Verify user is staff or superuser
+        if (!(response.user.is_staff || response.user.is_superuser)) {
+          setUser(null);
+          throw new Error("Access denied. Only staff members and superusers can access the web application.");
+        }
+        
         setUser(response.user);
         // Redirect to dashboard after successful login
         router.push("/dashboard");
@@ -71,21 +85,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Protect routes - redirect to login if not authenticated
-  // But allow access to login page
+  // Protect routes - redirect to login if not authenticated or not authorized
   useEffect(() => {
-    if (!isLoading && !user && pathname !== "/login") {
-      router.push("/login");
+    // Don't redirect while loading
+    if (isLoading) {
+      return;
     }
-    // If user is authenticated and on login page, redirect to dashboard
-    if (!isLoading && user && pathname === "/login") {
+
+    // Check if user is authenticated and authorized (staff or superuser)
+    const isAuthorized = user && (user.is_staff || user.is_superuser);
+
+    // If user is not authorized and not on login page, redirect to login
+    if (!isAuthorized && pathname !== "/login") {
+      router.push("/login");
+      return;
+    }
+
+    // If user is authorized and on login page, redirect to dashboard
+    if (isAuthorized && pathname === "/login") {
       router.push("/dashboard");
     }
   }, [user, isLoading, pathname, router]);
 
+  const isAuthorized = user && (user.is_staff || user.is_superuser);
+
   const value: AuthContextType = {
     user,
     isAuthenticated: !!user,
+    isAuthorized: !!isAuthorized,
     isLoading,
     login,
     logout,

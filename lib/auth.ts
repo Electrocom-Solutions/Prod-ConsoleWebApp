@@ -9,11 +9,13 @@ export interface User {
   first_name: string;
   last_name: string;
   is_superuser: boolean;
+  is_staff: boolean;
 }
 
 export interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
+  isAuthorized: boolean; // Staff or superuser
   isLoading: boolean;
 }
 

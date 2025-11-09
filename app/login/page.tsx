@@ -48,7 +48,29 @@ export default function LoginPage() {
         showConfirmButton: false,
       });
     } catch (error: any) {
-      const errorMessage = error?.error || error?.message || "Login failed. Please check your credentials.";
+      console.error("Login error:", error);
+      
+      // Handle different types of errors
+      let errorMessage = "Login failed. Please check your credentials.";
+      
+      if (error?.message) {
+        if (error.message.includes("Network Error") || error.message.includes("Failed to fetch")) {
+          errorMessage = `Cannot connect to the API server. Please check:
+1. Is the Django server running?
+2. Is the API URL correct? (Check .env.local file)
+3. Are CORS settings configured correctly?
+
+Error: ${error.message}`;
+        } else if (error.message.includes("Network Error")) {
+          errorMessage = error.message;
+        } else {
+          errorMessage = error.message;
+        }
+      } else if (error?.error) {
+        errorMessage = error.error;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
       
       Swal.fire({
         icon: "error",
@@ -57,6 +79,7 @@ export default function LoginPage() {
         background: "#1E2028",
         color: "#FFFFFF",
         confirmButtonColor: "#007BFF",
+        width: "600px",
       });
     } finally {
       setIsLoading(false);

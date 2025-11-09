@@ -3,7 +3,13 @@
  * Handles authentication, CSRF tokens, and session cookies
  */
 
+// Get API URL from environment variable or use default
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+// Log API URL in development for debugging
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+  console.log('[API Client] Base URL:', API_BASE_URL);
+}
 
 export interface ApiError {
   error?: string;
@@ -21,6 +27,7 @@ export interface LoginResponse {
     first_name: string;
     last_name: string;
     is_superuser: boolean;
+    is_staff: boolean;
   };
   session_expiry?: string;
 }
@@ -33,27 +40,72 @@ class ApiClient {
   }
 
   /**
-   * Get CSRF token from Django
+   * Get CSRF token from cookies
+   * Django automatically sets csrftoken cookie on first request
    */
-  private async getCsrfToken(): Promise<string | null> {
+  private getCsrfToken(): string | null {
+    if (typeof document === 'undefined') {
+      // Server-side rendering - no cookies available
+      return null;
+    }
+    
     try {
-      const response = await fetch(`${this.baseURL}/api/`, {
-        method: 'GET',
-        credentials: 'include',
-      });
-      
-      // CSRF token is usually in a cookie, but we can also get it from response headers
+      // Get CSRF token from cookies
       const cookies = document.cookie.split(';');
       const csrfCookie = cookies.find(cookie => cookie.trim().startsWith('csrftoken='));
       
       if (csrfCookie) {
-        return csrfCookie.split('=')[1];
+        return decodeURIComponent(csrfCookie.split('=')[1].trim());
       }
       
       return null;
     } catch (error) {
-      console.error('Error fetching CSRF token:', error);
+      console.error('Error getting CSRF token:', error);
       return null;
+    }
+  }
+  
+  /**
+   * Ensure CSRF token is available by making a request if needed
+   */
+  private async ensureCsrfToken(): Promise<void> {
+    if (typeof document === 'undefined') {
+      return;
+    }
+    
+    // If we already have a CSRF token, no need to fetch
+    if (this.getCsrfToken()) {
+      return;
+    }
+    
+    // Try to get CSRF token by making a request to a public endpoint
+    // For login, we can skip this as Django will set the token on the first POST
+    // But we'll try anyway for better UX
+    try {
+      // Try swagger endpoint first (usually public)
+      const response = await fetch(`${this.baseURL}/swagger/`, {
+        method: 'GET',
+        credentials: 'include',
+        mode: 'cors',
+      }).catch(() => {
+        // If swagger fails, try API root (might require auth, but that's ok for CSRF)
+        return fetch(`${this.baseURL}/api/`, {
+          method: 'GET',
+          credentials: 'include',
+          mode: 'cors',
+        }).catch(() => null);
+      });
+      
+      if (response && !response.ok && response.status !== 401 && response.status !== 403) {
+        // If we get a non-auth error, the server is reachable but something else is wrong
+        console.warn('[API] Server responded but CSRF token might not be set');
+      }
+    } catch (error) {
+      // Ignore errors - Django will set CSRF token on the actual login request
+      // This is just a best-effort attempt
+      if (process.env.NODE_ENV === 'development') {
+        console.debug('[API] CSRF token pre-fetch failed (this is usually ok):', error);
+      }
     }
   }
 
@@ -65,24 +117,33 @@ class ApiClient {
     options: RequestInit = {}
   ): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
+    const method = options.method || 'GET';
+    
+    // Log the request for debugging (only in development)
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[API] ${method} ${url}`);
+    }
+    
+    // Ensure CSRF token is available for state-changing requests
+    if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
+      await this.ensureCsrfToken();
+    }
     
     // Get CSRF token for POST, PUT, DELETE, PATCH requests
-    let csrfToken: string | null = null;
-    if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(options.method || '')) {
-      csrfToken = await this.getCsrfToken();
-    }
+    const csrfToken = this.getCsrfToken();
 
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
       ...options.headers,
     };
 
-    if (csrfToken) {
+    if (csrfToken && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
       headers['X-CSRFToken'] = csrfToken;
     }
 
     const config: RequestInit = {
       ...options,
+      method,
       headers,
       credentials: 'include', // Important for session cookies
     };
@@ -94,7 +155,13 @@ class ApiClient {
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          // Try to parse as JSON anyway for error messages
+          try {
+            const errorData = await response.json();
+            throw errorData;
+          } catch {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
         }
         return {} as T;
       }
@@ -103,30 +170,131 @@ class ApiClient {
 
       if (!response.ok) {
         const error: ApiError = data || { error: 'An error occurred' };
+        // If it's a 403, it might be a CSRF issue - try to get a new token
+        if (response.status === 403 && method !== 'GET') {
+          console.warn('CSRF token might be invalid, retrying...');
+        }
         throw error;
       }
 
       return data;
     } catch (error) {
+      // Enhanced error handling
+      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+        // Network error - API server might be down or CORS issue
+        const networkError: ApiError = {
+          error: 'Network Error',
+          message: `Unable to connect to the API server. Please check:
+1. Is the Django server running at ${this.baseURL}?
+2. Are CORS settings correctly configured?
+3. Is the API URL correct? (Current: ${this.baseURL})`,
+        };
+        console.error('[API Error]', networkError.message);
+        throw networkError;
+      }
+      
       if (error instanceof Error) {
+        console.error('[API Error]', error.message);
         throw error;
       }
-      throw new Error('Network error occurred');
+      
+      const unknownError: ApiError = {
+        error: 'Unknown Error',
+        message: 'An unexpected error occurred',
+      };
+      throw unknownError;
     }
   }
 
   /**
    * Login endpoint
+   * Special handling for login - Django will set CSRF token on first request if needed
    */
   async login(loginIdentifier: string, password: string, rememberMe: boolean = false): Promise<LoginResponse> {
-    return this.request<LoginResponse>('/api/authentication/owner/login/', {
-      method: 'POST',
-      body: JSON.stringify({
-        login_identifier: loginIdentifier,
-        password,
-        remember_me: rememberMe,
-      }),
-    });
+    const url = `${this.baseURL}/api/owner/login/`;
+    
+    // For login, try to get CSRF token but don't fail if we can't
+    // Django will handle CSRF validation and set the token
+    let csrfToken = this.getCsrfToken();
+    
+    // If we don't have CSRF token, try to get it (but don't block)
+    if (!csrfToken) {
+      try {
+        // Make a quick GET request to get CSRF token
+        await fetch(`${this.baseURL}/swagger/`, {
+          method: 'GET',
+          credentials: 'include',
+        }).catch(() => {
+          // If that fails, try API root
+          return fetch(`${this.baseURL}/api/`, {
+            method: 'GET',
+            credentials: 'include',
+          });
+        });
+        // Try to get token again
+        csrfToken = this.getCsrfToken();
+      } catch (error) {
+        // Ignore - we'll proceed without CSRF token
+        // Django might accept the request and set the token
+        console.debug('[API] Could not pre-fetch CSRF token for login, proceeding anyway');
+      }
+    }
+    
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (csrfToken) {
+      headers['X-CSRFToken'] = csrfToken;
+    }
+    
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify({
+          login_identifier: loginIdentifier,
+          password,
+          remember_me: rememberMe,
+        }),
+      });
+      
+      // Check if response is JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        throw new Error('Invalid response from server');
+      }
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        // If we get a 403, it might be CSRF - but also could be authorization
+        if (response.status === 403 && data.error) {
+          throw data;
+        }
+        const error: ApiError = data || { error: 'Login failed' };
+        throw error;
+      }
+      
+      return data;
+    } catch (error) {
+      // Enhanced error handling for network issues
+      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+        const networkError: ApiError = {
+          error: 'Network Error',
+          message: `Cannot connect to API server at ${this.baseURL}. Please check:
+1. Is the Django server running?
+2. Is the API URL correct in .env.local?
+3. Are CORS settings configured?`,
+        };
+        throw networkError;
+      }
+      throw error;
+    }
   }
 
   /**
@@ -134,11 +302,17 @@ class ApiClient {
    */
   async getCurrentUser(): Promise<LoginResponse['user'] | null> {
     try {
-      const response = await this.request<{ user: LoginResponse['user'] }>('/api/authentication/user/', {
+      const response = await this.request<{ user: LoginResponse['user'] }>('/api/user/', {
         method: 'GET',
       });
       return response.user;
-    } catch (error) {
+    } catch (error: any) {
+      // If it's a 403, user is not authorized (not staff/superuser)
+      // If it's a 401, user is not authenticated
+      // In both cases, return null
+      if (error?.error || error?.message) {
+        console.debug('getCurrentUser error:', error.error || error.message);
+      }
       return null;
     }
   }
@@ -148,7 +322,7 @@ class ApiClient {
    */
   async logout(): Promise<void> {
     try {
-      await this.request('/api/authentication/logout/', {
+      await this.request('/api/logout/', {
         method: 'POST',
       });
     } catch (error) {
@@ -197,4 +371,24 @@ class ApiClient {
 }
 
 export const apiClient = new ApiClient(API_BASE_URL);
+
+/**
+ * Test API connection
+ * Useful for debugging connection issues
+ */
+export async function testApiConnection(): Promise<{ connected: boolean; error?: string }> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/swagger/`, {
+      method: 'GET',
+      credentials: 'include',
+      mode: 'cors',
+    });
+    return { connected: response.ok || response.status < 500 };
+  } catch (error: any) {
+    return {
+      connected: false,
+      error: error.message || 'Cannot connect to API server',
+    };
+  }
+}
 

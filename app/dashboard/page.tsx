@@ -1,4 +1,7 @@
+"use client";
+
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
+import { ProtectedRoute } from "@/components/auth/protected-route";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,7 +15,7 @@ import {
   Plus,
 } from "lucide-react";
 
-export default function DashboardPage() {
+function DashboardContent() {
   const stats = [
     {
       title: "Total Clients",
@@ -215,5 +218,13 @@ export default function DashboardPage() {
         </Card>
       </div>
     </DashboardLayout>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <ProtectedRoute>
+      <DashboardContent />
+    </ProtectedRoute>
   );
 }
