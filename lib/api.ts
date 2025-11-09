@@ -1090,6 +1090,62 @@ export interface BulkMarkReadResponse {
   errors: string[] | null;
 }
 
+/**
+ * Email Templates Interfaces
+ */
+
+export interface BackendEmailTemplateListItem {
+  id: number;
+  name: string;
+  subject: string;
+  created_at: string;
+  created_by: number | null;
+  created_by_username: string | null;
+}
+
+export interface EmailTemplateListResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: BackendEmailTemplateListItem[];
+}
+
+export interface EmailTemplateDetail {
+  id: number;
+  name: string;
+  subject: string;
+  body: string;
+  placeholders: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: number | null;
+  created_by_username: string | null;
+  updated_by: number | null;
+  updated_by_username: string | null;
+}
+
+export interface EmailTemplateCreateData {
+  name: string;
+  subject: string;
+  body: string;
+  placeholders?: string | null;
+}
+
+export interface EmailTemplateSendRequest {
+  recipients: string;
+  scheduled_at?: string | null;
+  placeholder_values?: Record<string, any>;
+}
+
+export interface EmailTemplateSendResponse {
+  status: string;
+  message: string;
+  recipients_count: number;
+  scheduled_at?: string | null;
+  sent_at?: string | null;
+  errors?: string[];
+}
+
 class ApiClient {
   private baseURL: string;
 
@@ -3303,6 +3359,81 @@ Please verify:
   async deleteNotification(id: number): Promise<void> {
     await this.request(`/api/notifications/${id}/`, {
       method: 'DELETE',
+    });
+  }
+
+  /**
+   * Email Templates API Methods
+   */
+
+  /**
+   * Get email templates list with search
+   */
+  async getEmailTemplates(params?: {
+    search?: string;
+    page?: number;
+  }): Promise<EmailTemplateListResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.page) queryParams.append('page', params.page.toString());
+
+    const queryString = queryParams.toString();
+    const endpoint = `/api/email-templates/${queryString ? `?${queryString}` : ''}`;
+    return this.request<EmailTemplateListResponse>(endpoint);
+  }
+
+  /**
+   * Get email template details
+   */
+  async getEmailTemplate(id: number): Promise<EmailTemplateDetail> {
+    return this.request<EmailTemplateDetail>(`/api/email-templates/${id}/`);
+  }
+
+  /**
+   * Create email template
+   */
+  async createEmailTemplate(data: EmailTemplateCreateData): Promise<EmailTemplateDetail> {
+    return this.request<EmailTemplateDetail>('/api/email-templates/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+  }
+
+  /**
+   * Update email template
+   */
+  async updateEmailTemplate(id: number, data: Partial<EmailTemplateCreateData>): Promise<EmailTemplateDetail> {
+    return this.request<EmailTemplateDetail>(`/api/email-templates/${id}/`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+  }
+
+  /**
+   * Delete email template
+   */
+  async deleteEmailTemplate(id: number): Promise<void> {
+    await this.request(`/api/email-templates/${id}/`, {
+      method: 'DELETE',
+    });
+  }
+
+  /**
+   * Send email using template
+   */
+  async sendEmailUsingTemplate(id: number, data: EmailTemplateSendRequest): Promise<EmailTemplateSendResponse> {
+    return this.request<EmailTemplateSendResponse>(`/api/email-templates/${id}/send/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
     });
   }
 }
