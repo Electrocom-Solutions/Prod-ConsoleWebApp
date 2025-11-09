@@ -915,6 +915,55 @@ export interface BulkMarkPaymentTrackerPaidResponse {
   errors: string[] | null;
 }
 
+/**
+ * Stock Management (Inventory) Interfaces
+ */
+
+export interface StockStatisticsResponse {
+  total_resources: number;
+  total_inventory_value: number;
+  low_stock_items: number;
+}
+
+export interface BackendStockListItem {
+  id: number;
+  name: string;
+  unit_of_measure: string;
+  quantity: string;
+  price: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StockListResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: BackendStockListItem[];
+}
+
+export interface StockDetail {
+  id: number;
+  name: string;
+  unit_of_measure: string;
+  quantity: string;
+  price: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: number | null;
+  updated_by: number | null;
+}
+
+export interface StockCreateData {
+  name: string;
+  unit_of_measure: string;
+  quantity: number;
+  price: number;
+  description?: string;
+}
+
 class ApiClient {
   private baseURL: string;
 
@@ -2929,6 +2978,75 @@ Please verify:
    */
   async deletePaymentTracker(id: number): Promise<void> {
     await this.request(`/api/payment-tracker/${id}/`, {
+      method: 'DELETE',
+    });
+  }
+
+  /**
+   * Stock Management (Inventory) API Methods
+   */
+
+  /**
+   * Get stock statistics
+   */
+  async getStockStatistics(): Promise<StockStatisticsResponse> {
+    return this.request<StockStatisticsResponse>('/api/stocks/statistics/');
+  }
+
+  /**
+   * Get stock items with filters
+   */
+  async getStocks(params?: {
+    search?: string;
+    page?: number;
+  }): Promise<StockListResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.page) queryParams.append('page', params.page.toString());
+
+    const queryString = queryParams.toString();
+    const endpoint = `/api/stocks/${queryString ? `?${queryString}` : ''}`;
+    return this.request<StockListResponse>(endpoint);
+  }
+
+  /**
+   * Get stock item details
+   */
+  async getStock(id: number): Promise<StockDetail> {
+    return this.request<StockDetail>(`/api/stocks/${id}/`);
+  }
+
+  /**
+   * Create stock item
+   */
+  async createStock(data: StockCreateData): Promise<StockDetail> {
+    return this.request<StockDetail>('/api/stocks/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+  }
+
+  /**
+   * Update stock item
+   */
+  async updateStock(id: number, data: Partial<StockCreateData>): Promise<StockDetail> {
+    return this.request<StockDetail>(`/api/stocks/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+  }
+
+  /**
+   * Delete stock item
+   */
+  async deleteStock(id: number): Promise<void> {
+    await this.request(`/api/stocks/${id}/`, {
       method: 'DELETE',
     });
   }
