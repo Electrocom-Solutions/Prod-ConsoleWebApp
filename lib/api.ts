@@ -65,6 +65,61 @@ export interface DashboardStatsResponse {
   recent_activities: RecentActivity[];
 }
 
+/**
+ * Client Management Interfaces
+ */
+
+export interface ClientStatisticsResponse {
+  total_clients: number;
+  active_amcs_count: number;
+  open_projects_count: number;
+  outstanding_amount: number;
+}
+
+export interface BackendClientListItem {
+  id: number;
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  email: string;
+  phone_number: string;
+  has_active_amc: boolean;
+  created_at: string;
+}
+
+export interface BackendClientListResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: BackendClientListItem[];
+}
+
+export interface BackendClientDetail {
+  id: number;
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  email: string;
+  phone_number: string;
+  photo?: string;
+  photo_url?: string;
+  date_of_birth?: string;
+  gender?: string;
+  aadhar_number?: string;
+  pan_number?: string;
+  aadhar_card_url?: string;
+  pan_card_url?: string;
+  designation?: string;
+  joining_date?: string;
+  monthly_salary?: number;
+  notes?: string;
+  profile?: number;
+  created_at: string;
+  updated_at: string;
+  created_by?: number;
+  updated_by?: number;
+}
+
 // Document Management Interfaces
 export interface DocumentTemplateVersion {
   id: number;
@@ -485,6 +540,174 @@ Please verify:
   async getDashboardStats(): Promise<DashboardStatsResponse> {
     return this.request<DashboardStatsResponse>('/api/dashboard/all-stats/', {
       method: 'GET',
+    });
+  }
+
+  /**
+   * Get client statistics
+   */
+  async getClientStatistics(): Promise<ClientStatisticsResponse> {
+    return this.request<ClientStatisticsResponse>('/api/clients/statistics/', {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * Get all clients with optional filters
+   */
+  async getClients(params?: {
+    search?: string;
+    has_active_amc?: boolean;
+    page?: number;
+  }): Promise<BackendClientListResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.has_active_amc !== undefined) queryParams.append('has_active_amc', params.has_active_amc.toString());
+    if (params?.page) queryParams.append('page', params.page.toString());
+
+    const queryString = queryParams.toString();
+    const endpoint = `/api/clients/${queryString ? `?${queryString}` : ''}`;
+
+    return this.request<BackendClientListResponse>(endpoint, {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * Get a specific client by ID
+   */
+  async getClient(id: number): Promise<BackendClientDetail> {
+    return this.request<BackendClientDetail>(`/api/clients/${id}/`, {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * Create a new client
+   */
+  async createClient(data: {
+    first_name: string;
+    last_name: string;
+    email?: string;
+    phone_number?: string;
+    photo?: File;
+    date_of_birth?: string;
+    gender?: string;
+    aadhar_number?: string;
+    pan_number?: string;
+    aadhar_card?: File;
+    pan_card?: File;
+    designation?: string;
+    joining_date?: string;
+    monthly_salary?: number;
+    notes?: string;
+    profile?: number;
+  }): Promise<BackendClientDetail> {
+    const formData = new FormData();
+    formData.append('first_name', data.first_name);
+    formData.append('last_name', data.last_name);
+    if (data.email) formData.append('email', data.email);
+    if (data.phone_number) formData.append('phone_number', data.phone_number);
+    if (data.photo) formData.append('photo', data.photo);
+    if (data.date_of_birth) formData.append('date_of_birth', data.date_of_birth);
+    if (data.gender) formData.append('gender', data.gender);
+    if (data.aadhar_number) formData.append('aadhar_number', data.aadhar_number);
+    if (data.pan_number) formData.append('pan_number', data.pan_number);
+    if (data.aadhar_card) formData.append('aadhar_card', data.aadhar_card);
+    if (data.pan_card) formData.append('pan_card', data.pan_card);
+    if (data.designation) formData.append('designation', data.designation);
+    if (data.joining_date) formData.append('joining_date', data.joining_date);
+    if (data.monthly_salary !== undefined) formData.append('monthly_salary', data.monthly_salary.toString());
+    if (data.notes) formData.append('notes', data.notes);
+    if (data.profile) formData.append('profile', data.profile.toString());
+
+    const csrfToken = this.getCsrfToken();
+    const headers: Record<string, string> = {};
+    if (csrfToken) {
+      headers['X-CSRFToken'] = csrfToken;
+    }
+
+    const response = await fetch(`${this.baseURL}/api/clients/`, {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Create failed' }));
+      throw error;
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Update a client
+   */
+  async updateClient(id: number, data: Partial<{
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone_number: string;
+    photo: File;
+    date_of_birth: string;
+    gender: string;
+    aadhar_number: string;
+    pan_number: string;
+    aadhar_card: File;
+    pan_card: File;
+    designation: string;
+    joining_date: string;
+    monthly_salary: number;
+    notes: string;
+    profile: number;
+  }>): Promise<BackendClientDetail> {
+    const formData = new FormData();
+    if (data.first_name) formData.append('first_name', data.first_name);
+    if (data.last_name) formData.append('last_name', data.last_name);
+    if (data.email) formData.append('email', data.email);
+    if (data.phone_number) formData.append('phone_number', data.phone_number);
+    if (data.photo) formData.append('photo', data.photo);
+    if (data.date_of_birth) formData.append('date_of_birth', data.date_of_birth);
+    if (data.gender) formData.append('gender', data.gender);
+    if (data.aadhar_number) formData.append('aadhar_number', data.aadhar_number);
+    if (data.pan_number) formData.append('pan_number', data.pan_number);
+    if (data.aadhar_card) formData.append('aadhar_card', data.aadhar_card);
+    if (data.pan_card) formData.append('pan_card', data.pan_card);
+    if (data.designation) formData.append('designation', data.designation);
+    if (data.joining_date) formData.append('joining_date', data.joining_date);
+    if (data.monthly_salary !== undefined) formData.append('monthly_salary', data.monthly_salary.toString());
+    if (data.notes) formData.append('notes', data.notes);
+    if (data.profile) formData.append('profile', data.profile.toString());
+
+    const csrfToken = this.getCsrfToken();
+    const headers: Record<string, string> = {};
+    if (csrfToken) {
+      headers['X-CSRFToken'] = csrfToken;
+    }
+
+    const response = await fetch(`${this.baseURL}/api/clients/${id}/`, {
+      method: 'PATCH',
+      headers,
+      credentials: 'include',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Update failed' }));
+      throw error;
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Delete a client
+   */
+  async deleteClient(id: number): Promise<void> {
+    await this.request(`/api/clients/${id}/`, {
+      method: 'DELETE',
     });
   }
 

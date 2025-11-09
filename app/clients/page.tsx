@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { ClientFormModal } from "@/components/clients/client-form-modal";
@@ -17,141 +17,172 @@ import {
   Edit,
   Eye,
   FileText,
+  Loader2,
+  AlertCircle,
+  Inbox,
 } from "lucide-react";
 import type { Client } from "@/types";
 import { format } from "date-fns";
 import { showDeleteConfirm, showConfirm, showAlert } from "@/lib/sweetalert";
+import {
+  apiClient,
+  ClientStatisticsResponse,
+  BackendClientListItem,
+  BackendClientListResponse,
+  BackendClientDetail,
+} from "@/lib/api";
+import { useDebounce } from "use-debounce";
+import { ProtectedRoute } from "@/components/auth/protected-route";
+
+/**
+ * Map backend client list item to frontend Client type
+ */
+function mapBackendClientToFrontend(
+  backendClient: BackendClientListItem,
+  stats?: ClientStatisticsResponse
+): Client {
+  return {
+    id: backendClient.id,
+    name: backendClient.full_name || `${backendClient.first_name} ${backendClient.last_name}`,
+    business_name: undefined, // Not available in list endpoint
+    address: "", // Not available in list endpoint
+    city: "", // Not available in list endpoint
+    state: "", // Not available in list endpoint
+    pin_code: "", // Not available in list endpoint
+    country: "India", // Default
+    primary_contact_name: backendClient.full_name || `${backendClient.first_name} ${backendClient.last_name}`,
+    primary_contact_email: backendClient.email || "",
+    primary_contact_phone: backendClient.phone_number || "",
+    secondary_contact: undefined,
+    notes: undefined,
+    tags: [], // Not available in list endpoint
+    amc_count: backendClient.has_active_amc ? 1 : 0, // Approximate
+    open_projects: 0, // Not available in list endpoint
+    outstanding_amount: 0, // Not available in list endpoint
+    last_activity: backendClient.created_at,
+    created_at: backendClient.created_at,
+    updated_at: backendClient.created_at,
+  };
+}
+
+/**
+ * Map backend client detail to frontend Client type
+ */
+function mapBackendClientDetailToFrontend(
+  backendClient: BackendClientDetail
+): Client {
+  return {
+    id: backendClient.id,
+    name: backendClient.full_name || `${backendClient.first_name} ${backendClient.last_name}`,
+    business_name: undefined,
+    address: "", // Would need to fetch profile for this
+    city: "", // Would need to fetch profile for this
+    state: "", // Would need to fetch profile for this
+    pin_code: "", // Would need to fetch profile for this
+    country: "India",
+    primary_contact_name: backendClient.full_name || `${backendClient.first_name} ${backendClient.last_name}`,
+    primary_contact_email: backendClient.email || "",
+    primary_contact_phone: backendClient.phone_number || "",
+    secondary_contact: undefined,
+    notes: backendClient.notes || undefined,
+    tags: [],
+    amc_count: 0, // Would need to fetch separately
+    open_projects: 0, // Would need to fetch separately
+    outstanding_amount: 0, // Would need to fetch separately
+    last_activity: backendClient.updated_at || backendClient.created_at,
+    created_at: backendClient.created_at,
+    updated_at: backendClient.updated_at,
+  };
+}
 
 function ClientsPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [clients, setClients] = useState<Client[]>([
-    {
-      id: 1,
-      name: "ABC Power Solutions Ltd",
-      business_name: "ABC Power",
-      address: "123 Industrial Area, Sector 45",
-      city: "Mumbai",
-      state: "Maharashtra",
-      pin_code: "400001",
-      country: "India",
-      primary_contact_name: "Rajesh Kumar",
-      primary_contact_email: "rajesh@abcpower.com",
-      primary_contact_phone: "9876543210",
-      secondary_contact: "9123456789",
-      notes: "Premium client with multiple AMCs",
-      tags: ["premium", "long-term"],
-      amc_count: 5,
-      open_projects: 2,
-      outstanding_amount: 125000,
-      last_activity: "2025-10-30T10:30:00Z",
-      created_at: "2023-01-15T00:00:00Z",
-      updated_at: "2025-10-30T10:30:00Z",
-    },
-    {
-      id: 2,
-      name: "XYZ Industries",
-      address: "456 Tech Park, Phase 2",
-      city: "Pune",
-      state: "Maharashtra",
-      pin_code: "411001",
-      country: "India",
-      primary_contact_name: "Priya Sharma",
-      primary_contact_email: "priya@xyzind.com",
-      primary_contact_phone: "9765432109",
-      tags: ["industrial", "regular"],
-      amc_count: 3,
-      open_projects: 1,
-      outstanding_amount: 75000,
-      last_activity: "2025-10-28T14:20:00Z",
-      created_at: "2023-06-20T00:00:00Z",
-      updated_at: "2025-10-28T14:20:00Z",
-    },
-    {
-      id: 3,
-      name: "TechCorp Solutions",
-      business_name: "TechCorp IT Services",
-      address: "789 Software City, Building A",
-      city: "Bangalore",
-      state: "Karnataka",
-      pin_code: "560001",
-      country: "India",
-      primary_contact_name: "Amit Patel",
-      primary_contact_email: "amit@techcorp.com",
-      primary_contact_phone: "9654321098",
-      secondary_contact: "amit.p@techcorp.com",
-      notes: "IT infrastructure maintenance contracts",
-      tags: ["tech", "corporate"],
-      amc_count: 4,
-      open_projects: 3,
-      outstanding_amount: 0,
-      last_activity: "2025-11-01T09:15:00Z",
-      created_at: "2024-02-10T00:00:00Z",
-      updated_at: "2025-11-01T09:15:00Z",
-    },
-    {
-      id: 4,
-      name: "Metro Mall Services",
-      address: "Metro Plaza, MG Road",
-      city: "Delhi",
-      state: "Delhi",
-      pin_code: "110001",
-      country: "India",
-      primary_contact_name: "Sunita Verma",
-      primary_contact_email: "sunita@metromall.com",
-      primary_contact_phone: "9543210987",
-      tags: ["retail", "commercial"],
-      amc_count: 2,
-      open_projects: 0,
-      outstanding_amount: 50000,
-      last_activity: "2025-10-25T16:45:00Z",
-      created_at: "2024-08-05T00:00:00Z",
-      updated_at: "2025-10-25T16:45:00Z",
-    },
-  ]);
+
+  const [clients, setClients] = useState<Client[]>([]);
+  const [statistics, setStatistics] = useState<ClientStatisticsResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const [viewMode, setViewMode] = useState<"grid" | "table">("table");
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery] = useDebounce(searchQuery, 500);
   const [selectedCity, setSelectedCity] = useState<string>("all");
   const [selectedState, setSelectedState] = useState<string>("all");
   const [hasActiveAMC, setHasActiveAMC] = useState<string>("all");
   const [selectedTag, setSelectedTag] = useState<string>("all");
   const [selectedClients, setSelectedClients] = useState<Set<number>>(new Set());
-  
+
   const [formModalOpen, setFormModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | undefined>();
   const [formMode, setFormMode] = useState<"create" | "edit">("create");
 
-  // Get unique cities, states, and tags for filters
-  const cities = Array.from(new Set(clients.map((c) => c.city))).sort();
-  const states = Array.from(new Set(clients.map((c) => c.state))).sort();
-  const allTags = Array.from(
-    new Set(clients.flatMap((c) => c.tags))
-  ).sort();
+  // Fetch statistics
+  const fetchStatistics = useCallback(async () => {
+    try {
+      const stats = await apiClient.getClientStatistics();
+      setStatistics(stats);
+    } catch (err: any) {
+      console.error("Failed to fetch client statistics:", err);
+      // Don't set error here, just log it
+    }
+  }, []);
 
-  // Filter clients
+  // Fetch clients
+  const fetchClients = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const params: {
+        search?: string;
+        has_active_amc?: boolean;
+        page?: number;
+      } = {};
+
+      if (debouncedSearchQuery) {
+        params.search = debouncedSearchQuery;
+      }
+
+      if (hasActiveAMC === "yes") {
+        params.has_active_amc = true;
+      } else if (hasActiveAMC === "no") {
+        params.has_active_amc = false;
+      }
+
+      const response: BackendClientListResponse = await apiClient.getClients(params);
+      const mappedClients = response.results.map((backendClient) =>
+        mapBackendClientToFrontend(backendClient, statistics || undefined)
+      );
+      setClients(mappedClients);
+    } catch (err: any) {
+      console.error("Failed to fetch clients:", err);
+      setError(err.message || "Failed to load clients.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [debouncedSearchQuery, hasActiveAMC, statistics]);
+
+  useEffect(() => {
+    fetchStatistics();
+  }, [fetchStatistics]);
+
+  useEffect(() => {
+    fetchClients();
+  }, [fetchClients]);
+
+  // Get unique cities, states, and tags for filters (from current clients)
+  const cities = Array.from(new Set(clients.map((c) => c.city).filter(Boolean))).sort();
+  const states = Array.from(new Set(clients.map((c) => c.state).filter(Boolean))).sort();
+  const allTags = Array.from(new Set(clients.flatMap((c) => c.tags))).sort();
+
+  // Filter clients (client-side filtering for city, state, tags)
   const filteredClients = clients.filter((client) => {
-    const matchesSearch =
-      searchQuery === "" ||
-      client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      client.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      client.state.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      client.primary_contact_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      client.primary_contact_email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      client.primary_contact_phone.includes(searchQuery);
+    const matchesCity = selectedCity === "all" || !client.city || client.city === selectedCity;
+    const matchesState = selectedState === "all" || !client.state || client.state === selectedState;
+    const matchesTag = selectedTag === "all" || client.tags.length === 0 || client.tags.includes(selectedTag);
 
-    const matchesCity = selectedCity === "all" || client.city === selectedCity;
-    const matchesState = selectedState === "all" || client.state === selectedState;
-    const matchesAMC =
-      hasActiveAMC === "all" ||
-      (hasActiveAMC === "yes" && client.amc_count > 0) ||
-      (hasActiveAMC === "no" && client.amc_count === 0);
-    const matchesTag =
-      selectedTag === "all" || client.tags.includes(selectedTag);
-
-    return (
-      matchesSearch && matchesCity && matchesState && matchesAMC && matchesTag
-    );
+    return matchesCity && matchesState && matchesTag;
   });
 
   // Handlers
@@ -172,42 +203,88 @@ function ClientsPageContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
-  const handleEditClient = (client: Client) => {
-    setFormMode("edit");
-    setEditingClient(client);
-    setFormModalOpen(true);
+  const handleEditClient = async (client: Client) => {
+    try {
+      // Fetch full client details
+      const backendClient = await apiClient.getClient(client.id);
+      const fullClient = mapBackendClientDetailToFrontend(backendClient);
+      setFormMode("edit");
+      setEditingClient(fullClient);
+      setFormModalOpen(true);
+    } catch (err: any) {
+      console.error("Failed to fetch client details:", err);
+      showAlert("Error", err.message || "Failed to load client details.", "error");
+    }
   };
 
-  const handleSaveClient = (clientData: Partial<Client>) => {
-    if (formMode === "create") {
-      const newClient: Client = {
-        ...clientData,
-        id: Math.max(...clients.map((c) => c.id), 0) + 1,
-        amc_count: 0,
-        open_projects: 0,
-        outstanding_amount: 0,
-        last_activity: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      } as Client;
-      setClients([...clients, newClient]);
-    } else if (editingClient) {
-      setClients(
-        clients.map((c) =>
-          c.id === editingClient.id
-            ? { ...c, ...clientData, updated_at: new Date().toISOString() }
-            : c
-        )
-      );
+  const handleSaveClient = async (clientData: Partial<Client>) => {
+    setIsSaving(true);
+    try {
+      if (formMode === "create") {
+        // Map frontend Client to backend format
+        const nameParts = (clientData.name || "").split(" ");
+        const first_name = nameParts[0] || "";
+        const last_name = nameParts.slice(1).join(" ") || "";
+
+        const backendData = {
+          first_name,
+          last_name,
+          email: clientData.primary_contact_email,
+          phone_number: clientData.primary_contact_phone,
+          notes: clientData.notes,
+        };
+
+        await apiClient.createClient(backendData);
+        showAlert("Success", "Client created successfully.", "success");
+        setFormModalOpen(false);
+        fetchClients();
+        fetchStatistics();
+      } else if (editingClient) {
+        // Map frontend Client to backend format
+        const nameParts = (clientData.name || editingClient.name || "").split(" ");
+        const first_name = nameParts[0] || "";
+        const last_name = nameParts.slice(1).join(" ") || "";
+
+        const backendData: Partial<{
+          first_name: string;
+          last_name: string;
+          email: string;
+          phone_number: string;
+          notes: string;
+        }> = {};
+
+        if (first_name) backendData.first_name = first_name;
+        if (last_name) backendData.last_name = last_name;
+        if (clientData.primary_contact_email) backendData.email = clientData.primary_contact_email;
+        if (clientData.primary_contact_phone) backendData.phone_number = clientData.primary_contact_phone;
+        if (clientData.notes !== undefined) backendData.notes = clientData.notes;
+
+        await apiClient.updateClient(editingClient.id, backendData);
+        showAlert("Success", "Client updated successfully.", "success");
+        setFormModalOpen(false);
+        fetchClients();
+        fetchStatistics();
+      }
+    } catch (err: any) {
+      console.error("Failed to save client:", err);
+      showAlert("Error", err.message || "Failed to save client.", "error");
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const handleDeleteClient = async (clientId: number) => {
     const confirmed = await showDeleteConfirm("this client");
     if (confirmed) {
-      setClients(clients.filter((c) => c.id !== clientId));
-      selectedClients.delete(clientId);
-      setSelectedClients(new Set(selectedClients));
+      try {
+        await apiClient.deleteClient(clientId);
+        showAlert("Success", "Client deleted successfully.", "success");
+        fetchClients();
+        fetchStatistics();
+      } catch (err: any) {
+        console.error("Failed to delete client:", err);
+        showAlert("Error", err.message || "Failed to delete client.", "error");
+      }
     }
   };
 
@@ -230,16 +307,14 @@ function ClientsPageContent() {
   };
 
   const handleBulkExportCSV = () => {
-    const selectedClientData = clients.filter((c) =>
-      selectedClients.has(c.id)
-    );
+    const selectedClientData = clients.filter((c) => selectedClients.has(c.id));
     const csv = [
       ["Name", "Business Name", "City", "State", "Contact Email", "Contact Phone", "AMC Count", "Outstanding"],
       ...selectedClientData.map((c) => [
         c.name,
         c.business_name || "",
-        c.city,
-        c.state,
+        c.city || "",
+        c.state || "",
         c.primary_contact_email,
         c.primary_contact_phone,
         c.amc_count.toString(),
@@ -259,9 +334,7 @@ function ClientsPageContent() {
   };
 
   const handleBulkEmail = async () => {
-    const selectedClientData = clients.filter((c) =>
-      selectedClients.has(c.id)
-    );
+    const selectedClientData = clients.filter((c) => selectedClients.has(c.id));
     await showAlert(
       "Bulk Email",
       `Send bulk email to ${selectedClientData.length} clients:\n${selectedClientData
@@ -279,10 +352,50 @@ function ClientsPageContent() {
       "Cancel"
     );
     if (confirmed) {
-      setClients(clients.filter((c) => !selectedClients.has(c.id)));
-      setSelectedClients(new Set());
+      try {
+        const deletePromises = Array.from(selectedClients).map((id) => apiClient.deleteClient(id));
+        await Promise.all(deletePromises);
+        showAlert("Success", "Selected clients deleted successfully.", "success");
+        setSelectedClients(new Set());
+        fetchClients();
+        fetchStatistics();
+      } catch (err: any) {
+        console.error("Failed to delete clients:", err);
+        showAlert("Error", err.message || "Failed to delete clients.", "error");
+      }
     }
   };
+
+  if (isLoading && clients.length === 0) {
+    return (
+      <DashboardLayout title="Clients" breadcrumbs={["Home", "Clients"]}>
+        <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
+          <Loader2 className="h-8 w-8 animate-spin text-sky-500" />
+          <p className="ml-3 text-gray-500">Loading clients...</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (error && clients.length === 0) {
+    return (
+      <DashboardLayout title="Clients" breadcrumbs={["Home", "Clients"]}>
+        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] text-red-500">
+          <AlertCircle className="h-12 w-12 mb-4" />
+          <p className="text-lg font-medium">Error loading clients: {error}</p>
+          <button
+            onClick={() => {
+              setError(null);
+              fetchClients();
+            }}
+            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600"
+          >
+            <Loader2 className="h-4 w-4" /> Retry
+          </button>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout title="Clients" breadcrumbs={["Home", "Clients"]}>
@@ -311,25 +424,25 @@ function ClientsPageContent() {
           <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
             <p className="text-sm text-gray-500 dark:text-gray-400">Total Clients</p>
             <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
-              {clients.length}
+              {statistics?.total_clients ?? clients.length}
             </p>
           </div>
           <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
             <p className="text-sm text-gray-500 dark:text-gray-400">Active AMCs</p>
             <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
-              {clients.filter((c) => c.amc_count > 0).length}
+              {statistics?.active_amcs_count ?? clients.filter((c) => c.amc_count > 0).length}
             </p>
           </div>
           <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
             <p className="text-sm text-gray-500 dark:text-gray-400">Open Projects</p>
             <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
-              {clients.reduce((sum, c) => sum + c.open_projects, 0)}
+              {statistics?.open_projects_count ?? clients.reduce((sum, c) => sum + c.open_projects, 0)}
             </p>
           </div>
           <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
             <p className="text-sm text-gray-500 dark:text-gray-400">Outstanding</p>
             <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
-              ₹{clients.reduce((sum, c) => sum + c.outstanding_amount, 0).toLocaleString()}
+              ₹{statistics?.outstanding_amount?.toLocaleString() ?? clients.reduce((sum, c) => sum + c.outstanding_amount, 0).toLocaleString()}
             </p>
           </div>
         </div>
@@ -342,40 +455,44 @@ function ClientsPageContent() {
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search clients, city, state, contact..."
+                  placeholder="Search clients by name or phone..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 focus:border-sky-500 focus:outline-none focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
                 />
               </div>
             </div>
-            
-            <div className="flex items-center gap-2">
-              <select
-                value={selectedCity}
-                onChange={(e) => setSelectedCity(e.target.value)}
-                className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-              >
-                <option value="all">All Cities</option>
-                {cities.map((city) => (
-                  <option key={city} value={city}>
-                    {city}
-                  </option>
-                ))}
-              </select>
 
-              <select
-                value={selectedState}
-                onChange={(e) => setSelectedState(e.target.value)}
-                className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-              >
-                <option value="all">All States</option>
-                {states.map((state) => (
-                  <option key={state} value={state}>
-                    {state}
-                  </option>
-                ))}
-              </select>
+            <div className="flex items-center gap-2">
+              {cities.length > 0 && (
+                <select
+                  value={selectedCity}
+                  onChange={(e) => setSelectedCity(e.target.value)}
+                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                >
+                  <option value="all">All Cities</option>
+                  {cities.map((city) => (
+                    <option key={city} value={city}>
+                      {city}
+                    </option>
+                  ))}
+                </select>
+              )}
+
+              {states.length > 0 && (
+                <select
+                  value={selectedState}
+                  onChange={(e) => setSelectedState(e.target.value)}
+                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                >
+                  <option value="all">All States</option>
+                  {states.map((state) => (
+                    <option key={state} value={state}>
+                      {state}
+                    </option>
+                  ))}
+                </select>
+              )}
 
               <select
                 value={hasActiveAMC}
@@ -387,18 +504,20 @@ function ClientsPageContent() {
                 <option value="no">No Active AMC</option>
               </select>
 
-              <select
-                value={selectedTag}
-                onChange={(e) => setSelectedTag(e.target.value)}
-                className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-              >
-                <option value="all">All Tags</option>
-                {allTags.map((tag) => (
-                  <option key={tag} value={tag}>
-                    {tag}
-                  </option>
-                ))}
-              </select>
+              {allTags.length > 0 && (
+                <select
+                  value={selectedTag}
+                  onChange={(e) => setSelectedTag(e.target.value)}
+                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                >
+                  <option value="all">All Tags</option>
+                  {allTags.map((tag) => (
+                    <option key={tag} value={tag}>
+                      {tag}
+                    </option>
+                  ))}
+                </select>
+              )}
 
               <div className="flex rounded-lg border border-gray-300 dark:border-gray-600">
                 <button
@@ -461,20 +580,24 @@ function ClientsPageContent() {
         {/* Client List */}
         {filteredClients.length === 0 ? (
           <div className="rounded-lg border-2 border-dashed border-gray-300 p-12 text-center dark:border-gray-700">
-            <FileText className="mx-auto h-12 w-12 text-gray-400" />
+            <Inbox className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-600" />
             <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-white">
               No clients found
             </h3>
             <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              Get started by adding your first client
+              {clients.length === 0
+                ? "Get started by adding your first client"
+                : "Try adjusting your search or filters"}
             </p>
-            <button
-              onClick={handleCreateClient}
-              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600"
-            >
-              <Plus className="h-4 w-4" />
-              New Client
-            </button>
+            {clients.length === 0 && (
+              <button
+                onClick={handleCreateClient}
+                className="mt-4 inline-flex items-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600"
+              >
+                <Plus className="h-4 w-4" />
+                New Client
+              </button>
+            )}
           </div>
         ) : viewMode === "grid" ? (
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -494,16 +617,18 @@ function ClientsPageContent() {
                       onChange={() => toggleClientSelection(client.id)}
                       className="h-4 w-4 rounded border-gray-300 text-sky-500 focus:ring-sky-500 dark:border-gray-600"
                     />
-                    <div className="flex flex-wrap gap-1">
-                      {client.tags.map((tag) => (
-                        <span
-                          key={tag}
-                          className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-400"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
+                    {client.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {client.tags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-400"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   <h3 className="mb-1 font-semibold text-gray-900 dark:text-white">
@@ -516,20 +641,27 @@ function ClientsPageContent() {
                   )}
 
                   <div className="mb-4 space-y-2 text-sm">
-                    <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                      <MapPin className="h-4 w-4" />
-                      <span>
-                        {client.city}, {client.state}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                      <Mail className="h-4 w-4" />
-                      <span className="truncate">{client.primary_contact_email}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                      <Phone className="h-4 w-4" />
-                      <span>{client.primary_contact_phone}</span>
-                    </div>
+                    {(client.city || client.state) && (
+                      <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                        <MapPin className="h-4 w-4" />
+                        <span>
+                          {client.city ? `${client.city}, ` : ""}
+                          {client.state || ""}
+                        </span>
+                      </div>
+                    )}
+                    {client.primary_contact_email && (
+                      <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                        <Mail className="h-4 w-4" />
+                        <span className="truncate">{client.primary_contact_email}</span>
+                      </div>
+                    )}
+                    {client.primary_contact_phone && (
+                      <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                        <Phone className="h-4 w-4" />
+                        <span>{client.primary_contact_phone}</span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="mb-4 flex items-center justify-between border-t border-gray-200 pt-4 text-sm dark:border-gray-700">
@@ -638,23 +770,25 @@ function ClientsPageContent() {
                               {client.business_name}
                             </p>
                           )}
-                          <div className="mt-1 flex flex-wrap gap-1">
-                            {client.tags.map((tag) => (
-                              <span
-                                key={tag}
-                                className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-400"
-                              >
-                                {tag}
-                              </span>
-                            ))}
-                          </div>
+                          {client.tags.length > 0 && (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {client.tags.map((tag) => (
+                                <span
+                                  key={tag}
+                                  className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-400"
+                                >
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </td>
                       <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
-                        {client.city}
+                        {client.city || "-"}
                       </td>
                       <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
-                        {client.state}
+                        {client.state || "-"}
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-sm">
@@ -734,14 +868,18 @@ function ClientsPageContent() {
 
 export default function ClientsPage() {
   return (
-    <Suspense fallback={
-      <DashboardLayout title="Clients">
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-gray-500">Loading...</div>
-        </div>
-      </DashboardLayout>
-    }>
-      <ClientsPageContent />
-    </Suspense>
+    <ProtectedRoute>
+      <Suspense
+        fallback={
+          <DashboardLayout title="Clients">
+            <div className="flex items-center justify-center min-h-screen">
+              <div className="text-gray-500">Loading...</div>
+            </div>
+          </DashboardLayout>
+        }
+      >
+        <ClientsPageContent />
+      </Suspense>
+    </ProtectedRoute>
   );
 }
