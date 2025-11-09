@@ -1407,6 +1407,16 @@ class ApiClient {
   }
   
   /**
+   * Extract CSRF token from Set-Cookie header
+   */
+  private extractCsrfTokenFromHeaders(response: Response): string | null {
+    // Note: Browsers don't allow reading Set-Cookie headers from JavaScript for security reasons
+    // We have to rely on the browser setting the cookie and then reading it from document.cookie
+    // However, we can check if the response indicates the cookie should be set
+    return null;
+  }
+
+  /**
    * Ensure CSRF token is available by making a request if needed
    * This will ALWAYS fetch a fresh token to ensure it matches the current session
    */
@@ -1440,26 +1450,44 @@ class ApiClient {
         });
       });
       
-      // Django sets the CSRF token cookie in the response headers
-      // Wait a bit for the browser to process and store the cookie
-      // This is important because cookie setting is asynchronous
-      await new Promise(resolve => setTimeout(resolve, 150));
-      
-      // Verify we have the token
-      const token = this.getCsrfToken();
-      if (process.env.NODE_ENV === 'development') {
-        if (token) {
-          console.debug('[API] CSRF token refreshed, length:', token.length);
-        } else {
-          console.warn('[API] CSRF token not found after fetch');
-          console.warn('[API] Response status:', response?.status);
-          console.warn('[API] All cookies:', document.cookie);
+      // Check response status - even 401/403 should set CSRF cookie
+      if (response && (response.status === 200 || response.status === 401 || response.status === 403)) {
+        // Django sets the CSRF token cookie in the response headers
+        // Wait longer for the browser to process and store the cookie
+        // This is important because cookie setting is asynchronous and might take time
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        // Try multiple times to read the token (cookie might not be immediately available)
+        let token: string | null = null;
+        for (let i = 0; i < 3; i++) {
+          token = this.getCsrfToken();
+          if (token) break;
+          await new Promise(resolve => setTimeout(resolve, 100));
         }
-      }
-      
-      if (!token) {
-        console.error('[API] CRITICAL: Could not obtain CSRF token after fetch');
-        console.error('[API] This will cause CSRF errors on state-changing requests');
+        
+        if (process.env.NODE_ENV === 'development') {
+          if (token) {
+            console.debug('[API] CSRF token obtained, length:', token.length);
+          } else {
+            console.warn('[API] CSRF token not found after fetch');
+            console.warn('[API] Response status:', response.status);
+            console.warn('[API] Response headers:', Array.from(response.headers.entries()));
+            console.warn('[API] All cookies:', document.cookie);
+            console.warn('[API] Cookie domain/path issues might prevent reading the token');
+          }
+        }
+        
+        if (!token) {
+          console.error('[API] CRITICAL: Could not obtain CSRF token after fetch');
+          console.error('[API] This will cause CSRF errors on state-changing requests');
+          console.error('[API] Possible causes:');
+          console.error('[API] 1. Cookie domain mismatch (check CSRF_COOKIE_DOMAIN in Django settings)');
+          console.error('[API] 2. Cookie path mismatch');
+          console.error('[API] 3. Cookie Secure flag mismatch (HTTP vs HTTPS)');
+          console.error('[API] 4. Cookie SameSite restrictions');
+        }
+      } else {
+        console.warn('[API] Unexpected response status when fetching CSRF token:', response?.status);
       }
     } catch (error) {
       console.error('[API] Error fetching CSRF token:', error);
@@ -1523,22 +1551,42 @@ class ApiClient {
     }
     
     // Get CSRF token for POST, PUT, DELETE, PATCH requests
-    // ALWAYS refresh the token to ensure it matches the current session
-    // This is especially important after login when a new session is created
+    // Check if we have a token first, only refresh if we don't have one
+    // This avoids unnecessary token refreshes that might cause timing issues
     let csrfToken: string | null = null;
     if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
-      // Always fetch a fresh token before state-changing requests
-      // This ensures we have a token that matches the current session
-      await this.ensureCsrfToken();
+      // First check if we already have a token
       csrfToken = this.getCsrfToken();
+      
+      // Only fetch a new token if we don't have one
+      // This is more efficient and avoids potential timing issues
+      if (!csrfToken) {
+        if (process.env.NODE_ENV === 'development') {
+          console.debug('[API] No CSRF token found, fetching one...');
+        }
+        await this.ensureCsrfToken();
+        csrfToken = this.getCsrfToken();
+      }
       
       // If we still don't have a token after fetching, this is a critical error
       if (!csrfToken) {
         console.error('[API] CRITICAL ERROR: No CSRF token available for', method, 'request to', endpoint);
         console.error('[API] This request will fail with a CSRF error');
         console.error('[API] Available cookies:', typeof document !== 'undefined' ? document.cookie : 'N/A (SSR)');
-      } else if (process.env.NODE_ENV === 'development') {
-        console.debug('[API] Using CSRF token (length:', csrfToken.length, ') for', method, 'request to', endpoint);
+        console.error('[API] Cookie parsing test:');
+        if (typeof document !== 'undefined') {
+          const cookies = document.cookie.split(';');
+          cookies.forEach(cookie => {
+            const trimmed = cookie.trim();
+            if (trimmed.toLowerCase().includes('csrf')) {
+              console.error('[API] Found CSRF-related cookie:', trimmed.substring(0, 50) + '...');
+            }
+          });
+        }
+      } else {
+        if (process.env.NODE_ENV === 'development') {
+          console.debug('[API] Using CSRF token (length:', csrfToken.length, ') for', method, 'request to', endpoint);
+        }
       }
     }
 
@@ -1634,54 +1682,106 @@ class ApiClient {
         // If it's a CSRF error and we haven't retried yet, refresh token and retry once
         if (isCsrfError && method !== 'GET' && !(options as any)._csrfRetried) {
           console.warn('[API] CSRF token error detected, refreshing token and retrying...');
+          console.warn('[API] Original error:', error);
+          console.warn('[API] Current CSRF token from cookie:', this.getCsrfToken()?.substring(0, 20) + '...');
           
-          // Refresh the CSRF token
-          const newToken = await this.refreshCsrfToken();
+          // Clear any existing token cookie (might be stale)
+          if (typeof document !== 'undefined') {
+            // Try to clear the cookie by setting it to expire
+            document.cookie = 'csrftoken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=;';
+            document.cookie = 'csrftoken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+          }
           
-          if (newToken) {
-            // Retry the request with the new token
-            const retryHeaders = { ...headers };
-            retryHeaders['X-CSRFToken'] = newToken;
+          // Wait a bit before fetching new token
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+          // Refresh the CSRF token by making a GET request
+          // This will get a fresh token that matches the current session
+          try {
+            const tokenResponse = await fetch(`${this.baseURL}/api/user/`, {
+              method: 'GET',
+              credentials: 'include',
+              mode: 'cors',
+              headers: {
+                'Accept': 'application/json',
+              },
+            });
             
-            const retryConfig: RequestInit = {
-              ...config,
-              headers: retryHeaders,
-            };
+            // Wait for cookie to be set
+            await new Promise(resolve => setTimeout(resolve, 200));
             
-            // Mark that we've retried to avoid infinite loops
-            (retryConfig as any)._csrfRetried = true;
+            // Get the new token
+            const newToken = this.getCsrfToken();
             
-            try {
-              const retryResponse = await fetch(url, retryConfig);
-              const retryContentType = retryResponse.headers.get('content-type');
+            if (newToken) {
+              console.warn('[API] New CSRF token obtained:', newToken.substring(0, 20) + '...');
               
-              if (!retryContentType || !retryContentType.includes('application/json')) {
-                if (!retryResponse.ok) {
-                  throw new Error(`HTTP error! status: ${retryResponse.status}`);
+              // Retry the request with the new token
+              const retryHeaders = { ...headers };
+              retryHeaders['X-CSRFToken'] = newToken;
+              
+              const retryConfig: RequestInit = {
+                ...config,
+                headers: retryHeaders,
+              };
+              
+              // Mark that we've retried to avoid infinite loops
+              (retryConfig as any)._csrfRetried = true;
+              
+              try {
+                const retryResponse = await fetch(url, retryConfig);
+                const retryContentType = retryResponse.headers.get('content-type');
+                
+                if (!retryContentType || !retryContentType.includes('application/json')) {
+                  if (!retryResponse.ok) {
+                    throw new Error(`HTTP error! status: ${retryResponse.status}`);
+                  }
+                  return {} as T;
                 }
-                return {} as T;
+                
+                const retryData = await retryResponse.json();
+                
+                if (!retryResponse.ok) {
+                  // Check if it's still a CSRF error
+                  const isStillCsrfError = retryResponse.status === 403 || 
+                                         (retryResponse.status === 400 && 
+                                          (retryData.detail?.toLowerCase().includes('csrf') || 
+                                           retryData.error?.toLowerCase().includes('csrf')));
+                  
+                  if (isStillCsrfError) {
+                    console.error('[API] CSRF error persists after token refresh. This indicates a deeper issue:');
+                    console.error('[API] 1. Session cookie and CSRF cookie might have different domains/paths');
+                    console.error('[API] 2. CSRF cookie might not be accessible due to SameSite restrictions');
+                    console.error('[API] 3. Session might be changing between requests');
+                    console.error('[API] 4. Cookie domain/path configuration might be incorrect');
+                  }
+                  
+                  // Format retry error the same way
+                  const retryError: ApiError = {
+                    error: retryData.error || 'Error',
+                    message: retryData.detail || retryData.message || retryData.error || 'An error occurred',
+                    detail: retryData.detail,
+                    response: retryData,
+                    status: retryResponse.status,
+                  };
+                  throw retryError;
+                }
+                
+                console.warn('[API] Request succeeded after CSRF token refresh');
+                return retryData;
+              } catch (retryError) {
+                // If retry also fails, throw the original error
+                console.error('[API] Retry after CSRF token refresh also failed:', retryError);
+                throw error;
               }
-              
-              const retryData = await retryResponse.json();
-              
-              if (!retryResponse.ok) {
-                // Format retry error the same way
-                const retryError: ApiError = {
-                  error: retryData.error || 'Error',
-                  message: retryData.detail || retryData.message || retryData.error || 'An error occurred',
-                  detail: retryData.detail,
-                  response: retryData,
-                  status: retryResponse.status,
-                };
-                throw retryError;
-              }
-              
-              return retryData;
-            } catch (retryError) {
-              // If retry also fails, throw the original error
-              console.error('[API] Retry after CSRF token refresh also failed');
+            } else {
+              console.error('[API] Could not get new CSRF token after refresh');
+              console.error('[API] This might indicate a cookie access issue');
               throw error;
             }
+          } catch (tokenError) {
+            console.error('[API] Error while refreshing CSRF token:', tokenError);
+            throw error;
           }
         }
         
