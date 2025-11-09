@@ -870,7 +870,7 @@ export interface BackendPayrollListItem {
   days_present: number;
   net_amount: string;
   payment_date: string | null;
-  payment_mode: 'Cash' | 'Bank Transfer' | 'Cheque' | 'UPI' | null;
+  payment_mode: 'Cash' | 'Bank Transfer' | 'Cheque' | 'UPI' | 'NEFT/RTGS' | null;
   created_at: string;
 }
 
@@ -893,7 +893,7 @@ export interface PayrollDetail {
   days_present: number;
   net_amount: string;
   payment_date: string | null;
-  payment_mode: 'Cash' | 'Bank Transfer' | 'Cheque' | 'UPI' | null;
+  payment_mode: 'Cash' | 'Bank Transfer' | 'Cheque' | 'UPI' | 'NEFT/RTGS' | null;
   bank_transaction_reference_number: string | null;
   notes: string | null;
   created_at: string;
@@ -911,21 +911,21 @@ export interface PayrollCreateData {
   days_present: number;
   net_amount: number;
   payment_date?: string; // YYYY-MM-DD (required if payroll_status is "Paid")
-  payment_mode?: 'Cash' | 'Bank Transfer' | 'Cheque' | 'UPI'; // required if payroll_status is "Paid"
+  payment_mode?: 'Cash' | 'Bank Transfer' | 'Cheque' | 'UPI' | 'NEFT/RTGS'; // required if payroll_status is "Paid"
   bank_transaction_reference_number?: string;
   notes?: string;
 }
 
 export interface PayrollMarkPaidRequest {
   payment_date: string; // YYYY-MM-DD
-  payment_mode: 'Cash' | 'Bank Transfer' | 'Cheque' | 'UPI';
+  payment_mode: 'Cash' | 'Bank Transfer' | 'Cheque' | 'UPI' | 'NEFT/RTGS';
   bank_transaction_reference_number?: string;
 }
 
 export interface BulkMarkPayrollPaidRequest {
   payroll_ids: number[];
   payment_date: string; // YYYY-MM-DD
-  payment_mode: 'Cash' | 'Bank Transfer' | 'Cheque' | 'UPI';
+  payment_mode: 'Cash' | 'Bank Transfer' | 'Cheque' | 'UPI' | 'NEFT/RTGS';
   bank_transaction_reference_number?: string;
 }
 
@@ -957,7 +957,7 @@ export interface BackendPaymentTrackerListItem {
   ifsc_code: string | null;
   payment_status: 'Paid' | 'Pending';
   payment_date: string | null;
-  payment_mode: 'Cash' | 'Bank Transfer' | 'Cheque' | 'UPI' | null;
+  payment_mode: 'Cash' | 'Bank Transfer' | 'Cheque' | 'UPI' | 'NEFT/RTGS' | null;
   sheet_period: string; // YYYY-MM-DD (first day of month)
   created_at: string;
 }
@@ -980,7 +980,7 @@ export interface PaymentTrackerDetail {
   ifsc_code: string | null;
   payment_status: 'Paid' | 'Pending';
   payment_date: string | null;
-  payment_mode: 'Cash' | 'Bank Transfer' | 'Cheque' | 'UPI' | null;
+  payment_mode: 'Cash' | 'Bank Transfer' | 'Cheque' | 'UPI' | 'NEFT/RTGS' | null;
   sheet_period: string;
   sheet_attachment: string | null;
   sheet_attachment_url: string | null;
@@ -1005,13 +1005,13 @@ export interface PaymentTrackerUploadResponse {
 
 export interface PaymentTrackerMarkPaidRequest {
   payment_date: string; // YYYY-MM-DD
-  payment_mode: 'Cash' | 'Bank Transfer' | 'Cheque' | 'UPI';
+  payment_mode: 'Cash' | 'Bank Transfer' | 'Cheque' | 'UPI' | 'NEFT/RTGS';
 }
 
 export interface BulkMarkPaymentTrackerPaidRequest {
   payment_ids: number[];
   payment_date: string; // YYYY-MM-DD
-  payment_mode: 'Cash' | 'Bank Transfer' | 'Cheque' | 'UPI';
+  payment_mode: 'Cash' | 'Bank Transfer' | 'Cheque' | 'UPI' | 'NEFT/RTGS';
 }
 
 export interface BulkMarkPaymentTrackerPaidResponse {

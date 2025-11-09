@@ -304,9 +304,11 @@ function AttendancePageContent() {
   };
 
   const handleDelete = async (record: AttendanceRecord) => {
-    const confirmed = await showDeleteConfirm(
+    const confirmed = await showConfirm(
       "Delete Attendance",
-      `Are you sure you want to delete attendance for ${record.employee_name} on ${format(new Date(record.date), "dd MMM yyyy")}?`
+      `Are you sure you want to delete attendance for ${record.employee_name} on ${format(new Date(record.date), "dd MMM yyyy")}? This action cannot be undone.`,
+      "Yes, delete it",
+      "Cancel"
     );
 
     if (!confirmed) return;
@@ -1104,7 +1106,7 @@ function ExportReportModal({
         record.check_out || "",
         escapeCSV(record.notes || ""),
         record.approval_status,
-        escapeCSV(record.approved_by || "")
+        "" // approved_by not available in AttendanceRecord
       ].join(","))
     ].join("\n");
 

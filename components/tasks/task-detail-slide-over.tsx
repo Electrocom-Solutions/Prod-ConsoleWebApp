@@ -440,7 +440,7 @@ export function TaskDetailSlideOver({
                         <span>Time Taken</span>
                       </div>
                       <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
-                        {task.time_taken_minutes} minutes ({(task.time_taken_minutes / 60).toFixed(1)} hrs)
+                        {`${task.time_taken_minutes} minutes (${(task.time_taken_minutes / 60).toFixed(1)} hrs)`}
                       </p>
                     </div>
                     <div>
@@ -763,6 +763,7 @@ export function TaskDetailSlideOver({
               )}
             </section>
           </div>
+          )}
         </div>
 
         {/* Sticky Bottom Bar */}

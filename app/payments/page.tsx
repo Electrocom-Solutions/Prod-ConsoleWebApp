@@ -6,7 +6,7 @@ import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search, Upload, Download, CheckCircle, X, Calendar, Loader2, Inbox, Trash2 } from "lucide-react";
-import { showDeleteConfirm, showSuccess, showError, showAlert } from "@/lib/sweetalert";
+import { showDeleteConfirm, showSuccess, showError, showAlert, showConfirm } from "@/lib/sweetalert";
 import { format } from "date-fns";
 import * as XLSX from "xlsx";
 import { apiClient, PaymentTrackerStatisticsResponse, BackendPaymentTrackerListItem, PaymentTrackerListResponse, PaymentTrackerUploadResponse } from "@/lib/api";
@@ -181,9 +181,11 @@ function PaymentsPageContent() {
   };
 
   const handleDelete = async (payment: ContractWorkerPayment) => {
-    const confirmed = await showDeleteConfirm(
+    const confirmed = await showConfirm(
       "Delete Payment",
-      `Are you sure you want to delete payment for ${payment.workerName}?`
+      `Are you sure you want to delete payment for ${payment.workerName}? This action cannot be undone.`,
+      "Yes, delete it",
+      "Cancel"
     );
 
     if (!confirmed) return;

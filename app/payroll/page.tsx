@@ -24,7 +24,7 @@ import { PayrollRecord, PaymentStatus, PaymentMode } from "@/types";
 import { format } from "date-fns";
 import { PayslipModal } from "@/components/payroll/payslip-modal";
 import { MarkPaidModal } from "@/components/payroll/mark-paid-modal";
-import { showSuccess, showError, showDeleteConfirm, showAlert } from "@/lib/sweetalert";
+import { showSuccess, showError, showDeleteConfirm, showAlert, showConfirm } from "@/lib/sweetalert";
 import { apiClient, PayrollStatisticsResponse, BackendPayrollListItem, PayrollDetail, PayrollCreateData, BackendEmployeeListItem, EmployeeListResponse } from "@/lib/api";
 import { useDebounce } from "use-debounce";
 import { ProtectedRoute } from "@/components/auth/protected-route";
@@ -313,9 +313,11 @@ function PayrollPageContent() {
   };
 
   const handleDelete = async (record: PayrollRecord) => {
-    const confirmed = await showDeleteConfirm(
+    const confirmed = await showConfirm(
       "Delete Payroll",
-      `Are you sure you want to delete payroll for ${record.employee_name}?`
+      `Are you sure you want to delete payroll for ${record.employee_name}? This action cannot be undone.`,
+      "Yes, delete it",
+      "Cancel"
     );
 
     if (!confirmed) return;

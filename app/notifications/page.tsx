@@ -17,7 +17,7 @@ import {
   Loader2,
   Inbox,
   MessageSquare,
-  MessageSquareCheck,
+  CheckCircle,
 } from "lucide-react";
 import { NotificationRecord, NotificationType } from "@/types";
 import { formatDistanceToNow } from "date-fns";
@@ -241,7 +241,7 @@ function NotificationsPageContent() {
                   <div className="text-sm text-gray-500 dark:text-gray-400">Read</div>
                   <div className="text-2xl font-bold mt-1">{statistics.read_count}</div>
                 </div>
-                <MessageSquareCheck className="h-8 w-8 text-green-500" />
+                <CheckCircle className="h-8 w-8 text-green-500" />
               </div>
             </div>
           </div>
