@@ -1603,27 +1603,45 @@ class ApiClient {
       headers['Content-Type'] = 'application/json';
     }
     
-    // Merge with any custom headers (but don't override Content-Type for FormData)
+    // Merge with any custom headers from options
+    // Handle different header types: Record<string, string>, Headers object, or string[][]
     if (options.headers) {
-      Object.assign(headers, options.headers);
+      if (options.headers instanceof Headers) {
+        // Convert Headers object to Record
+        options.headers.forEach((value, key) => {
+          headers[key] = value;
+        });
+      } else if (Array.isArray(options.headers)) {
+        // Handle string[][] format
+        options.headers.forEach(([key, value]) => {
+          headers[key] = value;
+        });
+      } else {
+        // Handle Record<string, string>
+        Object.assign(headers, options.headers);
+      }
     }
 
-    // Add CSRF token header for state-changing requests
-    // Django accepts 'X-CSRFToken' (standard) but also 'X-Csrftoken' (some configurations)
-    // We'll use 'X-CSRFToken' as it's the standard
-    if (csrfToken && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
-      headers['X-CSRFToken'] = csrfToken;
-      if (process.env.NODE_ENV === 'development') {
-        console.debug('[API] Adding CSRF token header for', method, 'request to', endpoint);
-        console.debug('[API] CSRF token length:', csrfToken.length, 'first 10 chars:', csrfToken.substring(0, 10));
-      }
-    } else if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method) && !csrfToken) {
-      // This is a critical error - we need a token for state-changing requests
-      console.error('[API] ERROR: Making', method, 'request to', endpoint, 'without CSRF token. This will fail.');
-      // Never log full cookies as they may contain sensitive session data
-      if (process.env.NODE_ENV === 'development' && typeof document !== 'undefined') {
-        const cookieNames = document.cookie.split(';').map(c => c.trim().split('=')[0]);
-        console.error('[API] Available cookie names:', cookieNames);
+    // CRITICAL: Add CSRF token header for ALL state-changing requests
+    // This MUST be added AFTER merging custom headers to ensure it's never overridden
+    // Django requires CSRF token for POST, PUT, DELETE, PATCH requests
+    if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
+      if (csrfToken) {
+        // Always set CSRF token - this takes precedence over any token in options.headers
+        headers['X-CSRFToken'] = csrfToken;
+        if (process.env.NODE_ENV === 'development') {
+          console.debug('[API] Adding CSRF token header for', method, 'request to', endpoint);
+          console.debug('[API] CSRF token length:', csrfToken.length, 'first 10 chars:', csrfToken.substring(0, 10));
+        }
+      } else {
+        // This is a critical error - we need a token for state-changing requests
+        console.error('[API] ERROR: Making', method, 'request to', endpoint, 'without CSRF token. This will fail.');
+        console.error('[API] All state-changing requests (POST, PUT, DELETE, PATCH) require CSRF token.');
+        // Never log full cookies as they may contain sensitive session data
+        if (process.env.NODE_ENV === 'development' && typeof document !== 'undefined') {
+          const cookieNames = document.cookie.split(';').map(c => c.trim().split('=')[0]);
+          console.error('[API] Available cookie names:', cookieNames);
+        }
       }
     }
 
