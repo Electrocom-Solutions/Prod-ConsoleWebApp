@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X } from "lucide-react";
+import { X, Loader2 } from "lucide-react";
 import { Tender, TenderFinancials } from "@/types";
 
 interface TenderFormModalProps {
@@ -10,9 +10,10 @@ interface TenderFormModalProps {
   onSubmit: (
     tender: Omit<Tender, "id" | "created_at" | "updated_at">,
     financials?: Partial<TenderFinancials>
-  ) => void;
+  ) => Promise<void>;
   tender?: Tender | null;
   existingFinancials?: TenderFinancials | null;
+  isSaving?: boolean;
 }
 
 export default function TenderFormModal({
@@ -21,6 +22,7 @@ export default function TenderFormModal({
   tender,
   existingFinancials,
   onSubmit,
+  isSaving = false,
 }: TenderFormModalProps) {
   const [formData, setFormData] = useState({
     name: "",
@@ -119,7 +121,7 @@ export default function TenderFormModal({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!validate()) {
@@ -147,9 +149,13 @@ export default function TenderFormModal({
       dd_bank_name: formData.dd_bank_name || undefined,
     };
 
-    onSubmit(tenderData, financialsData);
-
-    onClose();
+    try {
+      await onSubmit(tenderData, financialsData);
+      // Only close on success - error handling is done in parent
+    } catch (error) {
+      // Error handling is done in parent component
+      console.error('Tender submit error:', error);
+    }
   };
 
   // Calculate financials for display
@@ -533,9 +539,17 @@ export default function TenderFormModal({
                 </button>
                 <button
                   type="submit"
-                  className="rounded-md bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600"
+                  disabled={isSaving}
+                  className="inline-flex items-center justify-center rounded-md bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {tender ? "Update Tender" : "Create Tender"}
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      {tender ? "Updating..." : "Creating..."}
+                    </>
+                  ) : (
+                    tender ? "Update Tender" : "Create Tender"
+                  )}
                 </button>
               </div>
             </form>

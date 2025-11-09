@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, Suspense } from "react";
+import { useState, useMemo, useEffect, Suspense, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import {
@@ -15,156 +15,275 @@ import {
   Eye,
   Edit,
   Trash2,
+  Loader2,
+  Inbox,
 } from "lucide-react";
 import Link from "next/link";
 import { Tender, TenderFinancials } from "@/types";
 import TenderFormModal from "@/components/tenders/tender-form-modal";
-import { mockTenders as initialTenders } from "@/lib/mock-data/tenders";
-import { showDeleteConfirm, showConfirm } from "@/lib/sweetalert";
+import {
+  apiClient,
+  TenderStatisticsResponse,
+  BackendTenderListItem,
+  BackendTenderDetail,
+} from "@/lib/api";
+import { showDeleteConfirm, showConfirm, showAlert } from "@/lib/sweetalert";
+import { useDebounce } from "use-debounce";
+import { ProtectedRoute } from "@/components/auth/protected-route";
+import { format } from "date-fns";
+
+/**
+ * Map backend tender list item to frontend Tender type
+ */
+function mapBackendTenderListItemToFrontend(backendTender: BackendTenderListItem): Tender {
+  return {
+    id: backendTender.id,
+    name: backendTender.name,
+    reference_number: backendTender.reference_number,
+    description: "", // Not in list item
+    filed_date: backendTender.filed_date,
+    start_date: backendTender.start_date,
+    end_date: backendTender.end_date,
+    estimated_value: parseFloat(backendTender.estimated_value),
+    status: backendTender.status === "Filed" ? "Filed" : backendTender.status === "Awarded" ? "Awarded" : backendTender.status === "Lost" ? "Lost" : "Closed", // Backend doesn't have "Draft"
+    created_at: backendTender.created_at,
+    updated_at: backendTender.created_at, // Fallback
+  };
+}
+
+/**
+ * Map backend tender detail to frontend Tender type
+ */
+function mapBackendTenderDetailToFrontend(backendTender: BackendTenderDetail): Tender {
+  return {
+    id: backendTender.id,
+    name: backendTender.name,
+    reference_number: backendTender.reference_number,
+    description: backendTender.description || "",
+    filed_date: backendTender.filed_date,
+    start_date: backendTender.start_date,
+    end_date: backendTender.end_date,
+    estimated_value: parseFloat(backendTender.estimated_value),
+    status: backendTender.status === "Filed" ? "Filed" : backendTender.status === "Awarded" ? "Awarded" : backendTender.status === "Lost" ? "Lost" : "Closed",
+    created_at: backendTender.created_at,
+    updated_at: backendTender.updated_at,
+  };
+}
+
+/**
+ * Map backend tender detail to frontend TenderFinancials type
+ */
+function mapBackendTenderDetailToFinancials(backendTender: BackendTenderDetail): TenderFinancials {
+  const sd1Deposit = backendTender.deposits.find((d) => d.deposit_type === "EMD_Security1");
+  const sd2Deposit = backendTender.deposits.find((d) => d.deposit_type === "EMD_Security2");
+
+  return {
+    id: backendTender.id,
+    tender_id: backendTender.id,
+    emd_amount: backendTender.total_emd_cost,
+    emd_refundable: backendTender.status !== "Awarded",
+    emd_refund_date: undefined, // Not in backend
+    emd_collected: false, // Not in backend
+    emd_collection_date: undefined, // Not in backend
+    sd1_amount: backendTender.security_deposit_1,
+    sd1_refundable: sd1Deposit?.is_refunded || false,
+    sd1_refund_date: sd1Deposit?.refund_date,
+    sd2_amount: backendTender.security_deposit_2,
+    sd2_refundable: sd2Deposit?.is_refunded || false,
+    sd2_refund_date: sd2Deposit?.refund_date,
+    dd_date: sd1Deposit?.dd_date || sd2Deposit?.dd_date,
+    dd_number: sd1Deposit?.dd_number || sd2Deposit?.dd_number,
+    dd_amount: sd1Deposit ? parseFloat(sd1Deposit.dd_amount) : sd2Deposit ? parseFloat(sd2Deposit.dd_amount) : undefined,
+    dd_beneficiary_name: sd1Deposit?.dd_beneficiary_name || sd2Deposit?.dd_beneficiary_name,
+    dd_bank_name: sd1Deposit?.bank_name || sd2Deposit?.bank_name,
+  };
+}
 
 function TendersPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [tenders, setTenders] = useState<Tender[]>(initialTenders);
+  const [tenders, setTenders] = useState<Tender[]>([]);
+  const [statistics, setStatistics] = useState<TenderStatisticsResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery] = useDebounce(searchQuery, 500);
   const [statusFilter, setStatusFilter] = useState<string>("All");
   const [emdFilter, setEmdFilter] = useState<boolean>(false);
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
   const [isTenderModalOpen, setIsTenderModalOpen] = useState(false);
   const [selectedTender, setSelectedTender] = useState<Tender | null>(null);
-  const [financials, setFinancials] = useState<TenderFinancials[]>([]);
+  const [selectedTenderFinancials, setSelectedTenderFinancials] = useState<TenderFinancials | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
-  // Calculate financials dynamically
-  const mockFinancials: TenderFinancials[] = useMemo(() => {
-    if (financials.length === 0) {
-      const initialFinancials = tenders.map((tender) => ({
-        id: tender.id,
-        tender_id: tender.id,
-        emd_amount: tender.estimated_value * 0.05,
-        emd_refundable: tender.status !== "Awarded",
-        emd_collected: false,
-        sd1_amount: tender.estimated_value * 0.02,
-        sd1_refundable: false,
-        sd2_amount: tender.estimated_value * 0.03,
-        sd2_refundable: false,
-      }));
-      setFinancials(initialFinancials);
-      return initialFinancials;
+  // Fetch statistics
+  const fetchStatistics = useCallback(async () => {
+    try {
+      const stats = await apiClient.getTenderStatistics();
+      setStatistics(stats);
+    } catch (err: any) {
+      console.error("Failed to fetch tender statistics:", err);
+      // Don't set error here, just log it
     }
-    return financials;
-  }, [tenders, financials]);
+  }, []);
 
-  // CRUD handlers
-  const handleNewTender = () => {
+  // Fetch tenders
+  const fetchTenders = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const params: {
+        search?: string;
+        status?: "Filed" | "Awarded" | "Lost" | "Closed";
+        pending_emds?: boolean;
+        page?: number;
+      } = { page: currentPage };
+
+      if (debouncedSearchQuery) params.search = debouncedSearchQuery;
+      if (statusFilter !== "All") {
+        params.status = statusFilter as "Filed" | "Awarded" | "Lost" | "Closed";
+      }
+      if (emdFilter) params.pending_emds = true;
+
+      const response = await apiClient.getTenders(params);
+      setTenders(response.results.map(mapBackendTenderListItemToFrontend));
+      setTotalPages(Math.ceil(response.count / 20)); // Assuming 20 items per page
+    } catch (err: any) {
+      console.error("Failed to fetch tenders:", err);
+      setError(err.message || "Failed to load tenders.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentPage, debouncedSearchQuery, statusFilter, emdFilter]);
+
+  useEffect(() => {
+    fetchStatistics();
+    fetchTenders();
+  }, [fetchStatistics, fetchTenders]);
+
+  // Handle URL parameters for quick actions (e.g., from dashboard)
+  const handleNewTender = useCallback(() => {
     setSelectedTender(null);
+    setSelectedTenderFinancials(null);
     setIsTenderModalOpen(true);
-  };
+  }, []);
 
-  // Check for action=new in URL params and open modal
   useEffect(() => {
     const action = searchParams.get("action");
+    const editId = searchParams.get("edit");
+    
     if (action === "new") {
       handleNewTender();
-      // Remove the query parameter from URL
-      router.replace("/tenders");
+      router.replace("/tenders"); // Clear the query parameter
+    } else if (editId) {
+      const tenderId = parseInt(editId, 10);
+      const tender = tenders.find((t) => t.id === tenderId);
+      if (tender) {
+        handleEditTender(tender);
+      } else {
+        // Tender not in current list, fetch it
+        apiClient.getTender(tenderId)
+          .then((detail) => {
+            const frontendTender = mapBackendTenderDetailToFrontend(detail);
+            const frontendFinancials = mapBackendTenderDetailToFinancials(detail);
+            setSelectedTender(frontendTender);
+            setSelectedTenderFinancials(frontendFinancials);
+            setIsTenderModalOpen(true);
+          })
+          .catch((err) => {
+            console.error("Failed to fetch tender for editing:", err);
+            showAlert("Error", "Failed to load tender for editing.", "error");
+          });
+      }
+      router.replace("/tenders"); // Clear the query parameter
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+  }, [searchParams, tenders]);
 
-  const handleEditTender = (tender: Tender) => {
-    setSelectedTender(tender);
-    setIsTenderModalOpen(true);
-  };
-
-  const handleCreateTender = (
-    tenderData: Omit<Tender, "id" | "created_at" | "updated_at">,
-    financialsData?: Partial<TenderFinancials>
-  ) => {
-    const newTender: Tender = {
-      ...tenderData,
-      id: Math.max(...tenders.map((t) => t.id), 0) + 1,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    setTenders([...tenders, newTender]);
-
-    // Create financials record with provided data or auto-calculated defaults
-    const newFinancials: TenderFinancials = {
-      id: newTender.id,
-      tender_id: newTender.id,
-      emd_amount: financialsData?.emd_amount ?? newTender.estimated_value * 0.05,
-      emd_refundable: newTender.status !== "Awarded",
-      emd_collected: false,
-      sd1_amount: financialsData?.sd1_amount ?? newTender.estimated_value * 0.02,
-      sd1_refundable: false,
-      sd2_amount: financialsData?.sd2_amount ?? newTender.estimated_value * 0.03,
-      sd2_refundable: false,
-      dd_date: financialsData?.dd_date,
-      dd_number: financialsData?.dd_number,
-      dd_amount: financialsData?.dd_amount,
-      dd_beneficiary_name: financialsData?.dd_beneficiary_name,
-      dd_bank_name: financialsData?.dd_bank_name,
-    };
-    setFinancials([...financials, newFinancials]);
-  };
-
-  const handleUpdateTender = (
-    tenderData: Omit<Tender, "id" | "created_at" | "updated_at">,
-    financialsData?: Partial<TenderFinancials>
-  ) => {
-    if (!selectedTender) return;
-
-    const updatedTender: Tender = {
-      ...tenderData,
-      id: selectedTender.id,
-      created_at: selectedTender.created_at,
-      updated_at: new Date().toISOString(),
-    };
-
-    setTenders(tenders.map((t) => (t.id === selectedTender.id ? updatedTender : t)));
-
-    // Update financials record
-    if (financialsData) {
-      setFinancials(
-        financials.map((f) =>
-          f.tender_id === selectedTender.id
-            ? {
-                ...f,
-                sd1_amount: financialsData.sd1_amount ?? f.sd1_amount,
-                sd2_amount: financialsData.sd2_amount ?? f.sd2_amount,
-                dd_date: financialsData.dd_date ?? f.dd_date,
-                dd_number: financialsData.dd_number ?? f.dd_number,
-                dd_amount: financialsData.dd_amount ?? f.dd_amount,
-                dd_beneficiary_name: financialsData.dd_beneficiary_name ?? f.dd_beneficiary_name,
-                dd_bank_name: financialsData.dd_bank_name ?? f.dd_bank_name,
-              }
-            : f
-        )
-      );
+  const handleEditTender = async (tender: Tender) => {
+    setIsLoading(true);
+    try {
+      const detail = await apiClient.getTender(tender.id);
+      setSelectedTender(mapBackendTenderDetailToFrontend(detail));
+      setSelectedTenderFinancials(mapBackendTenderDetailToFinancials(detail));
+      setIsTenderModalOpen(true);
+    } catch (err: any) {
+      showAlert("Error", err.message || "Failed to load tender details for editing.", "error");
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleTenderSubmit = (
+  const handleTenderSubmit = async (
     tenderData: Omit<Tender, "id" | "created_at" | "updated_at">,
     financialsData?: Partial<TenderFinancials>
   ) => {
-    if (selectedTender) {
-      handleUpdateTender(tenderData, financialsData);
-    } else {
-      handleCreateTender(tenderData, financialsData);
+    setIsSaving(true);
+    try {
+      const submitData: any = {
+        name: tenderData.name,
+        reference_number: tenderData.reference_number,
+        description: tenderData.description,
+        filed_date: tenderData.filed_date,
+        start_date: tenderData.start_date,
+        end_date: tenderData.end_date,
+        estimated_value: tenderData.estimated_value,
+        status: tenderData.status === "Draft" ? "Filed" : tenderData.status, // Backend doesn't have "Draft"
+      };
+
+      // Add security deposit data if provided
+      if (financialsData) {
+        if (financialsData.sd1_amount && financialsData.dd_date && financialsData.dd_number) {
+          submitData.security_deposit_1_dd_date = financialsData.dd_date;
+          submitData.security_deposit_1_dd_number = financialsData.dd_number;
+          submitData.security_deposit_1_dd_amount = financialsData.sd1_amount;
+          submitData.security_deposit_1_dd_bank_name = financialsData.dd_bank_name;
+          submitData.security_deposit_1_dd_beneficiary_name = financialsData.dd_beneficiary_name;
+        }
+        if (financialsData.sd2_amount && financialsData.dd_date && financialsData.dd_number) {
+          submitData.security_deposit_2_dd_date = financialsData.dd_date;
+          submitData.security_deposit_2_dd_number = financialsData.dd_number;
+          submitData.security_deposit_2_dd_amount = financialsData.sd2_amount;
+          submitData.security_deposit_2_dd_bank_name = financialsData.dd_bank_name;
+          submitData.security_deposit_2_dd_beneficiary_name = financialsData.dd_beneficiary_name;
+        }
+      }
+
+      if (selectedTender) {
+        await apiClient.updateTender(selectedTender.id, submitData);
+        showAlert("Success", "Tender updated successfully!", "success");
+      } else {
+        await apiClient.createTender(submitData);
+        showAlert("Success", "Tender created successfully!", "success");
+      }
+      setIsTenderModalOpen(false);
+      setSelectedTender(null);
+      setSelectedTenderFinancials(null);
+      fetchTenders(); // Refresh list
+      fetchStatistics(); // Refresh stats
+    } catch (err: any) {
+      console.error("Save failed:", err);
+      showAlert("Save Failed", err.message || "An error occurred during save.", "error");
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const handleDeleteTender = async (tender: Tender) => {
-    const confirmed = await showConfirm(
-      "Delete Tender?",
-      `Are you sure you want to delete tender "${tender.name}"? This action cannot be undone.`,
-      "Yes, delete it",
-      "Cancel"
-    );
+    const confirmed = await showDeleteConfirm("this tender");
     if (confirmed) {
-      setTenders(tenders.filter((t) => t.id !== tender.id));
-      setFinancials(financials.filter((f) => f.tender_id !== tender.id));
+      try {
+        await apiClient.deleteTender(tender.id);
+        showAlert("Deleted!", "Tender has been deleted.", "success");
+        fetchTenders(); // Refresh list
+        fetchStatistics(); // Refresh stats
+      } catch (err: any) {
+        console.error("Delete failed:", err);
+        showAlert("Delete Failed", err.message || "An error occurred during deletion.", "error");
+      }
     }
   };
 
@@ -180,63 +299,18 @@ function TendersPageContent() {
       "Cancel"
     );
     if (confirmed) {
-      setFinancials(
-        financials.map((f) =>
-          f.tender_id === tenderId
-            ? { ...f, emd_collected: true, emd_collection_date: new Date().toISOString() }
-            : f
-        )
-      );
+      // This would require a specific API endpoint for marking EMD as collected.
+      // For now, we'll show an info message.
+      showAlert("Info", "EMD collection marking functionality is a placeholder. This would require a backend API endpoint.", "info");
     }
   };
 
-  // Search and filter
+  // Search and filter - now handled by backend, but we still need to filter for display
   const filteredTenders = useMemo(() => {
-    return tenders.filter((tender) => {
-      const matchesSearch =
-        searchQuery === "" ||
-        tender.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        tender.reference_number.toLowerCase().includes(searchQuery.toLowerCase());
-
-      const matchesStatus = statusFilter === "All" || tender.status === statusFilter;
-
-      const tenderFinancials = mockFinancials.find((f) => f.tender_id === tender.id);
-      const needsEMDCollection = (tender.status === "Closed" || tender.status === "Lost") && !tenderFinancials?.emd_collected;
-      const matchesEMD = !emdFilter || needsEMDCollection;
-
-      return matchesSearch && matchesStatus && matchesEMD;
-    });
-  }, [tenders, searchQuery, statusFilter, emdFilter, mockFinancials]);
-
-  // Stats
-  const stats = useMemo(() => {
-    const pendingEMDs = tenders.filter((t) => {
-      const tenderFinancials = mockFinancials.find((f) => f.tender_id === t.id);
-      return (t.status === "Closed" || t.status === "Lost") && !tenderFinancials?.emd_collected;
-    });
-
-    const pendingEMDAmount = pendingEMDs.reduce((sum, t) => {
-      const tenderFinancials = mockFinancials.find((f) => f.tender_id === t.id);
-      if (t.status === "Lost") {
-        return sum + (tenderFinancials?.sd1_amount || 0);
-      }
-      return sum + (tenderFinancials?.emd_amount || 0);
-    }, 0);
-
-    return {
-      total: tenders.length,
-      draft: tenders.filter((t) => t.status === "Draft").length,
-      filed: tenders.filter((t) => t.status === "Filed").length,
-      awarded: tenders.filter((t) => t.status === "Awarded").length,
-      lost: tenders.filter((t) => t.status === "Lost").length,
-      totalValue: tenders.reduce((sum, t) => sum + t.estimated_value, 0),
-      awardedValue: tenders
-        .filter((t) => t.status === "Awarded")
-        .reduce((sum, t) => sum + t.estimated_value, 0),
-      pendingEMDCount: pendingEMDs.length,
-      pendingEMDAmount: pendingEMDAmount,
-    };
-  }, [tenders, mockFinancials]);
+    // Backend handles search and status filter, but we still need to filter for EMD if needed
+    // Since backend handles pending_emds filter, filteredTenders should just be tenders
+    return tenders;
+  }, [tenders]);
 
   const getStatusBadgeClass = (status: Tender["status"]) => {
     switch (status) {
@@ -256,7 +330,24 @@ function TendersPageContent() {
   };
 
   const getFinancials = (tenderId: number) => {
-    return mockFinancials.find((f) => f.tender_id === tenderId);
+    // For list view, we need to calculate financials from backend data
+    // Since we don't have full detail in list, we'll use the backend's calculated values
+    const tender = tenders.find((t) => t.id === tenderId);
+    if (!tender) return null;
+
+    // We'll need to fetch full detail to get financials, or use backend's calculated values
+    // For now, return a placeholder based on estimated_value
+    return {
+      id: tender.id,
+      tender_id: tender.id,
+      emd_amount: tender.estimated_value * 0.05,
+      emd_refundable: tender.status !== "Awarded",
+      emd_collected: false,
+      sd1_amount: tender.estimated_value * 0.02,
+      sd1_refundable: false,
+      sd2_amount: tender.estimated_value * 0.03,
+      sd2_refundable: false,
+    } as TenderFinancials;
   };
 
   // Group tenders by status for Kanban view
@@ -276,11 +367,36 @@ function TendersPageContent() {
     return columns;
   }, [filteredTenders]);
 
+  if (isLoading && tenders.length === 0) {
+    return (
+      <DashboardLayout title="Tenders" breadcrumbs={["Home", "Tenders"]}>
+        <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
+          <Loader2 className="h-8 w-8 animate-spin text-sky-500" />
+          <p className="ml-3 text-gray-500">Loading tenders...</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (error && tenders.length === 0) {
+    return (
+      <DashboardLayout title="Tenders" breadcrumbs={["Home", "Tenders"]}>
+        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] text-red-500">
+          <AlertCircle className="h-12 w-12 mb-4" />
+          <p className="text-lg font-medium">Error loading tenders: {error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600"
+          >
+            <Loader2 className="h-4 w-4" /> Retry
+          </button>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
-    <DashboardLayout
-      title="Tenders"
-      breadcrumbs={["Home", "Tenders"]}
-    >
+    <DashboardLayout title="Tenders" breadcrumbs={["Home", "Tenders"]}>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -305,7 +421,9 @@ function TendersPageContent() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Tenders</p>
-                <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
+                <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
+                  {statistics?.total_tenders ?? "..."}
+                </p>
               </div>
               <div className="rounded-full bg-sky-100 p-3 dark:bg-sky-900/30">
                 <FileText className="h-6 w-6 text-sky-600 dark:text-sky-400" />
@@ -317,7 +435,9 @@ function TendersPageContent() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Filed</p>
-                <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{stats.filed}</p>
+                <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
+                  {statistics?.tenders_filed ?? "..."}
+                </p>
               </div>
               <div className="rounded-full bg-blue-100 p-3 dark:bg-blue-900/30">
                 <FileText className="h-6 w-6 text-blue-600 dark:text-blue-400" />
@@ -329,9 +449,11 @@ function TendersPageContent() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Awarded</p>
-                <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{stats.awarded}</p>
+                <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
+                  {statistics?.tenders_awarded ?? "..."}
+                </p>
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  ₹{(stats.awardedValue / 10000000).toFixed(1)}Cr
+                  ₹{(statistics ? statistics.total_value_awarded / 10000000 : 0).toFixed(1)}Cr
                 </p>
               </div>
               <div className="rounded-full bg-green-100 p-3 dark:bg-green-900/30">
@@ -345,7 +467,7 @@ function TendersPageContent() {
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Value</p>
                 <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-                  ₹{(stats.totalValue / 10000000).toFixed(1)}Cr
+                  ₹{(statistics ? statistics.total_value_awarded / 10000000 : 0).toFixed(1)}Cr
                 </p>
               </div>
               <div className="rounded-full bg-purple-100 p-3 dark:bg-purple-900/30">
@@ -358,7 +480,9 @@ function TendersPageContent() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pending EMDs</p>
-                <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">{stats.pendingEMDCount}</p>
+                <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
+                  {statistics?.pending_emds ?? "..."}
+                </p>
               </div>
               <div className="rounded-full bg-orange-100 p-3 dark:bg-orange-900/30">
                 <AlertCircle className="h-6 w-6 text-orange-600 dark:text-orange-400" />
@@ -371,7 +495,7 @@ function TendersPageContent() {
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pending EMD Amt</p>
                 <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-                  ₹{(stats.pendingEMDAmount / 100000).toFixed(1)}L
+                  ₹{(statistics ? statistics.pending_emd_amount / 100000 : 0).toFixed(1)}L
                 </p>
               </div>
               <div className="rounded-full bg-red-100 p-3 dark:bg-red-900/30">
@@ -403,7 +527,6 @@ function TendersPageContent() {
               className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
             >
               <option value="All">All Status</option>
-              <option value="Draft">Draft</option>
               <option value="Filed">Filed</option>
               <option value="Awarded">Awarded</option>
               <option value="Lost">Lost</option>
@@ -496,23 +619,25 @@ function TendersPageContent() {
                           <div className="text-sm font-medium text-gray-900 dark:text-white">
                             {tender.name}
                           </div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400 line-clamp-1">
-                            {tender.description}
-                          </div>
+                          {tender.description && (
+                            <div className="text-sm text-gray-500 dark:text-gray-400 line-clamp-1">
+                              {tender.description}
+                            </div>
+                          )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                           {tender.reference_number}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                           {tender.filed_date
-                            ? new Date(tender.filed_date).toLocaleDateString("en-IN")
+                            ? format(new Date(tender.filed_date), "dd MMM yyyy")
                             : "-"}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          {new Date(tender.start_date).toLocaleDateString("en-IN")}
+                          {format(new Date(tender.start_date), "dd MMM yyyy")}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          {new Date(tender.end_date).toLocaleDateString("en-IN")}
+                          {format(new Date(tender.end_date), "dd MMM yyyy")}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                           ₹{(tender.estimated_value / 100000).toFixed(2)}L
@@ -531,7 +656,7 @@ function TendersPageContent() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <div className="flex justify-end gap-2">
-                            {(tender.status === "Closed" || tender.status === "Lost") && !financials?.emd_collected && (
+                            {(tender.status === "Closed" || tender.status === "Lost") && (
                               <button
                                 onClick={() => handleMarkEMDCollected(tender.id)}
                                 className="rounded bg-orange-50 px-2 py-1 text-xs font-medium text-orange-600 hover:bg-orange-100 dark:bg-orange-900/30 dark:text-orange-400 dark:hover:bg-orange-900/50"
@@ -613,7 +738,7 @@ function TendersPageContent() {
                           {tender.filed_date && (
                             <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                               <Calendar className="h-3 w-3" />
-                              <span>Filed: {new Date(tender.filed_date).toLocaleDateString("en-IN")}</span>
+                              <span>Filed: {format(new Date(tender.filed_date), "dd MMM yyyy")}</span>
                             </div>
                           )}
                           {financials && (
@@ -657,9 +782,9 @@ function TendersPageContent() {
         )}
 
         {/* Empty State */}
-        {filteredTenders.length === 0 && (
+        {filteredTenders.length === 0 && !isLoading && (
           <div className="rounded-lg border-2 border-dashed border-gray-300 p-12 text-center dark:border-gray-700">
-            <FileText className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-600" />
+            <Inbox className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-600" />
             <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-white">
               No tenders found
             </h3>
@@ -682,30 +807,34 @@ function TendersPageContent() {
           onClose={() => {
             setIsTenderModalOpen(false);
             setSelectedTender(null);
+            setSelectedTenderFinancials(null);
           }}
           onSubmit={handleTenderSubmit}
           tender={selectedTender}
-          existingFinancials={
-            selectedTender
-              ? financials.find((f) => f.tender_id === selectedTender.id) || null
-              : null
-          }
+          existingFinancials={selectedTenderFinancials}
+          isSaving={isSaving}
         />
       </div>
     </DashboardLayout>
   );
 }
 
-export default function TendersPage() {
+function TendersPage() {
   return (
-    <Suspense fallback={
-      <DashboardLayout title="Tenders">
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-gray-500">Loading...</div>
-        </div>
-      </DashboardLayout>
-    }>
-      <TendersPageContent />
-    </Suspense>
+    <ProtectedRoute>
+      <Suspense
+        fallback={
+          <DashboardLayout title="Tenders">
+            <div className="flex items-center justify-center min-h-screen">
+              <div className="text-gray-500">Loading...</div>
+            </div>
+          </DashboardLayout>
+        }
+      >
+        <TendersPageContent />
+      </Suspense>
+    </ProtectedRoute>
   );
 }
+
+export default TendersPage;

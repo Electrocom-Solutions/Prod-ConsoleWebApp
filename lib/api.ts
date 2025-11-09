@@ -198,6 +198,99 @@ export interface BackendAMCBilling {
   notes?: string;
 }
 
+/**
+ * Tender Management Interfaces
+ */
+
+export interface TenderStatisticsResponse {
+  total_tenders: number;
+  tenders_filed: number;
+  tenders_awarded: number;
+  total_value_awarded: number;
+  pending_emds: number;
+  pending_emd_amount: number;
+}
+
+export interface BackendTenderDeposit {
+  id: number;
+  dd_date: string;
+  dd_number: string;
+  dd_amount: string; // Decimal as string
+  dd_beneficiary_name: string;
+  bank_name: string;
+  deposit_type: 'EMD_Security1' | 'EMD_Security2';
+  is_refunded: boolean;
+  refund_date?: string;
+}
+
+export interface BackendTenderDocument {
+  id: number;
+  file: string; // File path
+  file_url: string; // Full URL
+  file_name: string;
+  created_at: string;
+  created_by?: number;
+  created_by_username?: string;
+}
+
+export interface BackendTenderActivity {
+  id: number;
+  entity_type: string;
+  entity_id: number;
+  action: string;
+  description: string;
+  created_at: string;
+  created_by?: number;
+  created_by_username?: string;
+}
+
+export interface BackendTenderListItem {
+  id: number;
+  name: string;
+  reference_number: string;
+  filed_date?: string;
+  start_date: string;
+  end_date: string;
+  estimated_value: string; // Decimal as string
+  status: 'Filed' | 'Awarded' | 'Lost' | 'Closed';
+  total_emd_cost: number;
+  security_deposit_1: number;
+  security_deposit_2: number;
+  pending_emd_amount: number;
+  has_pending_emd: boolean;
+  created_at: string;
+}
+
+export interface BackendTenderListResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: BackendTenderListItem[];
+}
+
+export interface BackendTenderDetail {
+  id: number;
+  name: string;
+  reference_number: string;
+  description?: string;
+  filed_date?: string;
+  start_date: string;
+  end_date: string;
+  estimated_value: string; // Decimal as string
+  status: 'Filed' | 'Awarded' | 'Lost' | 'Closed';
+  total_emd_cost: number;
+  security_deposit_1: number;
+  security_deposit_2: number;
+  pending_emd_amount: number;
+  deposits: BackendTenderDeposit[];
+  documents: BackendTenderDocument[];
+  activity_feed: BackendTenderActivity[];
+  created_at: string;
+  updated_at: string;
+  created_by?: number;
+  updated_by?: number;
+}
+
 // Document Management Interfaces
 export interface DocumentTemplateVersion {
   id: number;
@@ -888,6 +981,176 @@ Please verify:
    */
   async deleteAMC(id: number): Promise<void> {
     await this.request(`/api/amcs/${id}/`, {
+      method: 'DELETE',
+    });
+  }
+
+  /**
+   * Tender Management APIs
+   */
+
+  /**
+   * Get tender statistics
+   */
+  async getTenderStatistics(): Promise<TenderStatisticsResponse> {
+    return this.request<TenderStatisticsResponse>('/api/tenders/statistics/', {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * Get all tenders with optional filters
+   */
+  async getTenders(params?: {
+    search?: string;
+    status?: 'Filed' | 'Awarded' | 'Lost' | 'Closed';
+    pending_emds?: boolean;
+    page?: number;
+  }): Promise<BackendTenderListResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.pending_emds !== undefined) queryParams.append('pending_emds', params.pending_emds.toString());
+    if (params?.page) queryParams.append('page', params.page.toString());
+
+    const queryString = queryParams.toString();
+    const endpoint = `/api/tenders/${queryString ? `?${queryString}` : ''}`;
+
+    return this.request<BackendTenderListResponse>(endpoint, {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * Get a specific tender by ID
+   */
+  async getTender(id: number): Promise<BackendTenderDetail> {
+    return this.request<BackendTenderDetail>(`/api/tenders/${id}/`, {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * Create a new tender
+   */
+  async createTender(data: {
+    name: string;
+    reference_number?: string;
+    description?: string;
+    filed_date?: string;
+    start_date?: string;
+    end_date?: string;
+    estimated_value?: number;
+    status?: 'Filed' | 'Awarded' | 'Lost' | 'Closed';
+    security_deposit_1_dd_date?: string;
+    security_deposit_1_dd_number?: string;
+    security_deposit_1_dd_amount?: number;
+    security_deposit_1_dd_bank_name?: string;
+    security_deposit_1_dd_beneficiary_name?: string;
+    security_deposit_2_dd_date?: string;
+    security_deposit_2_dd_number?: string;
+    security_deposit_2_dd_amount?: number;
+    security_deposit_2_dd_bank_name?: string;
+    security_deposit_2_dd_beneficiary_name?: string;
+  }): Promise<BackendTenderDetail> {
+    return this.request<BackendTenderDetail>('/api/tenders/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  /**
+   * Update a tender
+   */
+  async updateTender(id: number, data: Partial<{
+    name: string;
+    reference_number: string;
+    description: string;
+    filed_date: string;
+    start_date: string;
+    end_date: string;
+    estimated_value: number;
+    status: 'Filed' | 'Awarded' | 'Lost' | 'Closed';
+    security_deposit_1_dd_date: string;
+    security_deposit_1_dd_number: string;
+    security_deposit_1_dd_amount: number;
+    security_deposit_1_dd_bank_name: string;
+    security_deposit_1_dd_beneficiary_name: string;
+    security_deposit_2_dd_date: string;
+    security_deposit_2_dd_number: string;
+    security_deposit_2_dd_amount: number;
+    security_deposit_2_dd_bank_name: string;
+    security_deposit_2_dd_beneficiary_name: string;
+  }>): Promise<BackendTenderDetail> {
+    return this.request<BackendTenderDetail>(`/api/tenders/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  /**
+   * Delete a tender
+   */
+  async deleteTender(id: number): Promise<void> {
+    await this.request(`/api/tenders/${id}/`, {
+      method: 'DELETE',
+    });
+  }
+
+  /**
+   * Attach a document to a tender
+   */
+  async attachTenderDocument(tenderId: number, file: File, description?: string): Promise<BackendTenderDocument> {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (description) formData.append('description', description);
+
+    const csrfToken = this.getCsrfToken();
+    const headers: Record<string, string> = {};
+    if (csrfToken) {
+      headers['X-CSRFToken'] = csrfToken;
+    }
+
+    const response = await fetch(`${this.baseURL}/api/tenders/${tenderId}/attach-document/`, {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Upload failed' }));
+      throw error;
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Download a tender document
+   */
+  async downloadTenderDocument(tenderId: number, documentId: number): Promise<Blob> {
+    const response = await fetch(
+      `${this.baseURL}/api/tenders/${tenderId}/download-document/${documentId}/`,
+      {
+        method: 'GET',
+        credentials: 'include',
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Download failed' }));
+      throw error;
+    }
+
+    return response.blob();
+  }
+
+  /**
+   * Delete a tender document
+   */
+  async deleteTenderDocument(tenderId: number, documentId: number): Promise<void> {
+    await this.request(`/api/tenders/${tenderId}/delete-document/${documentId}/`, {
       method: 'DELETE',
     });
   }
