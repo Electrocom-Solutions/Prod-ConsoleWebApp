@@ -120,6 +120,84 @@ export interface BackendClientDetail {
   updated_by?: number;
 }
 
+/**
+ * AMC Management Interfaces
+ */
+
+export interface AMCStatisticsResponse {
+  total_amcs: number;
+  active_amcs: number;
+  expiring_soon: number;
+  pending_bills: number;
+}
+
+export interface AMCExpiringCountResponse {
+  count: number;
+}
+
+export interface BackendAMCListItem {
+  id: number;
+  amc_number: string;
+  client: number;
+  client_id: number;
+  client_name: string;
+  amount: string; // Decimal as string
+  start_date: string;
+  end_date: string;
+  status: 'Pending' | 'Active' | 'Expired' | 'Canceled';
+  billing_cycle: 'Monthly' | 'Quarterly' | 'Half-yearly' | 'Yearly';
+  days_until_expiry: number | null;
+  created_at: string;
+}
+
+export interface BackendAMCListResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: BackendAMCListItem[];
+}
+
+export interface BackendAMCDetail {
+  id: number;
+  amc_number: string;
+  client: number;
+  client_id: number;
+  client_name: string;
+  amount: string; // Decimal as string
+  start_date: string;
+  end_date: string;
+  status: 'Pending' | 'Active' | 'Expired' | 'Canceled';
+  billing_cycle: 'Monthly' | 'Quarterly' | 'Half-yearly' | 'Yearly';
+  notes?: string;
+  total_amount: number;
+  paid_amount: number;
+  outstanding_amount: number;
+  billings: BackendAMCBilling[];
+  created_at: string;
+  updated_at: string;
+  created_by?: number;
+  updated_by?: number;
+}
+
+export interface BackendAMCBilling {
+  id: number;
+  bill_number: string;
+  period: string;
+  amount: string; // Decimal as string
+  status: 'Paid' | 'Pending';
+  payment_details?: {
+    payment_date: string;
+    payment_mode: string;
+  };
+  bill_date: string;
+  period_from: string;
+  period_to: string;
+  paid: boolean;
+  payment_date?: string;
+  payment_mode?: 'Cash' | 'Cheque' | 'Bank Transfer' | 'UPI';
+  notes?: string;
+}
+
 // Document Management Interfaces
 export interface DocumentTemplateVersion {
   id: number;
@@ -707,6 +785,109 @@ Please verify:
    */
   async deleteClient(id: number): Promise<void> {
     await this.request(`/api/clients/${id}/`, {
+      method: 'DELETE',
+    });
+  }
+
+  /**
+   * AMC Management APIs
+   */
+
+  /**
+   * Get AMC statistics
+   */
+  async getAMCStatistics(): Promise<AMCStatisticsResponse> {
+    return this.request<AMCStatisticsResponse>('/api/amcs/statistics/', {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * Get count of AMCs expiring in next 30 days
+   */
+  async getAMCExpiringCount(): Promise<AMCExpiringCountResponse> {
+    return this.request<AMCExpiringCountResponse>('/api/amcs/expiring-count/', {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * Get all AMCs with optional filters
+   */
+  async getAMCs(params?: {
+    search?: string;
+    status?: 'Pending' | 'Active' | 'Expired' | 'Canceled';
+    billing_cycle?: 'Monthly' | 'Quarterly' | 'Half-yearly' | 'Yearly';
+    expiring_days?: number; // 7, 15, or 30
+    page?: number;
+  }): Promise<BackendAMCListResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.billing_cycle) queryParams.append('billing_cycle', params.billing_cycle);
+    if (params?.expiring_days) queryParams.append('expiring_days', params.expiring_days.toString());
+    if (params?.page) queryParams.append('page', params.page.toString());
+
+    const queryString = queryParams.toString();
+    const endpoint = `/api/amcs/${queryString ? `?${queryString}` : ''}`;
+
+    return this.request<BackendAMCListResponse>(endpoint, {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * Get a specific AMC by ID
+   */
+  async getAMC(id: number): Promise<BackendAMCDetail> {
+    return this.request<BackendAMCDetail>(`/api/amcs/${id}/`, {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * Create a new AMC
+   */
+  async createAMC(data: {
+    client: number;
+    amc_number: string;
+    amount: number;
+    start_date: string;
+    end_date: string;
+    billing_cycle: 'Monthly' | 'Quarterly' | 'Half-yearly' | 'Yearly';
+    status?: 'Pending' | 'Active' | 'Expired' | 'Canceled';
+    notes?: string;
+  }): Promise<BackendAMCDetail> {
+    return this.request<BackendAMCDetail>('/api/amcs/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  /**
+   * Update an AMC
+   */
+  async updateAMC(id: number, data: Partial<{
+    client: number;
+    amc_number: string;
+    amount: number;
+    start_date: string;
+    end_date: string;
+    billing_cycle: 'Monthly' | 'Quarterly' | 'Half-yearly' | 'Yearly';
+    status: 'Pending' | 'Active' | 'Expired' | 'Canceled';
+    notes: string;
+  }>): Promise<BackendAMCDetail> {
+    return this.request<BackendAMCDetail>(`/api/amcs/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  /**
+   * Delete an AMC
+   */
+  async deleteAMC(id: number): Promise<void> {
+    await this.request(`/api/amcs/${id}/`, {
       method: 'DELETE',
     });
   }

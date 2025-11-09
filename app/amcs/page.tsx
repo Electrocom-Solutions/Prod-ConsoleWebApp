@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { AMC, AMCBilling, Client } from '@/types';
@@ -16,165 +16,128 @@ import {
   IndianRupee,
   Filter,
   Clock,
+  Loader2,
+  Inbox,
+  X,
 } from 'lucide-react';
-import { format, differenceInDays, addDays, addMonths, addYears } from 'date-fns';
-import Link from 'next/link';
+import { format, differenceInDays } from 'date-fns';
 import { AMCFormModal } from '@/components/amcs/amc-form-modal';
+import {
+  apiClient,
+  AMCStatisticsResponse,
+  AMCExpiringCountResponse,
+  BackendAMCListItem,
+  BackendAMCListResponse,
+  BackendAMCDetail,
+  BackendAMCBilling,
+  BackendClientListItem,
+  BackendClientListResponse,
+} from '@/lib/api';
+import { useDebounce } from 'use-debounce';
+import { ProtectedRoute } from '@/components/auth/protected-route';
+import { showAlert, showDeleteConfirm } from '@/lib/sweetalert';
 
-const mockClients: Client[] = [
-  {
-    id: 1,
-    name: 'ABC Power Solutions Ltd',
-    business_name: 'ABC Power',
-    address: '123 Industrial Area',
-    city: 'Mumbai',
-    state: 'Maharashtra',
-    pin_code: '400001',
+/**
+ * Map backend AMC list item to frontend AMC type
+ */
+function mapBackendAMCToFrontend(backendAMC: BackendAMCListItem): AMC {
+  return {
+    id: backendAMC.id,
+    client_id: backendAMC.client_id,
+    client_name: backendAMC.client_name,
+    amc_number: backendAMC.amc_number,
+    start_date: backendAMC.start_date,
+    end_date: backendAMC.end_date,
+    status: backendAMC.status,
+    billing_cycle: backendAMC.billing_cycle,
+    amount: parseFloat(backendAMC.amount),
+    description: undefined, // Not available in list endpoint
+    notes: undefined, // Not available in list endpoint
+    created_at: backendAMC.created_at,
+    updated_at: backendAMC.created_at,
+  };
+}
+
+/**
+ * Map backend AMC detail to frontend AMC type
+ */
+function mapBackendAMCDetailToFrontend(backendAMC: BackendAMCDetail): AMC {
+  return {
+    id: backendAMC.id,
+    client_id: backendAMC.client_id,
+    client_name: backendAMC.client_name,
+    amc_number: backendAMC.amc_number,
+    start_date: backendAMC.start_date,
+    end_date: backendAMC.end_date,
+    status: backendAMC.status,
+    billing_cycle: backendAMC.billing_cycle,
+    amount: parseFloat(backendAMC.amount),
+    description: undefined,
+    notes: backendAMC.notes || undefined,
+    created_at: backendAMC.created_at,
+    updated_at: backendAMC.updated_at,
+  };
+}
+
+/**
+ * Map backend AMC billing to frontend AMCBilling type
+ */
+function mapBackendBillingToFrontend(backendBilling: BackendAMCBilling, amcId: number): AMCBilling {
+  return {
+    id: backendBilling.id,
+    amc_id: amcId,
+    bill_number: backendBilling.bill_number,
+    period_from: backendBilling.period_from,
+    period_to: backendBilling.period_to,
+    amount: parseFloat(backendBilling.amount),
+    paid: backendBilling.paid,
+    payment_date: backendBilling.payment_date,
+    payment_mode: backendBilling.payment_mode,
+  };
+}
+
+/**
+ * Map backend client list item to frontend Client type (for AMC form)
+ */
+function mapBackendClientToFrontendForAMC(backendClient: BackendClientListItem): Client {
+  return {
+    id: backendClient.id,
+    name: backendClient.full_name || `${backendClient.first_name} ${backendClient.last_name}`,
+    business_name: undefined,
+    address: '',
+    city: '',
+    state: '',
+    pin_code: '',
     country: 'India',
-    primary_contact_name: 'Rajesh Kumar',
-    primary_contact_email: 'rajesh@abcpower.com',
-    primary_contact_phone: '9876543210',
-    tags: ['premium', 'long-term'],
-    amc_count: 5,
-    open_projects: 3,
-    outstanding_amount: 125000,
-    last_activity: '2025-10-30T10:00:00Z',
-    created_at: '2023-01-15T08:00:00Z',
-    updated_at: '2025-10-30T10:00:00Z',
-  },
-  {
-    id: 2,
-    name: 'XYZ Industries',
-    business_name: 'XYZ Industries',
-    address: '456 Business Park',
-    city: 'Pune',
-    state: 'Maharashtra',
-    pin_code: '411001',
-    country: 'India',
-    primary_contact_name: 'Priya Sharma',
-    primary_contact_email: 'priya@xyzind.com',
-    primary_contact_phone: '9765432109',
-    tags: ['industrial', 'regular'],
-    amc_count: 3,
-    open_projects: 2,
-    outstanding_amount: 75000,
-    last_activity: '2025-10-28T14:00:00Z',
-    created_at: '2023-06-20T09:00:00Z',
-    updated_at: '2025-10-28T14:00:00Z',
-  },
-];
-
-const mockAMCs: AMC[] = [
-  {
-    id: 1,
-    client_id: 1,
-    client_name: 'ABC Power Solutions Ltd',
-    amc_number: 'AMC/2024/028',
-    start_date: '2025-01-01',
-    end_date: '2025-11-15',
-    status: 'Active',
-    billing_cycle: 'Quarterly',
-    amount: 500000,
-    description: 'Annual maintenance for electrical panels and systems',
-    notes: 'Client requires 24/7 support',
-    created_at: '2024-12-15T10:00:00Z',
-    updated_at: '2025-01-01T08:00:00Z',
-  },
-  {
-    id: 2,
-    client_id: 2,
-    client_name: 'XYZ Industries',
-    amc_number: 'AMC/2024/033',
-    start_date: '2024-06-01',
-    end_date: '2025-11-20',
-    status: 'Active',
-    billing_cycle: 'Monthly',
-    amount: 300000,
-    description: 'Preventive maintenance for industrial electrical equipment',
-    notes: 'Monthly site visits required',
-    created_at: '2024-05-20T09:00:00Z',
-    updated_at: '2024-06-01T10:00:00Z',
-  },
-  {
-    id: 3,
-    client_id: 1,
-    client_name: 'ABC Power Solutions Ltd',
-    amc_number: 'AMC/2024/015',
-    start_date: '2024-03-01',
-    end_date: '2025-02-28',
-    status: 'Expired',
-    billing_cycle: 'Half-yearly',
-    amount: 450000,
-    description: 'Panel board maintenance contract',
-    created_at: '2024-02-15T11:00:00Z',
-    updated_at: '2025-03-01T09:00:00Z',
-  },
-  {
-    id: 4,
-    client_id: 1,
-    client_name: 'ABC Power Solutions Ltd',
-    amc_number: 'AMC/2025/045',
-    start_date: '2025-11-01',
-    end_date: '2025-11-09',
-    status: 'Active',
-    billing_cycle: 'Yearly',
-    amount: 600000,
-    description: 'Comprehensive electrical maintenance',
-    notes: 'Expiring soon - need to discuss renewal',
-    created_at: '2025-10-20T14:00:00Z',
-    updated_at: '2025-11-01T08:00:00Z',
-  },
-];
-
-const mockBillings: AMCBilling[] = [
-  {
-    id: 1,
-    amc_id: 1,
-    bill_number: 'BILL/AMC/2025/001',
-    period_from: '2025-01-01',
-    period_to: '2025-03-31',
-    amount: 125000,
-    paid: true,
-    payment_date: '2025-01-15',
-    payment_mode: 'Bank Transfer',
-  },
-  {
-    id: 2,
-    amc_id: 1,
-    bill_number: 'BILL/AMC/2025/002',
-    period_from: '2025-04-01',
-    period_to: '2025-06-30',
-    amount: 125000,
-    paid: true,
-    payment_date: '2025-04-10',
-    payment_mode: 'Cheque',
-  },
-  {
-    id: 3,
-    amc_id: 1,
-    bill_number: 'BILL/AMC/2025/003',
-    period_from: '2025-07-01',
-    period_to: '2025-09-30',
-    amount: 125000,
-    paid: false,
-  },
-  {
-    id: 4,
-    amc_id: 2,
-    bill_number: 'BILL/AMC/2025/010',
-    period_from: '2025-10-01',
-    period_to: '2025-10-31',
-    amount: 25000,
-    paid: false,
-  },
-];
+    primary_contact_name: backendClient.full_name || `${backendClient.first_name} ${backendClient.last_name}`,
+    primary_contact_email: backendClient.email || '',
+    primary_contact_phone: backendClient.phone_number || '',
+    secondary_contact: undefined,
+    notes: undefined,
+    tags: [],
+    amc_count: backendClient.has_active_amc ? 1 : 0,
+    open_projects: 0,
+    outstanding_amount: 0,
+    last_activity: backendClient.created_at,
+    created_at: backendClient.created_at,
+    updated_at: backendClient.created_at,
+  };
+}
 
 function AMCsPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [amcs, setAmcs] = useState<AMC[]>(mockAMCs);
-  const [billings, setBillings] = useState<AMCBilling[]>(mockBillings);
+
+  const [amcs, setAmcs] = useState<AMC[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [statistics, setStatistics] = useState<AMCStatisticsResponse | null>(null);
+  const [expiringCount, setExpiringCount] = useState<number>(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery] = useDebounce(searchQuery, 500);
   const [statusFilter, setStatusFilter] = useState('all');
   const [billingCycleFilter, setBillingCycleFilter] = useState('all');
   const [expiryFilter, setExpiryFilter] = useState<number | null>(null);
@@ -184,89 +147,181 @@ function AMCsPageContent() {
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [billingAMC, setBillingAMC] = useState<AMC | null>(null);
   const [emailAMC, setEmailAMC] = useState<AMC | null>(null);
+  const [billingAMCDetail, setBillingAMCDetail] = useState<BackendAMCDetail | null>(null);
+
+  // Fetch statistics
+  const fetchStatistics = useCallback(async () => {
+    try {
+      const stats = await apiClient.getAMCStatistics();
+      setStatistics(stats);
+    } catch (err: any) {
+      console.error('Failed to fetch AMC statistics:', err);
+      // Don't set error here, just log it
+    }
+  }, []);
+
+  // Fetch expiring count
+  const fetchExpiringCount = useCallback(async () => {
+    try {
+      const response = await apiClient.getAMCExpiringCount();
+      setExpiringCount(response.count);
+    } catch (err: any) {
+      console.error('Failed to fetch expiring AMC count:', err);
+      // Don't set error here, just log it
+    }
+  }, []);
+
+  // Fetch clients for form modal
+  const fetchClients = useCallback(async () => {
+    try {
+      const response: BackendClientListResponse = await apiClient.getClients();
+      const mappedClients = response.results.map(mapBackendClientToFrontendForAMC);
+      setClients(mappedClients);
+    } catch (err: any) {
+      console.error('Failed to fetch clients:', err);
+      // Don't set error here, just log it
+    }
+  }, []);
+
+  // Fetch AMCs
+  const fetchAMCs = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const params: {
+        search?: string;
+        status?: 'Pending' | 'Active' | 'Expired' | 'Canceled';
+        billing_cycle?: 'Monthly' | 'Quarterly' | 'Half-yearly' | 'Yearly';
+        expiring_days?: number;
+        page?: number;
+      } = {};
+
+      if (debouncedSearchQuery) {
+        params.search = debouncedSearchQuery;
+      }
+
+      if (statusFilter !== 'all') {
+        params.status = statusFilter as 'Pending' | 'Active' | 'Expired' | 'Canceled';
+      }
+
+      if (billingCycleFilter !== 'all') {
+        params.billing_cycle = billingCycleFilter as 'Monthly' | 'Quarterly' | 'Half-yearly' | 'Yearly';
+      }
+
+      if (expiryFilter !== null) {
+        params.expiring_days = expiryFilter;
+      }
+
+      const response: BackendAMCListResponse = await apiClient.getAMCs(params);
+      const mappedAMCs = response.results.map(mapBackendAMCToFrontend);
+      setAmcs(mappedAMCs);
+    } catch (err: any) {
+      console.error('Failed to fetch AMCs:', err);
+      setError(err.message || 'Failed to load AMCs.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [debouncedSearchQuery, statusFilter, billingCycleFilter, expiryFilter]);
+
+  useEffect(() => {
+    fetchStatistics();
+    fetchExpiringCount();
+    fetchClients();
+  }, [fetchStatistics, fetchExpiringCount, fetchClients]);
+
+  useEffect(() => {
+    fetchAMCs();
+  }, [fetchAMCs]);
+
+  // Refresh expiring count when AMCs change
+  useEffect(() => {
+    fetchExpiringCount();
+  }, [amcs, fetchExpiringCount]);
 
   const getAMCStats = (amc: AMC) => {
-    const amcBills = billings.filter((b) => b.amc_id === amc.id);
-    const totalBills = amcBills.length;
-    const paidBills = amcBills.filter((b) => b.paid).length;
-    const outstanding = amcBills
-      .filter((b) => !b.paid)
-      .reduce((sum, b) => sum + b.amount, 0);
-
-    const nextBill = amcBills.find((b) => !b.paid);
+    // For now, we'll need to fetch the detail to get billing info
+    // This is a simplified version
     const daysToEnd = differenceInDays(new Date(amc.end_date), new Date());
-
-    return { totalBills, paidBills, outstanding, nextBill, daysToEnd };
+    return { totalBills: 0, paidBills: 0, outstanding: 0, nextBill: null, daysToEnd };
   };
 
-  const filteredAMCs = amcs.filter((amc) => {
-    const matchesSearch =
-      searchQuery === '' ||
-      amc.amc_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      amc.client_name?.toLowerCase().includes(searchQuery.toLowerCase());
+  const filteredAMCs = amcs; // Backend already filters, so we just use the results
 
-    const matchesStatus = statusFilter === 'all' || amc.status === statusFilter;
-
-    const matchesBillingCycle =
-      billingCycleFilter === 'all' || amc.billing_cycle === billingCycleFilter;
-
-    const daysToEnd = differenceInDays(new Date(amc.end_date), new Date());
-    const matchesExpiry =
-      expiryFilter === null ||
-      (daysToEnd >= 0 && daysToEnd <= expiryFilter);
-
-    return matchesSearch && matchesStatus && matchesBillingCycle && matchesExpiry;
-  });
-
-  const expiringAMCs = amcs.filter((amc) => {
-    const daysToEnd = differenceInDays(new Date(amc.end_date), new Date());
-    return amc.status === 'Active' && daysToEnd >= 0 && daysToEnd <= 30;
-  });
-
-  const pendingBills = billings.filter((b) => !b.paid);
-
-  const handleCreateAMC = (data: Partial<AMC>) => {
-    const newAMC: AMC = {
-      id: Math.max(...amcs.map((a) => a.id), 0) + 1,
-      client_id: data.client_id!,
-      client_name: mockClients.find((c) => c.id === data.client_id)?.name,
+  const handleCreateAMC = async (data: Partial<AMC>) => {
+    setIsSaving(true);
+    try {
+      const backendData = {
+        client: data.client_id!,
       amc_number: data.amc_number!,
+        amount: data.amount!,
       start_date: data.start_date!,
       end_date: data.end_date!,
-      status: data.status!,
       billing_cycle: data.billing_cycle!,
-      amount: data.amount!,
-      description: data.description,
+        status: data.status || 'Pending',
       notes: data.notes,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    setAmcs([...amcs, newAMC]);
+      };
+
+      await apiClient.createAMC(backendData);
+      showAlert('Success', 'AMC created successfully.', 'success');
+      setIsAMCModalOpen(false);
+      setSelectedAMC(null);
+      fetchAMCs();
+      fetchStatistics();
+      fetchExpiringCount();
+    } catch (err: any) {
+      console.error('Failed to create AMC:', err);
+      showAlert('Error', err.message || 'Failed to create AMC.', 'error');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleUpdateAMC = (data: Partial<AMC>) => {
-    setAmcs(
-      amcs.map((amc) =>
-        amc.id === data.id
-          ? {
-              ...amc,
-              ...data,
-              client_name: mockClients.find((c) => c.id === data.client_id)?.name,
-              updated_at: new Date().toISOString(),
-            }
-          : amc
-      )
-    );
+  const handleUpdateAMC = async (data: Partial<AMC>) => {
+    if (!selectedAMC) return;
+
+    setIsSaving(true);
+    try {
+      const backendData: Partial<{
+        client: number;
+        amc_number: string;
+        amount: number;
+        start_date: string;
+        end_date: string;
+        billing_cycle: 'Monthly' | 'Quarterly' | 'Half-yearly' | 'Yearly';
+        status: 'Pending' | 'Active' | 'Expired' | 'Canceled';
+        notes: string;
+      }> = {};
+
+      if (data.client_id) backendData.client = data.client_id;
+      if (data.amc_number) backendData.amc_number = data.amc_number;
+      if (data.amount !== undefined) backendData.amount = data.amount;
+      if (data.start_date) backendData.start_date = data.start_date;
+      if (data.end_date) backendData.end_date = data.end_date;
+      if (data.billing_cycle) backendData.billing_cycle = data.billing_cycle;
+      if (data.status) backendData.status = data.status;
+      if (data.notes !== undefined) backendData.notes = data.notes;
+
+      await apiClient.updateAMC(selectedAMC.id, backendData);
+      showAlert('Success', 'AMC updated successfully.', 'success');
+      setIsAMCModalOpen(false);
+      setSelectedAMC(null);
+      fetchAMCs();
+      fetchStatistics();
+      fetchExpiringCount();
+    } catch (err: any) {
+      console.error('Failed to update AMC:', err);
+      showAlert('Error', err.message || 'Failed to update AMC.', 'error');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleAMCSubmit = (data: Partial<AMC>) => {
     if (selectedAMC) {
-      handleUpdateAMC({ ...data, id: selectedAMC.id });
+      handleUpdateAMC(data);
     } else {
       handleCreateAMC(data);
     }
-    setIsAMCModalOpen(false);
-    setSelectedAMC(null);
   };
 
   const handleNewAMC = () => {
@@ -276,18 +331,54 @@ function AMCsPageContent() {
 
   // Check for action=new in URL params and open modal
   useEffect(() => {
-    const action = searchParams.get("action");
-    if (action === "new") {
+    const action = searchParams.get('action');
+    if (action === 'new') {
       handleNewAMC();
       // Remove the query parameter from URL
-      router.replace("/amcs");
+      router.replace('/amcs');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
-  const handleEditAMC = (amc: AMC) => {
-    setSelectedAMC(amc);
+  const handleEditAMC = async (amc: AMC) => {
+    try {
+      // Fetch full AMC details
+      const backendAMC = await apiClient.getAMC(amc.id);
+      const fullAMC = mapBackendAMCDetailToFrontend(backendAMC);
+      setSelectedAMC(fullAMC);
     setIsAMCModalOpen(true);
+    } catch (err: any) {
+      console.error('Failed to fetch AMC details:', err);
+      showAlert('Error', err.message || 'Failed to load AMC details.', 'error');
+    }
+  };
+
+  const handleDeleteAMC = async (amcId: number) => {
+    const confirmed = await showDeleteConfirm('this AMC');
+    if (confirmed) {
+      try {
+        await apiClient.deleteAMC(amcId);
+        showAlert('Success', 'AMC deleted successfully.', 'success');
+        fetchAMCs();
+        fetchStatistics();
+        fetchExpiringCount();
+      } catch (err: any) {
+        console.error('Failed to delete AMC:', err);
+        showAlert('Error', err.message || 'Failed to delete AMC.', 'error');
+      }
+    }
+  };
+
+  const handleViewBilling = async (amc: AMC) => {
+    try {
+      const backendAMC = await apiClient.getAMC(amc.id);
+      setBillingAMCDetail(backendAMC);
+      setBillingAMC(amc);
+      setShowBillingModal(true);
+    } catch (err: any) {
+      console.error('Failed to fetch AMC billing details:', err);
+      showAlert('Error', err.message || 'Failed to load billing details.', 'error');
+    }
   };
 
   const getStatusBadgeClass = (status: string) => {
@@ -307,6 +398,37 @@ function AMCsPageContent() {
     return 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400';
   };
 
+  if (isLoading && amcs.length === 0) {
+    return (
+      <DashboardLayout title="AMCs" breadcrumbs={['Home', 'AMCs']}>
+        <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
+          <Loader2 className="h-8 w-8 animate-spin text-sky-500" />
+          <p className="ml-3 text-gray-500">Loading AMCs...</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (error && amcs.length === 0) {
+    return (
+      <DashboardLayout title="AMCs" breadcrumbs={['Home', 'AMCs']}>
+        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] text-red-500">
+          <AlertCircle className="h-12 w-12 mb-4" />
+          <p className="text-lg font-medium">Error loading AMCs: {error}</p>
+          <button
+            onClick={() => {
+              setError(null);
+              fetchAMCs();
+            }}
+            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600"
+          >
+            <Loader2 className="h-4 w-4" /> Retry
+          </button>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout title="AMCs" breadcrumbs={['Home', 'AMCs']}>
       <div className="space-y-6">
@@ -320,20 +442,20 @@ function AMCsPageContent() {
           </div>
           <button 
             onClick={handleNewAMC}
-            className="flex items-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600">
+            className="flex items-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600"
+          >
             <Plus className="h-4 w-4" />
             New AMC
           </button>
         </div>
 
-        {/* Alert Banner */}
-        {expiringAMCs.length > 0 && expiryFilter === null && (
+        {/* Alert Banner - Show only if expiringCount > 0 */}
+        {expiringCount > 0 && expiryFilter === null && (
           <div className="flex items-start gap-3 rounded-lg border border-orange-200 bg-orange-50 p-4 dark:border-orange-900/50 dark:bg-orange-900/20">
             <AlertCircle className="h-5 w-5 text-orange-600 dark:text-orange-400" />
             <div className="flex-1">
               <h3 className="text-sm font-medium text-orange-900 dark:text-orange-300">
-                {expiringAMCs.length} AMC{expiringAMCs.length > 1 ? 's' : ''} expiring in next 30
-                days
+                {expiringCount} AMC{expiringCount > 1 ? 's' : ''} expiring in next 30 days
               </h3>
               <p className="mt-1 text-sm text-orange-700 dark:text-orange-400">
                 Review and plan renewals to avoid service interruptions
@@ -355,7 +477,7 @@ function AMCsPageContent() {
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total AMCs</p>
                 <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-                  {amcs.length}
+                  {statistics?.total_amcs ?? amcs.length}
                 </p>
               </div>
               <div className="rounded-lg bg-sky-50 p-3 dark:bg-sky-900/20">
@@ -367,11 +489,9 @@ function AMCsPageContent() {
           <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Active AMCs
-                </p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active AMCs</p>
                 <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-                  {amcs.filter((a) => a.status === 'Active').length}
+                  {statistics?.active_amcs ?? amcs.filter((a) => a.status === 'Active').length}
                 </p>
               </div>
               <div className="rounded-lg bg-green-50 p-3 dark:bg-green-900/20">
@@ -383,11 +503,9 @@ function AMCsPageContent() {
           <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Expiring Soon
-                </p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Expiring Soon</p>
                 <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-                  {expiringAMCs.length}
+                  {statistics?.expiring_soon ?? expiringCount}
                 </p>
               </div>
               <div className="rounded-lg bg-orange-50 p-3 dark:bg-orange-900/20">
@@ -399,11 +517,9 @@ function AMCsPageContent() {
           <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Pending Bills
-                </p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pending Bills</p>
                 <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-                  {pendingBills.length}
+                  {statistics?.pending_bills ?? 0}
                 </p>
               </div>
               <div className="rounded-lg bg-red-50 p-3 dark:bg-red-900/20">
@@ -493,6 +609,26 @@ function AMCsPageContent() {
         </div>
 
         {/* AMC Table */}
+        {filteredAMCs.length === 0 ? (
+          <div className="rounded-lg border-2 border-dashed border-gray-300 p-12 text-center dark:border-gray-700">
+            <Inbox className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-600" />
+            <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-white">No AMCs found</h3>
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+              {amcs.length === 0
+                ? 'Get started by creating your first AMC contract'
+                : 'Try adjusting your search or filters'}
+            </p>
+            {amcs.length === 0 && (
+              <button
+                onClick={handleNewAMC}
+                className="mt-4 inline-flex items-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600"
+              >
+                <Plus className="h-4 w-4" />
+                New AMC
+              </button>
+            )}
+          </div>
+        ) : (
         <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -517,10 +653,7 @@ function AMCsPageContent() {
                     Status
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                    Next Bill Due
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                    Outstanding
+                      Days Until Expiry
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                     Actions
@@ -530,26 +663,19 @@ function AMCsPageContent() {
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                 {filteredAMCs.map((amc) => {
                   const stats = getAMCStats(amc);
+                    const daysToEnd = differenceInDays(new Date(amc.end_date), new Date());
                   return (
-                    <tr
-                      key={amc.id}
-                      className="hover:bg-gray-50 dark:hover:bg-gray-700/50"
-                    >
+                      <tr key={amc.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <button
-                          onClick={() => {
-                            setBillingAMC(amc);
-                            setShowBillingModal(true);
-                          }}
+                            onClick={() => handleViewBilling(amc)}
                           className="text-sm font-medium text-sky-600 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300"
                         >
                           {amc.amc_number}
                         </button>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900 dark:text-white">
-                          {amc.client_name}
-                        </div>
+                          <div className="text-sm text-gray-900 dark:text-white">{amc.client_name}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900 dark:text-gray-300">
@@ -577,40 +703,22 @@ function AMCsPageContent() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        {stats.nextBill ? (
-                          <div>
-                            <div className="text-sm text-gray-900 dark:text-white">
-                              {format(new Date(stats.nextBill.period_to), 'dd MMM')}
-                            </div>
-                          </div>
-                        ) : stats.daysToEnd > 0 ? (
+                          {daysToEnd >= 0 ? (
                           <span
                             className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${getExpiryBadgeClass(
-                              stats.daysToEnd
+                                daysToEnd
                             )}`}
                           >
-                            {stats.daysToEnd} days left
+                              {daysToEnd} days left
                           </span>
                         ) : (
-                          <span className="text-sm text-gray-500 dark:text-gray-400">-</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {stats.outstanding > 0 ? (
-                          <span className="text-sm font-medium text-red-600 dark:text-red-400">
-                            ₹{stats.outstanding.toLocaleString()}
-                          </span>
-                        ) : (
-                          <span className="text-sm text-gray-500 dark:text-gray-400">-</span>
+                            <span className="text-sm text-gray-500 dark:text-gray-400">Expired</span>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex justify-end gap-2">
                           <button
-                            onClick={() => {
-                              setBillingAMC(amc);
-                              setShowBillingModal(true);
-                            }}
+                              onClick={() => handleViewBilling(amc)}
                             className="rounded p-1 text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white"
                             title="View Billing Details"
                           >
@@ -641,24 +749,6 @@ function AMCsPageContent() {
               </tbody>
             </table>
           </div>
-        </div>
-
-        {filteredAMCs.length === 0 && (
-          <div className="rounded-lg border-2 border-dashed border-gray-300 p-12 text-center dark:border-gray-700">
-            <FileText className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-600" />
-            <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-white">
-              No AMCs found
-            </h3>
-            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              Get started by creating your first AMC contract
-            </p>
-            <button
-              onClick={handleNewAMC}
-              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600"
-            >
-              <Plus className="h-4 w-4" />
-              New AMC
-            </button>
           </div>
         )}
 
@@ -671,24 +761,23 @@ function AMCsPageContent() {
           }}
           onSubmit={handleAMCSubmit}
           amc={selectedAMC}
-          clients={mockClients}
+          clients={clients}
         />
 
         {/* Billing Details Modal */}
-        {showBillingModal && billingAMC && (
+        {showBillingModal && billingAMC && billingAMCDetail && (
           <AMCBillingModal
             amc={billingAMC}
-            billings={billings.filter(b => b.amc_id === billingAMC.id)}
+            billings={billingAMCDetail.billings.map((b) => mapBackendBillingToFrontend(b, billingAMC.id))}
             onClose={() => {
               setShowBillingModal(false);
               setBillingAMC(null);
+              setBillingAMCDetail(null);
             }}
-            onUpdateBilling={(billingId: number, updates: Partial<AMCBilling>) => {
-              setBillings(prevBillings => 
-                prevBillings.map(b => 
-                  b.id === billingId ? { ...b, ...updates } : b
-                )
-              );
+            onUpdateBilling={async (billingId: number, updates: Partial<AMCBilling>) => {
+              // This would need a backend API endpoint to update billing
+              // For now, we'll just show an alert
+              showAlert('Info', 'Billing update functionality will be implemented in the backend API.', 'info');
             }}
           />
         )}
@@ -703,6 +792,7 @@ function AMCsPageContent() {
             }}
             onSend={(template, message) => {
               console.log('Sending email with template:', template, 'Message:', message);
+              showAlert('Info', 'Email sending functionality will be implemented in the backend API.', 'info');
               setShowEmailModal(false);
               setEmailAMC(null);
             }}
@@ -715,33 +805,42 @@ function AMCsPageContent() {
 
 export default function AMCsPage() {
   return (
-    <Suspense fallback={
-      <DashboardLayout title="AMCs">
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-gray-500">Loading...</div>
-        </div>
-      </DashboardLayout>
-    }>
-      <AMCsPageContent />
-    </Suspense>
+    <ProtectedRoute>
+      <Suspense
+        fallback={
+          <DashboardLayout title="AMCs">
+            <div className="flex items-center justify-center min-h-screen">
+              <div className="text-gray-500">Loading...</div>
+            </div>
+          </DashboardLayout>
+        }
+      >
+        <AMCsPageContent />
+      </Suspense>
+    </ProtectedRoute>
   );
 }
 
-function AMCBillingModal({ amc, billings, onClose, onUpdateBilling }: {
+function AMCBillingModal({
+  amc,
+  billings,
+  onClose,
+  onUpdateBilling,
+}: {
   amc: AMC;
   billings: AMCBilling[];
   onClose: () => void;
   onUpdateBilling: (billingId: number, updates: Partial<AMCBilling>) => void;
 }) {
   const totalAmount = billings.reduce((sum, b) => sum + b.amount, 0);
-  const paidAmount = billings.filter(b => b.paid).reduce((sum, b) => sum + b.amount, 0);
+  const paidAmount = billings.filter((b) => b.paid).reduce((sum, b) => sum + b.amount, 0);
   const outstandingAmount = totalAmount - paidAmount;
 
   const handleTogglePaid = async (billing: AMCBilling) => {
     const newPaidStatus = !billing.paid;
     const updates: Partial<AMCBilling> = {
       paid: newPaidStatus,
-      payment_date: newPaidStatus ? new Date().toISOString() : undefined,
+      payment_date: newPaidStatus ? new Date().toISOString().split('T')[0] : undefined,
       payment_mode: newPaidStatus ? 'Bank Transfer' : undefined,
     };
     onUpdateBilling(billing.id, updates);
@@ -752,15 +851,16 @@ function AMCBillingModal({ amc, billings, onClose, onUpdateBilling }: {
       <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-white dark:bg-gray-900 border-b dark:border-gray-800 p-6 flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
-              AMC Billing Details
-            </h2>
+            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">AMC Billing Details</h2>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               {amc.amc_number} - {amc.client_name}
             </p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-            <AlertCircle className="h-6 w-6" />
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+          >
+            <X className="h-6 w-6" />
           </button>
         </div>
 
@@ -819,7 +919,8 @@ function AMCBillingModal({ amc, billings, onClose, onUpdateBilling }: {
                       {bill.bill_number}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
-                      {format(new Date(bill.period_from), 'dd MMM yyyy')} - {format(new Date(bill.period_to), 'dd MMM yyyy')}
+                      {format(new Date(bill.period_from), 'dd MMM yyyy')} -{' '}
+                      {format(new Date(bill.period_to), 'dd MMM yyyy')}
                     </td>
                     <td className="px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white">
                       ₹{bill.amount.toLocaleString()}
@@ -884,7 +985,11 @@ function AMCBillingModal({ amc, billings, onClose, onUpdateBilling }: {
   );
 }
 
-function EmailTemplateModal({ amc, onClose, onSend }: {
+function EmailTemplateModal({
+  amc,
+  onClose,
+  onSend,
+}: {
   amc: AMC;
   onClose: () => void;
   onSend: (template: string, message: string) => void;
@@ -897,27 +1002,29 @@ function EmailTemplateModal({ amc, onClose, onSend }: {
       id: 'renewal_reminder',
       name: 'AMC Renewal Reminder',
       subject: 'AMC Renewal Due - {{amc_number}}',
-      placeholders: ['{{client_name}}', '{{amc_number}}', '{{end_date}}', '{{amount}}']
+      placeholders: ['{{client_name}}', '{{amc_number}}', '{{end_date}}', '{{amount}}'],
     },
     {
       id: 'payment_reminder',
       name: 'Payment Reminder',
       subject: 'Payment Due for AMC - {{amc_number}}',
-      placeholders: ['{{client_name}}', '{{amc_number}}', '{{outstanding_amount}}', '{{due_date}}']
+      placeholders: ['{{client_name}}', '{{amc_number}}', '{{outstanding_amount}}', '{{due_date}}'],
     },
     {
       id: 'service_notification',
       name: 'Service Notification',
       subject: 'Scheduled Service - {{amc_number}}',
-      placeholders: ['{{client_name}}', '{{amc_number}}', '{{service_date}}', '{{location}}']
+      placeholders: ['{{client_name}}', '{{amc_number}}', '{{service_date}}', '{{location}}'],
     },
   ];
 
   const handleTemplateChange = (templateId: string) => {
     setSelectedTemplate(templateId);
-    const template = emailTemplates.find(t => t.id === templateId);
+    const template = emailTemplates.find((t) => t.id === templateId);
     if (template) {
-      setEmailMessage(`Dear {{client_name}},\n\nThis is regarding your AMC contract {{amc_number}}.\n\n[Your message here]\n\nBest regards,\nElectrocom Team`);
+      setEmailMessage(
+        `Dear {{client_name}},\n\nThis is regarding your AMC contract {{amc_number}}.\n\n[Your message here]\n\nBest regards,\nElectrocom Team`
+      );
     }
   };
 
@@ -926,15 +1033,13 @@ function EmailTemplateModal({ amc, onClose, onSend }: {
       <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-2xl">
         <div className="border-b dark:border-gray-800 p-6 flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
-              Send Email
-            </h2>
+            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">Send Email</h2>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               To: {amc.client_name} - {amc.amc_number}
             </p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-            <AlertCircle className="h-6 w-6" />
+            <X className="h-6 w-6" />
           </button>
         </div>
 
@@ -964,7 +1069,9 @@ function EmailTemplateModal({ amc, onClose, onSend }: {
                   Available Placeholders:
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {emailTemplates.find(t => t.id === selectedTemplate)?.placeholders.map((placeholder) => (
+                  {emailTemplates
+                    .find((t) => t.id === selectedTemplate)
+                    ?.placeholders.map((placeholder) => (
                     <code
                       key={placeholder}
                       className="px-2 py-1 bg-white dark:bg-gray-800 border border-sky-200 dark:border-sky-800 rounded text-xs font-mono text-sky-700 dark:text-sky-400"
