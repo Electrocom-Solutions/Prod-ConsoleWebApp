@@ -13,13 +13,14 @@ type UploadTemplateModalProps = {
     firm_id?: number;
     file: File | null;
     notes: string;
-  }) => void;
+  }) => Promise<void>;
   clients: Client[];
+  isUploading?: boolean;
 };
 
 const categories = ['Work Order', 'Experience Certificate', 'Tender Document', 'Affidavit', 'AMC', 'Invoice', 'Contract', 'Report', 'Other'];
 
-export function UploadTemplateModal({ isOpen, onClose, onUpload, clients }: UploadTemplateModalProps) {
+export function UploadTemplateModal({ isOpen, onClose, onUpload, clients, isUploading = false }: UploadTemplateModalProps) {
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('');
   const [firmId, setFirmId] = useState<number | ''>('');
@@ -80,7 +81,7 @@ export function UploadTemplateModal({ isOpen, onClose, onUpload, clients }: Uplo
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!title.trim()) {
@@ -98,20 +99,26 @@ export function UploadTemplateModal({ isOpen, onClose, onUpload, clients }: Uplo
       return;
     }
 
-    onUpload({ 
-      title, 
-      category, 
-      firm_id: firmId === '' ? undefined : firmId,
-      file, 
-      notes 
-    });
-    
-    setTitle('');
-    setCategory('');
-    setFirmId('');
-    setFile(null);
-    setNotes('');
-    setError('');
+    try {
+      await onUpload({ 
+        title, 
+        category, 
+        firm_id: firmId === '' ? undefined : firmId,
+        file, 
+        notes 
+      });
+      
+      // Only clear form if upload was successful
+      setTitle('');
+      setCategory('');
+      setFirmId('');
+      setFile(null);
+      setNotes('');
+      setError('');
+    } catch (error) {
+      // Error handling is done in parent component
+      // Just keep the form data so user can retry
+    }
   };
 
   const handleClose = () => {
@@ -267,9 +274,10 @@ export function UploadTemplateModal({ isOpen, onClose, onUpload, clients }: Uplo
             </button>
             <button
               type="submit"
-              className="rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600"
+              disabled={isUploading}
+              className="rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Upload Template
+              {isUploading ? 'Uploading...' : 'Upload Template'}
             </button>
           </div>
         </form>

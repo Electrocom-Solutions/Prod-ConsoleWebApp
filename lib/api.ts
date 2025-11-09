@@ -65,6 +65,65 @@ export interface DashboardStatsResponse {
   recent_activities: RecentActivity[];
 }
 
+// Document Management Interfaces
+export interface DocumentTemplateVersion {
+  id: number;
+  version_number: number;
+  file: string; // File path
+  file_url: string; // Full URL
+  file_type: 'pdf' | 'docx';
+  is_published: boolean;
+  created_at: string;
+  created_by: number | null;
+  created_by_username: string | null;
+}
+
+export interface DocumentTemplate {
+  id: number;
+  title: string;
+  category: string | null;
+  description: string | null;
+  firm: number | null;
+  firm_name: string | null;
+  versions: DocumentTemplateVersion[];
+  published_version: DocumentTemplateVersion | null;
+  created_at: string;
+  created_by: number | null;
+  created_by_username: string | null;
+}
+
+export interface DocumentTemplateListResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: DocumentTemplate[];
+}
+
+export interface DocumentUploadResponse {
+  message: string;
+  template: DocumentTemplate;
+  version: DocumentTemplateVersion;
+}
+
+export interface Firm {
+  id: number;
+  firm_name: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface FirmListResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: Firm[];
+}
+
+export interface BulkDownloadRequest {
+  version_ids?: number[];
+  template_ids?: number[];
+}
+
 class ApiClient {
   private baseURL: string;
 
@@ -464,6 +523,178 @@ Please verify:
   async delete<T>(endpoint: string): Promise<T> {
     return this.request<T>(endpoint, {
       method: 'DELETE',
+    });
+  }
+
+  /**
+   * Document Management APIs
+   */
+
+  /**
+   * Get all document templates with optional filters
+   */
+  async getDocumentTemplates(params?: {
+    category?: string;
+    firm?: number;
+    search?: string;
+    page?: number;
+  }): Promise<DocumentTemplateListResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.category) queryParams.append('category', params.category);
+    if (params?.firm) queryParams.append('firm', params.firm.toString());
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.page) queryParams.append('page', params.page.toString());
+
+    const queryString = queryParams.toString();
+    const endpoint = `/api/documents/templates/${queryString ? `?${queryString}` : ''}`;
+    
+    return this.request<DocumentTemplateListResponse>(endpoint, {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * Get a specific document template by ID
+   */
+  async getDocumentTemplate(id: number): Promise<DocumentTemplate> {
+    return this.request<DocumentTemplate>(`/api/documents/templates/${id}/`, {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * Upload a new document template
+   */
+  async uploadDocumentTemplate(data: {
+    title: string;
+    category?: string;
+    firm?: number;
+    upload_file: File;
+    notes?: string;
+  }): Promise<DocumentUploadResponse> {
+    const formData = new FormData();
+    formData.append('title', data.title);
+    if (data.category) formData.append('category', data.category);
+    if (data.firm) formData.append('firm', data.firm.toString());
+    formData.append('upload_file', data.upload_file);
+    if (data.notes) formData.append('notes', data.notes);
+
+    // Get CSRF token
+    const csrfToken = this.getCsrfToken();
+    
+    const headers: Record<string, string> = {};
+    if (csrfToken) {
+      headers['X-CSRFToken'] = csrfToken;
+    }
+
+    const response = await fetch(`${this.baseURL}/api/documents/templates/upload-template/`, {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Upload failed' }));
+      throw error;
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Delete a document template
+   */
+  async deleteDocumentTemplate(id: number): Promise<void> {
+    await this.request(`/api/documents/templates/${id}/`, {
+      method: 'DELETE',
+    });
+  }
+
+  /**
+   * Download published version of a template
+   */
+  async downloadPublishedVersion(templateId: number): Promise<Blob> {
+    const response = await fetch(
+      `${this.baseURL}/api/documents/templates/${templateId}/download-published/`,
+      {
+        method: 'GET',
+        credentials: 'include',
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Download failed' }));
+      throw error;
+    }
+
+    return response.blob();
+  }
+
+  /**
+   * Download a specific version by version ID
+   */
+  async downloadVersion(versionId: number): Promise<Blob> {
+    const response = await fetch(
+      `${this.baseURL}/api/documents/templates/download-version/?version_id=${versionId}`,
+      {
+        method: 'GET',
+        credentials: 'include',
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Download failed' }));
+      throw error;
+    }
+
+    return response.blob();
+  }
+
+  /**
+   * Bulk download documents
+   */
+  async bulkDownloadDocuments(data: BulkDownloadRequest): Promise<Blob> {
+    const csrfToken = this.getCsrfToken();
+    
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (csrfToken) {
+      headers['X-CSRFToken'] = csrfToken;
+    }
+
+    const response = await fetch(`${this.baseURL}/api/documents/templates/bulk-download/`, {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Bulk download failed' }));
+      throw error;
+    }
+
+    return response.blob();
+  }
+
+  /**
+   * Get all firms (for document template firm selection)
+   */
+  async getFirms(params?: {
+    search?: string;
+    page?: number;
+  }): Promise<FirmListResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.page) queryParams.append('page', params.page.toString());
+
+    const queryString = queryParams.toString();
+    const endpoint = `/api/firms/${queryString ? `?${queryString}` : ''}`;
+    
+    return this.request<FirmListResponse>(endpoint, {
+      method: 'GET',
     });
   }
 }
