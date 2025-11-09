@@ -492,6 +492,83 @@ export interface BulkDownloadRequest {
   template_ids?: number[];
 }
 
+// Employee Management Interfaces
+export interface EmployeeStatisticsResponse {
+  total_employees: number;
+  total_present: number;
+  total_absent: number;
+  monthly_payroll: number;
+}
+
+export interface BackendEmployeeListItem {
+  id: number;
+  employee_code: string;
+  full_name: string | null;
+  email: string | null;
+  phone_number: string | null;
+  designation: 'Technician' | 'Field Staff' | 'Computer Operator' | 'Other';
+  availability_status: string | null; // 'Present' or 'Absent' or null
+  created_at: string;
+}
+
+export interface EmployeeListResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: BackendEmployeeListItem[];
+}
+
+export interface EmployeeDetail {
+  id: number;
+  employee_code: string;
+  full_name: string | null;
+  email: string | null;
+  phone_number: string | null;
+  photo_url: string | null;
+  date_of_birth: string | null;
+  gender: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  pin_code: string | null;
+  country: string | null;
+  aadhar_number: string | null;
+  pan_number: string | null;
+  aadhar_card_url: string | null;
+  pan_card_url: string | null;
+  designation: 'Technician' | 'Field Staff' | 'Computer Operator' | 'Other';
+  joining_date: string;
+  monthly_salary: string; // Decimal as string
+  profile: number;
+  created_at: string;
+  updated_at: string;
+  created_by?: number;
+  updated_by?: number;
+}
+
+export interface EmployeeCreateData {
+  first_name: string;
+  last_name: string;
+  email: string;
+  employee_code: string;
+  designation: 'Technician' | 'Field Staff' | 'Computer Operator' | 'Other';
+  joining_date: string; // YYYY-MM-DD
+  monthly_salary: number;
+  phone_number?: string;
+  photo?: File;
+  date_of_birth?: string; // YYYY-MM-DD
+  gender?: 'male' | 'female' | 'other';
+  address?: string;
+  city?: string;
+  state?: string;
+  pin_code?: string;
+  country?: string;
+  aadhar_number?: string;
+  pan_number?: string;
+  aadhar_card?: File;
+  pan_card?: File;
+}
+
 class ApiClient {
   private baseURL: string;
 
@@ -1803,6 +1880,162 @@ Please verify:
     
     return this.request<FirmListResponse>(endpoint, {
       method: 'GET',
+    });
+  }
+
+  /**
+   * Employee Management APIs
+   */
+
+  /**
+   * Get employee statistics
+   */
+  async getEmployeeStatistics(): Promise<EmployeeStatisticsResponse> {
+    return this.request<EmployeeStatisticsResponse>('/api/employees/statistics/', {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * Get all employees with optional filters
+   */
+  async getEmployees(params?: {
+    search?: string;
+    designation?: string;
+    availability?: 'present' | 'absent';
+    page?: number;
+  }): Promise<EmployeeListResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.designation) queryParams.append('designation', params.designation);
+    if (params?.availability) queryParams.append('availability', params.availability);
+    if (params?.page) queryParams.append('page', params.page.toString());
+
+    const queryString = queryParams.toString();
+    const endpoint = `/api/employees/${queryString ? `?${queryString}` : ''}`;
+
+    return this.request<EmployeeListResponse>(endpoint, {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * Get a specific employee by ID
+   */
+  async getEmployee(id: number): Promise<EmployeeDetail> {
+    return this.request<EmployeeDetail>(`/api/employees/${id}/`, {
+      method: 'GET',
+    });
+  }
+
+  /**
+   * Create a new employee
+   */
+  async createEmployee(data: EmployeeCreateData): Promise<EmployeeDetail> {
+    const formData = new FormData();
+    
+    // Required fields
+    formData.append('first_name', data.first_name);
+    formData.append('last_name', data.last_name);
+    formData.append('email', data.email);
+    formData.append('employee_code', data.employee_code);
+    formData.append('designation', data.designation);
+    formData.append('joining_date', data.joining_date);
+    formData.append('monthly_salary', data.monthly_salary.toString());
+    
+    // Optional fields
+    if (data.phone_number) formData.append('phone_number', data.phone_number);
+    if (data.photo) formData.append('photo', data.photo);
+    if (data.date_of_birth) formData.append('date_of_birth', data.date_of_birth);
+    if (data.gender) formData.append('gender', data.gender);
+    if (data.address) formData.append('address', data.address);
+    if (data.city) formData.append('city', data.city);
+    if (data.state) formData.append('state', data.state);
+    if (data.pin_code) formData.append('pin_code', data.pin_code);
+    if (data.country) formData.append('country', data.country);
+    if (data.aadhar_number) formData.append('aadhar_number', data.aadhar_number);
+    if (data.pan_number) formData.append('pan_number', data.pan_number);
+    if (data.aadhar_card) formData.append('aadhar_card', data.aadhar_card);
+    if (data.pan_card) formData.append('pan_card', data.pan_card);
+
+    const csrfToken = this.getCsrfToken();
+    const headers: Record<string, string> = {};
+    if (csrfToken) {
+      headers['X-CSRFToken'] = csrfToken;
+    }
+
+    const response = await fetch(`${this.baseURL}/api/employees/`, {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Create failed' }));
+      throw error;
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Update an employee
+   */
+  async updateEmployee(id: number, data: Partial<EmployeeCreateData>): Promise<EmployeeDetail> {
+    const formData = new FormData();
+    
+    // Required fields (only if provided)
+    if (data.first_name) formData.append('first_name', data.first_name);
+    if (data.last_name) formData.append('last_name', data.last_name);
+    if (data.email) formData.append('email', data.email);
+    if (data.employee_code) formData.append('employee_code', data.employee_code);
+    if (data.designation) formData.append('designation', data.designation);
+    if (data.joining_date) formData.append('joining_date', data.joining_date);
+    if (data.monthly_salary !== undefined) formData.append('monthly_salary', data.monthly_salary.toString());
+    
+    // Optional fields
+    if (data.phone_number !== undefined) formData.append('phone_number', data.phone_number || '');
+    if (data.photo) formData.append('photo', data.photo);
+    if (data.date_of_birth) formData.append('date_of_birth', data.date_of_birth);
+    if (data.gender) formData.append('gender', data.gender);
+    if (data.address) formData.append('address', data.address);
+    if (data.city) formData.append('city', data.city);
+    if (data.state) formData.append('state', data.state);
+    if (data.pin_code) formData.append('pin_code', data.pin_code);
+    if (data.country) formData.append('country', data.country);
+    if (data.aadhar_number) formData.append('aadhar_number', data.aadhar_number);
+    if (data.pan_number) formData.append('pan_number', data.pan_number);
+    if (data.aadhar_card) formData.append('aadhar_card', data.aadhar_card);
+    if (data.pan_card) formData.append('pan_card', data.pan_card);
+
+    const csrfToken = this.getCsrfToken();
+    const headers: Record<string, string> = {};
+    if (csrfToken) {
+      headers['X-CSRFToken'] = csrfToken;
+    }
+
+    const response = await fetch(`${this.baseURL}/api/employees/${id}/`, {
+      method: 'PATCH',
+      headers,
+      credentials: 'include',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Update failed' }));
+      throw error;
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Delete an employee
+   */
+  async deleteEmployee(id: number): Promise<void> {
+    await this.request(`/api/employees/${id}/`, {
+      method: 'DELETE',
     });
   }
 }
