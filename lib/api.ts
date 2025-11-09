@@ -396,12 +396,27 @@ Please verify:
    */
   async logout(): Promise<void> {
     try {
+      // Call logout endpoint to clear server-side session
       await this.request('/api/logout/', {
         method: 'POST',
       });
+      
+      // Clear CSRF token from cookies
+      if (typeof document !== 'undefined') {
+        // Clear CSRF token cookie
+        document.cookie = 'csrftoken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+        // Clear session cookie (if any)
+        document.cookie = 'sessionid=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+      }
     } catch (error) {
-      // Even if logout fails, clear local state
+      // Even if logout fails, clear local state and cookies
       console.error('Logout error:', error);
+      
+      // Clear cookies even if request failed
+      if (typeof document !== 'undefined') {
+        document.cookie = 'csrftoken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+        document.cookie = 'sessionid=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+      }
     }
   }
 

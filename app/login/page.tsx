@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,8 +14,16 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, user, isAuthorized, isLoading: authLoading } = useAuth();
   const router = useRouter();
+
+  // Redirect if already authenticated (additional check in component)
+  useEffect(() => {
+    if (!authLoading && isAuthorized && user) {
+      console.log('[LoginPage] User already authenticated, redirecting to dashboard');
+      router.replace("/dashboard");
+    }
+  }, [user, isAuthorized, authLoading, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,6 +93,26 @@ Error: ${error.message}`;
       setIsLoading(false);
     }
   };
+
+  // Show loading state while checking authentication
+  if (authLoading) {
+    return (
+      <div 
+        className="min-h-screen flex items-center justify-center p-4 sm:p-6 lg:p-8" 
+        style={{ backgroundColor: "#0F1117" }}
+      >
+        <div className="text-center">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]" style={{ color: "#007BFF" }}></div>
+          <p className="mt-4 text-gray-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render login form if user is already authenticated (will redirect)
+  if (isAuthorized && user) {
+    return null;
+  }
 
   return (
     <div 

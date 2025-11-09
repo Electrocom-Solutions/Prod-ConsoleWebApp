@@ -78,18 +78,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
+      setIsLoading(true);
+      // Call backend logout endpoint
       await apiClient.logout();
     } catch (error) {
       console.error("Logout error:", error);
+      // Continue with logout even if backend call fails
     } finally {
+      // Clear user state
       setUser(null);
+      // Clear any cached data
+      if (typeof window !== 'undefined') {
+        // Clear any localStorage items if needed
+        // localStorage.clear(); // Uncomment if you want to clear all localStorage
+      }
+      // Redirect to login page
       router.push("/login");
       router.refresh();
+      setIsLoading(false);
     }
   };
 
-  // Only redirect from login page to dashboard if user is already logged in
-  // Route protection is handled by ProtectedRoute component
+  // Redirect authenticated users away from login page
+  // This prevents authenticated users from accessing the login page
   useEffect(() => {
     // Don't redirect while loading
     if (isLoading) {
@@ -99,9 +110,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Check if user is authenticated and authorized (staff or superuser)
     const isAuthorized = user && (user.is_staff || user.is_superuser);
 
-    // If user is authorized and on login page, redirect to dashboard
+    // If user is authorized and on login page, immediately redirect to dashboard
     if (isAuthorized && pathname === "/login") {
-      router.push("/dashboard");
+      console.log('[Auth] User already authenticated, redirecting to dashboard');
+      router.replace("/dashboard");
     }
   }, [user, isLoading, pathname, router]);
 
