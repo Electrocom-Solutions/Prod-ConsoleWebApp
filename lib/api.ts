@@ -964,6 +964,60 @@ export interface StockCreateData {
   description?: string;
 }
 
+/**
+ * Task Resources Dashboard Interfaces
+ */
+
+export interface TaskResourcesStatisticsResponse {
+  total_tasks: number;
+  total_resources: number;
+  total_cost: number;
+  avg_cost_per_task: number;
+}
+
+export interface BackendTaskResourceBreakdown {
+  id: number;
+  resource_name: string;
+  quantity: string;
+  unit_cost: string;
+  total_cost: string;
+}
+
+export interface BackendTaskResourceListItem {
+  id: number;
+  task_name: string;
+  employee: number;
+  employee_name: string | null;
+  project: number;
+  project_name: string;
+  client_name: string | null;
+  task_date: string;
+  resources_count: number;
+  grand_total: number;
+  resource_breakdown: BackendTaskResourceBreakdown[];
+}
+
+export interface TaskResourcesListResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: BackendTaskResourceListItem[];
+}
+
+export interface TaskResourceDetail {
+  id: number;
+  task_name: string;
+  employee: number;
+  employee_name: string | null;
+  project: number;
+  project_name: string;
+  client_name: string | null;
+  task_date: string;
+  resources_count: number;
+  grand_total: number;
+  resource_breakdown: BackendTaskResourceBreakdown[];
+}
+
 class ApiClient {
   private baseURL: string;
 
@@ -3049,6 +3103,53 @@ Please verify:
     await this.request(`/api/stocks/${id}/`, {
       method: 'DELETE',
     });
+  }
+
+  /**
+   * Task Resources Dashboard API Methods
+   */
+
+  /**
+   * Get task resources statistics
+   */
+  async getTaskResourcesStatistics(params?: {
+    month?: number;
+    year?: number;
+  }): Promise<TaskResourcesStatisticsResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.month) queryParams.append('month', params.month.toString());
+    if (params?.year) queryParams.append('year', params.year.toString());
+
+    const queryString = queryParams.toString();
+    const endpoint = `/api/task-resources/statistics/${queryString ? `?${queryString}` : ''}`;
+    return this.request<TaskResourcesStatisticsResponse>(endpoint);
+  }
+
+  /**
+   * Get task resources list with filters
+   */
+  async getTaskResources(params?: {
+    search?: string;
+    month?: number;
+    year?: number;
+    page?: number;
+  }): Promise<TaskResourcesListResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.month) queryParams.append('month', params.month.toString());
+    if (params?.year) queryParams.append('year', params.year.toString());
+    if (params?.page) queryParams.append('page', params.page.toString());
+
+    const queryString = queryParams.toString();
+    const endpoint = `/api/task-resources/${queryString ? `?${queryString}` : ''}`;
+    return this.request<TaskResourcesListResponse>(endpoint);
+  }
+
+  /**
+   * Get task resources details
+   */
+  async getTaskResource(id: number): Promise<TaskResourceDetail> {
+    return this.request<TaskResourceDetail>(`/api/task-resources/${id}/`);
   }
 }
 
