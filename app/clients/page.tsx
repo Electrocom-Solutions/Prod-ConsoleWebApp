@@ -21,6 +21,7 @@ import {
   Loader2,
   AlertCircle,
   Inbox,
+  ChevronDown,
 } from "lucide-react";
 import type { Client } from "@/types";
 import { format } from "date-fns";
@@ -114,6 +115,10 @@ function ClientsPageContent() {
   const [hasActiveAMC, setHasActiveAMC] = useState<string>("all");
   const [selectedTag, setSelectedTag] = useState<string>("all");
   const [selectedClients, setSelectedClients] = useState<Set<number>>(new Set());
+  const [showCityDropdown, setShowCityDropdown] = useState(false);
+  const [showStateDropdown, setShowStateDropdown] = useState(false);
+  const [showAMCDropdown, setShowAMCDropdown] = useState(false);
+  const [showTagDropdown, setShowTagDropdown] = useState(false);
   
   const [formModalOpen, setFormModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | undefined>();
@@ -178,6 +183,36 @@ function ClientsPageContent() {
   const cities = Array.from(new Set(clients.map((c) => c.city).filter(Boolean))).sort();
   const states = Array.from(new Set(clients.map((c) => c.state).filter(Boolean))).sort();
   const allTags = Array.from(new Set(clients.flatMap((c) => c.tags))).sort();
+
+  // Close filter dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.city-filter-dropdown-container')) {
+        setShowCityDropdown(false);
+      }
+      if (!target.closest('.state-filter-dropdown-container')) {
+        setShowStateDropdown(false);
+      }
+      if (!target.closest('.amc-filter-dropdown-container')) {
+        setShowAMCDropdown(false);
+      }
+      if (!target.closest('.tag-filter-dropdown-container')) {
+        setShowTagDropdown(false);
+      }
+    };
+
+    if (showCityDropdown || showStateDropdown || showAMCDropdown || showTagDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showCityDropdown, showStateDropdown, showAMCDropdown, showTagDropdown]);
+
+  const amcFilterOptions = [
+    { value: "all", label: "All Clients" },
+    { value: "yes", label: "Has Active AMC" },
+    { value: "no", label: "No Active AMC" },
+  ];
 
   // Filter clients (client-side filtering for city, state, tags)
   const filteredClients = clients.filter((client) => {
@@ -572,58 +607,171 @@ function ClientsPageContent() {
             
             <div className="flex items-center gap-2">
               {cities.length > 0 && (
-              <select
-                value={selectedCity}
-                onChange={(e) => setSelectedCity(e.target.value)}
-                className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-              >
-                <option value="all">All Cities</option>
-                {cities.map((city) => (
-                  <option key={city} value={city}>
-                    {city}
-                  </option>
-                ))}
-              </select>
+              <div className="relative city-filter-dropdown-container">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCityDropdown(!showCityDropdown);
+                    setShowStateDropdown(false);
+                    setShowAMCDropdown(false);
+                    setShowTagDropdown(false);
+                  }}
+                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-left focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white flex items-center justify-between min-w-[120px]"
+                >
+                  <span>{selectedCity === "all" ? "All Cities" : selectedCity}</span>
+                  <ChevronDown className="h-4 w-4 text-gray-400 ml-2" />
+                </button>
+                {showCityDropdown && (
+                  <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedCity("all");
+                        setShowCityDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      All Cities
+                    </button>
+                    {cities.map((city) => (
+                      <button
+                        key={city}
+                        type="button"
+                        onClick={() => {
+                          setSelectedCity(city);
+                          setShowCityDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                      >
+                        {city}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               )}
 
               {states.length > 0 && (
-              <select
-                value={selectedState}
-                onChange={(e) => setSelectedState(e.target.value)}
-                className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-              >
-                <option value="all">All States</option>
-                {states.map((state) => (
-                  <option key={state} value={state}>
-                    {state}
-                  </option>
-                ))}
-              </select>
+              <div className="relative state-filter-dropdown-container">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowStateDropdown(!showStateDropdown);
+                    setShowCityDropdown(false);
+                    setShowAMCDropdown(false);
+                    setShowTagDropdown(false);
+                  }}
+                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-left focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white flex items-center justify-between min-w-[120px]"
+                >
+                  <span>{selectedState === "all" ? "All States" : selectedState}</span>
+                  <ChevronDown className="h-4 w-4 text-gray-400 ml-2" />
+                </button>
+                {showStateDropdown && (
+                  <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedState("all");
+                        setShowStateDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      All States
+                    </button>
+                    {states.map((state) => (
+                      <button
+                        key={state}
+                        type="button"
+                        onClick={() => {
+                          setSelectedState(state);
+                          setShowStateDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                      >
+                        {state}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               )}
 
-              <select
-                value={hasActiveAMC}
-                onChange={(e) => setHasActiveAMC(e.target.value)}
-                className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-              >
-                <option value="all">All Clients</option>
-                <option value="yes">Has Active AMC</option>
-                <option value="no">No Active AMC</option>
-              </select>
+              <div className="relative amc-filter-dropdown-container">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAMCDropdown(!showAMCDropdown);
+                    setShowCityDropdown(false);
+                    setShowStateDropdown(false);
+                    setShowTagDropdown(false);
+                  }}
+                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-left focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white flex items-center justify-between min-w-[140px]"
+                >
+                  <span>{amcFilterOptions.find(opt => opt.value === hasActiveAMC)?.label || "All Clients"}</span>
+                  <ChevronDown className="h-4 w-4 text-gray-400 ml-2" />
+                </button>
+                {showAMCDropdown && (
+                  <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    {amcFilterOptions.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => {
+                          setHasActiveAMC(option.value);
+                          setShowAMCDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               {allTags.length > 0 && (
-              <select
-                value={selectedTag}
-                onChange={(e) => setSelectedTag(e.target.value)}
-                className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-              >
-                <option value="all">All Tags</option>
-                {allTags.map((tag) => (
-                  <option key={tag} value={tag}>
-                    {tag}
-                  </option>
-                ))}
-              </select>
+              <div className="relative tag-filter-dropdown-container">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowTagDropdown(!showTagDropdown);
+                    setShowCityDropdown(false);
+                    setShowStateDropdown(false);
+                    setShowAMCDropdown(false);
+                  }}
+                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-left focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white flex items-center justify-between min-w-[120px]"
+                >
+                  <span>{selectedTag === "all" ? "All Tags" : selectedTag}</span>
+                  <ChevronDown className="h-4 w-4 text-gray-400 ml-2" />
+                </button>
+                {showTagDropdown && (
+                  <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedTag("all");
+                        setShowTagDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      All Tags
+                    </button>
+                    {allTags.map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => {
+                          setSelectedTag(tag);
+                          setShowTagDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               )}
 
               <div className="flex rounded-lg border border-gray-300 dark:border-gray-600">

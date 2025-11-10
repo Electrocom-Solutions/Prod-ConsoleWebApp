@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Upload, Download, CheckCircle, X, Calendar, Loader2, Inbox, Trash2 } from "lucide-react";
+import { Search, Upload, Download, CheckCircle, X, Calendar, Loader2, Inbox, Trash2, ChevronDown } from "lucide-react";
 import { showDeleteConfirm, showSuccess, showError, showAlert, showConfirm } from "@/lib/sweetalert";
 import { format } from "date-fns";
 import * as XLSX from "xlsx";
@@ -82,12 +82,32 @@ function PaymentsPageContent() {
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [showMonthDropdown, setShowMonthDropdown] = useState(false);
+  const [showYearDropdown, setShowYearDropdown] = useState(false);
 
   const years = useMemo(() => {
     const startYear = 2020;
     const endYear = currentYear + 1;
     return Array.from({ length: endYear - startYear + 1 }, (_, i) => startYear + i);
   }, [currentYear]);
+
+  // Close filter dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.month-filter-dropdown-container')) {
+        setShowMonthDropdown(false);
+      }
+      if (!target.closest('.year-filter-dropdown-container')) {
+        setShowYearDropdown(false);
+      }
+    };
+
+    if (showMonthDropdown || showYearDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showMonthDropdown, showYearDropdown]);
 
   /**
    * Fetch statistics from backend
@@ -309,30 +329,68 @@ function PaymentsPageContent() {
               className="pl-10"
             />
           </div>
-          <select
-            value={selectedMonth}
-            onChange={(e) => {
-              setSelectedMonth(Number(e.target.value));
-              setCurrentPage(1);
-            }}
-            className="rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
-          >
-            {months.map((month, index) => (
-              <option key={month} value={index + 1}>{month}</option>
-            ))}
-          </select>
-          <select
-            value={selectedYear}
-            onChange={(e) => {
-              setSelectedYear(Number(e.target.value));
-              setCurrentPage(1);
-            }}
-            className="rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
-          >
-            {years.map(year => (
-              <option key={year} value={year}>{year}</option>
-            ))}
-          </select>
+          <div className="relative month-filter-dropdown-container">
+            <button
+              type="button"
+              onClick={() => {
+                setShowMonthDropdown(!showMonthDropdown);
+                setShowYearDropdown(false);
+              }}
+              className="rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-left focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 flex items-center justify-between min-w-[140px]"
+            >
+              <span>{months[selectedMonth - 1]}</span>
+              <ChevronDown className="h-4 w-4 text-gray-400 ml-2" />
+            </button>
+            {showMonthDropdown && (
+              <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                {months.map((month, index) => (
+                  <button
+                    key={month}
+                    type="button"
+                    onClick={() => {
+                      setSelectedMonth(index + 1);
+                      setCurrentPage(1);
+                      setShowMonthDropdown(false);
+                    }}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
+                    {month}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="relative year-filter-dropdown-container">
+            <button
+              type="button"
+              onClick={() => {
+                setShowYearDropdown(!showYearDropdown);
+                setShowMonthDropdown(false);
+              }}
+              className="rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-left focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 flex items-center justify-between min-w-[100px]"
+            >
+              <span>{selectedYear}</span>
+              <ChevronDown className="h-4 w-4 text-gray-400 ml-2" />
+            </button>
+            {showYearDropdown && (
+              <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                {years.map(year => (
+                  <button
+                    key={year}
+                    type="button"
+                    onClick={() => {
+                      setSelectedYear(year);
+                      setCurrentPage(1);
+                      setShowYearDropdown(false);
+                    }}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
+                    {year}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <Button onClick={() => setShowUploadModal(true)}>
             <Upload className="h-4 w-4 mr-2" />
             Upload Sheet

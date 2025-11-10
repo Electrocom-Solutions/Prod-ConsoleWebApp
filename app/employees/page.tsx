@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { DatePicker } from "@/components/ui/date-picker";
-import { Plus, Search, Mail, Phone, MapPin, Edit, Trash2, X, User, Briefcase, Loader2, Inbox, Eye, Calendar, CreditCard, FileText, Building2, MapPin as MapPinIcon, Globe, Award, DollarSign, IdCard } from "lucide-react";
+import { Plus, Search, Mail, Phone, MapPin, Edit, Trash2, X, User, Briefcase, Loader2, Inbox, Eye, Calendar, CreditCard, FileText, Building2, MapPin as MapPinIcon, Globe, Award, DollarSign, IdCard, ChevronDown } from "lucide-react";
 import { showDeleteConfirm, showAlert, showSuccess } from "@/lib/sweetalert";
 import { apiClient, EmployeeStatisticsResponse, BackendEmployeeListItem, EmployeeDetail, EmployeeCreateData } from "@/lib/api";
 import { useDebounce } from "use-debounce";
@@ -134,6 +134,8 @@ function EmployeesPageContent() {
   const [debouncedSearchQuery] = useDebounce(searchQuery, 500);
   const [designationFilter, setDesignationFilter] = useState<string>("all");
   const [availabilityFilter, setAvailabilityFilter] = useState<string>("all");
+  const [showDesignationDropdown, setShowDesignationDropdown] = useState(false);
+  const [showAvailabilityDropdown, setShowAvailabilityDropdown] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -179,6 +181,24 @@ function EmployeesPageContent() {
       setIsLoading(false);
     }
   }, [debouncedSearchQuery, designationFilter, availabilityFilter, currentPage]);
+
+  // Close filter dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.designation-filter-dropdown-container')) {
+        setShowDesignationDropdown(false);
+      }
+      if (!target.closest('.availability-filter-dropdown-container')) {
+        setShowAvailabilityDropdown(false);
+      }
+    };
+
+    if (showDesignationDropdown || showAvailabilityDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showDesignationDropdown, showAvailabilityDropdown]);
 
   // Initial data fetch
   useEffect(() => {
@@ -364,26 +384,85 @@ function EmployeesPageContent() {
               className="pl-9"
             />
           </div>
-          <select
-            value={designationFilter}
-            onChange={(e) => setDesignationFilter(e.target.value)}
-            className="rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
-          >
-            {uniqueDesignations.map(designation => (
-              <option key={designation} value={designation}>
-                {designation === "all" ? "All Designations" : designation}
-              </option>
-            ))}
-          </select>
-          <select
-            value={availabilityFilter}
-            onChange={(e) => setAvailabilityFilter(e.target.value)}
-            className="rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
-          >
-            <option value="all">All Status</option>
-            <option value="present">Present</option>
-            <option value="absent">Absent</option>
-          </select>
+          <div className="relative designation-filter-dropdown-container">
+            <button
+              type="button"
+              onClick={() => {
+                setShowDesignationDropdown(!showDesignationDropdown);
+                setShowAvailabilityDropdown(false);
+              }}
+              className="rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-left focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 flex items-center justify-between min-w-[150px]"
+            >
+              <span>{designationFilter === "all" ? "All Designations" : designationFilter}</span>
+              <ChevronDown className="h-4 w-4 text-gray-400 ml-2" />
+            </button>
+            {showDesignationDropdown && (
+              <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                {uniqueDesignations.map(designation => (
+                  <button
+                    key={designation}
+                    type="button"
+                    onClick={() => {
+                      setDesignationFilter(designation);
+                      setShowDesignationDropdown(false);
+                    }}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
+                    {designation === "all" ? "All Designations" : designation}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="relative availability-filter-dropdown-container">
+            <button
+              type="button"
+              onClick={() => {
+                setShowAvailabilityDropdown(!showAvailabilityDropdown);
+                setShowDesignationDropdown(false);
+              }}
+              className="rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-left focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 flex items-center justify-between min-w-[130px]"
+            >
+              <span>
+                {availabilityFilter === "all" ? "All Status" : availabilityFilter === "present" ? "Present" : "Absent"}
+              </span>
+              <ChevronDown className="h-4 w-4 text-gray-400 ml-2" />
+            </button>
+            {showAvailabilityDropdown && (
+              <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAvailabilityFilter("all");
+                    setShowAvailabilityDropdown(false);
+                  }}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  All Status
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAvailabilityFilter("present");
+                    setShowAvailabilityDropdown(false);
+                  }}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  Present
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAvailabilityFilter("absent");
+                    setShowAvailabilityDropdown(false);
+                  }}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  Absent
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Employees Table */}

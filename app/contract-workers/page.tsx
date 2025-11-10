@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { DatePicker } from "@/components/ui/date-picker";
-import { Plus, Search, Upload, Edit, Trash2, X, User, Phone, MapPin, Mail, Loader2, Inbox, FileText, Download } from "lucide-react";
+import { Plus, Search, Upload, Edit, Trash2, X, User, Phone, MapPin, Mail, Loader2, Inbox, FileText, Download, ChevronDown } from "lucide-react";
 import { showDeleteConfirm, showAlert, showSuccess } from "@/lib/sweetalert";
 import { apiClient, ContractWorkerStatisticsResponse, BackendContractWorkerListItem, ContractWorkerDetail, ContractWorkerCreateData, BulkUploadContractWorkerResponse, BackendProjectListItem } from "@/lib/api";
 import { useDebounce } from "use-debounce";
@@ -144,6 +144,8 @@ function ContractWorkersPageContent() {
   const [debouncedSearchQuery] = useDebounce(searchQuery, 500);
   const [workerTypeFilter, setWorkerTypeFilter] = useState<string>("all");
   const [availabilityFilter, setAvailabilityFilter] = useState<string>("all");
+  const [showWorkerTypeDropdown, setShowWorkerTypeDropdown] = useState(false);
+  const [showAvailabilityDropdown, setShowAvailabilityDropdown] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [selectedWorker, setSelectedWorker] = useState<ContractWorker | null>(null);
@@ -207,6 +209,24 @@ function ContractWorkersPageContent() {
   useEffect(() => {
     fetchWorkers();
   }, [fetchWorkers]);
+
+  // Close filter dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.worker-type-filter-dropdown-container')) {
+        setShowWorkerTypeDropdown(false);
+      }
+      if (!target.closest('.availability-filter-dropdown-container')) {
+        setShowAvailabilityDropdown(false);
+      }
+    };
+
+    if (showWorkerTypeDropdown || showAvailabilityDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showWorkerTypeDropdown, showAvailabilityDropdown]);
 
   // Handle URL parameter for opening modal
   useEffect(() => {
@@ -402,26 +422,85 @@ function ContractWorkersPageContent() {
               className="pl-9"
             />
           </div>
-          <select
-            value={workerTypeFilter}
-            onChange={(e) => setWorkerTypeFilter(e.target.value)}
-            className="rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
-          >
-            {uniqueWorkerTypes.map(workerType => (
-              <option key={workerType} value={workerType}>
-                {workerType === "all" ? "All Worker Types" : workerType}
-              </option>
-            ))}
-          </select>
-          <select
-            value={availabilityFilter}
-            onChange={(e) => setAvailabilityFilter(e.target.value)}
-            className="rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
-          >
-            <option value="all">All Status</option>
-            <option value="available">Available</option>
-            <option value="assigned">Assigned</option>
-          </select>
+          <div className="relative worker-type-filter-dropdown-container">
+            <button
+              type="button"
+              onClick={() => {
+                setShowWorkerTypeDropdown(!showWorkerTypeDropdown);
+                setShowAvailabilityDropdown(false);
+              }}
+              className="rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-left focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 flex items-center justify-between min-w-[150px]"
+            >
+              <span>{workerTypeFilter === "all" ? "All Worker Types" : workerTypeFilter}</span>
+              <ChevronDown className="h-4 w-4 text-gray-400 ml-2" />
+            </button>
+            {showWorkerTypeDropdown && (
+              <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                {uniqueWorkerTypes.map(workerType => (
+                  <button
+                    key={workerType}
+                    type="button"
+                    onClick={() => {
+                      setWorkerTypeFilter(workerType);
+                      setShowWorkerTypeDropdown(false);
+                    }}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
+                    {workerType === "all" ? "All Worker Types" : workerType}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="relative availability-filter-dropdown-container">
+            <button
+              type="button"
+              onClick={() => {
+                setShowAvailabilityDropdown(!showAvailabilityDropdown);
+                setShowWorkerTypeDropdown(false);
+              }}
+              className="rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-left focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 flex items-center justify-between min-w-[130px]"
+            >
+              <span>
+                {availabilityFilter === "all" ? "All Status" : availabilityFilter === "available" ? "Available" : "Assigned"}
+              </span>
+              <ChevronDown className="h-4 w-4 text-gray-400 ml-2" />
+            </button>
+            {showAvailabilityDropdown && (
+              <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAvailabilityFilter("all");
+                    setShowAvailabilityDropdown(false);
+                  }}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  All Status
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAvailabilityFilter("available");
+                    setShowAvailabilityDropdown(false);
+                  }}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  Available
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAvailabilityFilter("assigned");
+                    setShowAvailabilityDropdown(false);
+                  }}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  Assigned
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Contract Workers Table */}

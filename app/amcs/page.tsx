@@ -19,6 +19,7 @@ import {
   Loader2,
   Inbox,
   X,
+  ChevronDown,
 } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { AMCFormModal } from '@/components/amcs/amc-form-modal';
@@ -141,6 +142,8 @@ function AMCsPageContent() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [billingCycleFilter, setBillingCycleFilter] = useState('all');
   const [expiryFilter, setExpiryFilter] = useState<number | null>(null);
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const [showBillingCycleDropdown, setShowBillingCycleDropdown] = useState(false);
   const [isAMCModalOpen, setIsAMCModalOpen] = useState(false);
   const [selectedAMC, setSelectedAMC] = useState<AMC | null>(null);
   const [showBillingModal, setShowBillingModal] = useState(false);
@@ -237,6 +240,27 @@ function AMCsPageContent() {
   useEffect(() => {
     fetchExpiringCount();
   }, [amcs, fetchExpiringCount]);
+
+  // Close filter dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.status-filter-dropdown-container')) {
+        setShowStatusDropdown(false);
+      }
+      if (!target.closest('.billing-cycle-filter-dropdown-container')) {
+        setShowBillingCycleDropdown(false);
+      }
+    };
+
+    if (showStatusDropdown || showBillingCycleDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showStatusDropdown, showBillingCycleDropdown]);
+
+  const statusFilterOptions = ['all', 'Active', 'Pending', 'Expired', 'Canceled'];
+  const billingCycleFilterOptions = ['all', 'Monthly', 'Quarterly', 'Half-yearly', 'Yearly'];
 
   const getAMCStats = (amc: AMC) => {
     // For now, we'll need to fetch the detail to get billing info
@@ -553,30 +577,68 @@ function AMCsPageContent() {
 
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-            >
-              <option value="all">All Status</option>
-              <option value="Active">Active</option>
-              <option value="Pending">Pending</option>
-              <option value="Expired">Expired</option>
-              <option value="Canceled">Canceled</option>
-            </select>
+            <div className="relative status-filter-dropdown-container">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowStatusDropdown(!showStatusDropdown);
+                  setShowBillingCycleDropdown(false);
+                }}
+                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-left text-gray-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white flex items-center justify-between min-w-[120px]"
+              >
+                <span>{statusFilter === "all" ? "All Status" : statusFilter}</span>
+                <ChevronDown className="h-4 w-4 text-gray-400 ml-2" />
+              </button>
+              {showStatusDropdown && (
+                <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {statusFilterOptions.map((status) => (
+                    <button
+                      key={status}
+                      type="button"
+                      onClick={() => {
+                        setStatusFilter(status);
+                        setShowStatusDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      {status === "all" ? "All Status" : status}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
-          <select
-            value={billingCycleFilter}
-            onChange={(e) => setBillingCycleFilter(e.target.value)}
-            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-          >
-            <option value="all">All Cycles</option>
-            <option value="Monthly">Monthly</option>
-            <option value="Quarterly">Quarterly</option>
-            <option value="Half-yearly">Half-yearly</option>
-            <option value="Yearly">Yearly</option>
-          </select>
+          <div className="relative billing-cycle-filter-dropdown-container">
+            <button
+              type="button"
+              onClick={() => {
+                setShowBillingCycleDropdown(!showBillingCycleDropdown);
+                setShowStatusDropdown(false);
+              }}
+              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-left text-gray-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white flex items-center justify-between min-w-[130px]"
+            >
+              <span>{billingCycleFilter === "all" ? "All Cycles" : billingCycleFilter}</span>
+              <ChevronDown className="h-4 w-4 text-gray-400 ml-2" />
+            </button>
+            {showBillingCycleDropdown && (
+              <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                {billingCycleFilterOptions.map((cycle) => (
+                  <button
+                    key={cycle}
+                    type="button"
+                    onClick={() => {
+                      setBillingCycleFilter(cycle);
+                      setShowBillingCycleDropdown(false);
+                    }}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
+                    {cycle === "all" ? "All Cycles" : cycle}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           <div className="flex gap-2">
             <button

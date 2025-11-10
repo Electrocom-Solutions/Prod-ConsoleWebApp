@@ -6,7 +6,7 @@ import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Search, Check, X as XIcon, ChevronLeft, ChevronRight, Download, CheckCircle, XCircle, Clock, Edit2, Loader2, Inbox, Trash2 } from "lucide-react";
+import { Calendar, Search, Check, X as XIcon, ChevronLeft, ChevronRight, Download, CheckCircle, XCircle, Clock, Edit2, Loader2, Inbox, Trash2, ChevronDown } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, parseISO } from "date-fns";
 import { showConfirm, showSuccess, showDeleteConfirm, showAlert } from "@/lib/sweetalert";
 import { apiClient, AttendanceStatisticsResponse, BackendAttendanceListItem, AttendanceDetail, AttendanceCreateData, BackendEmployeeListItem, EmployeeListResponse } from "@/lib/api";
@@ -65,6 +65,7 @@ function AttendancePageContent() {
   const [debouncedSearch] = useDebounce(searchQuery, 500);
   const [viewMode, setViewMode] = useState<"calendar" | "list">("list");
   const [approvalFilter, setApprovalFilter] = useState<ApprovalStatus | "All">("All");
+  const [showApprovalDropdown, setShowApprovalDropdown] = useState(false);
   const [showMarkModal, setShowMarkModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [showBulkPresentModal, setShowBulkPresentModal] = useState(false);
@@ -150,6 +151,23 @@ function AttendancePageContent() {
       setIsLoading(false);
     }
   }, [currentMonth, debouncedSearch, selectedDate, approvalFilter, currentPage]);
+
+  // Close filter dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.approval-filter-dropdown-container')) {
+        setShowApprovalDropdown(false);
+      }
+    };
+
+    if (showApprovalDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showApprovalDropdown]);
+
+  const approvalFilterOptions = ['All', 'Pending', 'Approved', 'Rejected'];
 
   // Fetch statistics and employees on mount
   useEffect(() => {
@@ -469,16 +487,33 @@ function AttendancePageContent() {
               />
             </div>
 
-            <select
-              value={approvalFilter}
-              onChange={(e) => setApprovalFilter(e.target.value as any)}
-              className="rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm dark:text-gray-200"
-            >
-              <option value="All">All Approvals</option>
-              <option value="Pending">Pending</option>
-              <option value="Approved">Approved</option>
-              <option value="Rejected">Rejected</option>
-            </select>
+            <div className="relative approval-filter-dropdown-container">
+              <button
+                type="button"
+                onClick={() => setShowApprovalDropdown(!showApprovalDropdown)}
+                className="rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-left dark:text-gray-200 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 flex items-center justify-between min-w-[140px]"
+              >
+                <span>{approvalFilter === "All" ? "All Approvals" : approvalFilter}</span>
+                <ChevronDown className="h-4 w-4 text-gray-400 ml-2" />
+              </button>
+              {showApprovalDropdown && (
+                <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {approvalFilterOptions.map((status) => (
+                    <button
+                      key={status}
+                      type="button"
+                      onClick={() => {
+                        setApprovalFilter(status as ApprovalStatus | "All");
+                        setShowApprovalDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      {status === "All" ? "All Approvals" : status}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <div className="flex rounded-lg border border-gray-300 dark:border-gray-700">
               <Button

@@ -21,6 +21,7 @@ import {
   Clock,
   Pause,
   XCircle,
+  ChevronDown,
 } from "lucide-react";
 import { Project } from "@/types";
 import { cn } from "@/lib/utils";
@@ -87,6 +88,7 @@ function ProjectsPageContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery] = useDebounce(searchQuery, 500);
   const [statusFilter, setStatusFilter] = useState<string>("All");
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -140,6 +142,23 @@ function ProjectsPageContent() {
       setIsLoading(false);
     }
   }, [currentPage, debouncedSearchQuery, statusFilter]);
+
+  // Close filter dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.status-filter-dropdown-container')) {
+        setShowStatusDropdown(false);
+      }
+    };
+
+    if (showStatusDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showStatusDropdown]);
+
+  const statusFilterOptions = ['All', 'Planned', 'In Progress', 'On Hold', 'Completed', 'Canceled'];
 
   useEffect(() => {
     fetchStatistics();
@@ -389,18 +408,33 @@ function ProjectsPageContent() {
               className="pl-9"
             />
           </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-          >
-            <option value="All">All Status</option>
-            <option value="Planned">Planned</option>
-            <option value="In Progress">In Progress</option>
-            <option value="On Hold">On Hold</option>
-            <option value="Completed">Completed</option>
-            <option value="Canceled">Canceled</option>
-          </select>
+          <div className="relative status-filter-dropdown-container">
+            <button
+              type="button"
+              onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-left text-gray-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white flex items-center justify-between min-w-[140px]"
+            >
+              <span>{statusFilter === "All" ? "All Status" : statusFilter}</span>
+              <ChevronDown className="h-4 w-4 text-gray-400 ml-2" />
+            </button>
+            {showStatusDropdown && (
+              <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                {statusFilterOptions.map((status) => (
+                  <button
+                    key={status}
+                    type="button"
+                    onClick={() => {
+                      setStatusFilter(status);
+                      setShowStatusDropdown(false);
+                    }}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
+                    {status === "All" ? "All Status" : status}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Projects List */}

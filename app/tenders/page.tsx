@@ -17,6 +17,7 @@ import {
   Trash2,
   Loader2,
   Inbox,
+  ChevronDown,
 } from "lucide-react";
 import Link from "next/link";
 import { Tender, TenderFinancials } from "@/types";
@@ -115,6 +116,7 @@ function TendersPageContent() {
   const [statusFilter, setStatusFilter] = useState<string>("All");
   const [emdFilter, setEmdFilter] = useState<boolean>(false);
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [isTenderModalOpen, setIsTenderModalOpen] = useState(false);
   const [selectedTender, setSelectedTender] = useState<Tender | null>(null);
   const [selectedTenderFinancials, setSelectedTenderFinancials] = useState<TenderFinancials | null>(null);
@@ -166,6 +168,23 @@ function TendersPageContent() {
     fetchStatistics();
     fetchTenders();
   }, [fetchStatistics, fetchTenders]);
+
+  // Close filter dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.status-filter-dropdown-container')) {
+        setShowStatusDropdown(false);
+      }
+    };
+
+    if (showStatusDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showStatusDropdown]);
+
+  const statusFilterOptions = ['All', 'Draft', 'Filed', 'Awarded', 'Lost', 'Closed'];
 
   // Handle URL parameters for quick actions (e.g., from dashboard)
   const handleNewTender = useCallback(() => {
@@ -554,18 +573,33 @@ function TendersPageContent() {
             </div>
 
             {/* Status Filter */}
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-            >
-              <option value="All">All Status</option>
-              <option value="Draft">Draft</option>
-              <option value="Filed">Filed</option>
-              <option value="Awarded">Awarded</option>
-              <option value="Lost">Lost</option>
-              <option value="Closed">Closed</option>
-            </select>
+            <div className="relative status-filter-dropdown-container">
+              <button
+                type="button"
+                onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+                className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-left text-gray-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white flex items-center justify-between min-w-[130px]"
+              >
+                <span>{statusFilter === "All" ? "All Status" : statusFilter}</span>
+                <ChevronDown className="h-4 w-4 text-gray-400 ml-2" />
+              </button>
+              {showStatusDropdown && (
+                <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {statusFilterOptions.map((status) => (
+                    <button
+                      key={status}
+                      type="button"
+                      onClick={() => {
+                        setStatusFilter(status);
+                        setShowStatusDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      {status === "All" ? "All Status" : status}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
             {/* EMD Filter */}
             <button
