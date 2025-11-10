@@ -4273,16 +4273,45 @@ Please verify:
     month?: number;
     year?: number;
     page?: number;
+    page_size?: number;
   }): Promise<PaymentTrackerListResponse> {
     const queryParams = new URLSearchParams();
     if (params?.search) queryParams.append('search', params.search);
     if (params?.month) queryParams.append('month', params.month.toString());
     if (params?.year) queryParams.append('year', params.year.toString());
     if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.page_size) queryParams.append('page_size', params.page_size.toString());
 
     const queryString = queryParams.toString();
     const endpoint = `/api/payment-tracker/${queryString ? `?${queryString}` : ''}`;
     return this.request<PaymentTrackerListResponse>(endpoint);
+  }
+
+  /**
+   * Download payment tracker Excel template
+   */
+  async downloadPaymentTrackerTemplate(): Promise<Blob> {
+    // Ensure we have a CSRF token before making the request
+    await this.ensureCsrfToken();
+    const csrfToken = this.getCsrfToken();
+    const headers: Record<string, string> = {};
+    if (csrfToken) {
+      headers['X-CSRFToken'] = csrfToken;
+    }
+
+    // CRITICAL: credentials: 'include' is required to send cookies (sessionid, csrftoken)
+    const response = await fetch(`${this.baseURL}/api/payment-tracker/download-template/`, {
+      method: 'GET',
+      headers,
+      credentials: 'include', // Required for cookies and CSRF protection
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Download failed' }));
+      throw error;
+    }
+
+    return response.blob();
   }
 
   /**

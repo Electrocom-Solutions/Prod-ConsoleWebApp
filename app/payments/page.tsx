@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Upload, Download, CheckCircle, X, Calendar, Loader2, Inbox, Trash2, ChevronDown } from "lucide-react";
+import { Search, Upload, Download, CheckCircle, X, Calendar, Loader2, Inbox, Trash2, ChevronDown, Eye } from "lucide-react";
 import { showDeleteConfirm, showSuccess, showError, showAlert, showConfirm } from "@/lib/sweetalert";
 import { format } from "date-fns";
 import * as XLSX from "xlsx";
@@ -81,9 +81,14 @@ function PaymentsPageContent() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [totalPages, setTotalPages] = useState(1);
   const [showMonthDropdown, setShowMonthDropdown] = useState(false);
   const [showYearDropdown, setShowYearDropdown] = useState(false);
+  const [showPageSizeDropdown, setShowPageSizeDropdown] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [viewPayment, setViewPayment] = useState<ContractWorkerPayment | null>(null);
+  const [isLoadingView, setIsLoadingView] = useState(false);
 
   const years = useMemo(() => {
     const startYear = 2020;
@@ -101,13 +106,16 @@ function PaymentsPageContent() {
       if (!target.closest('.year-filter-dropdown-container')) {
         setShowYearDropdown(false);
       }
+      if (!target.closest('.page-size-dropdown-container')) {
+        setShowPageSizeDropdown(false);
+      }
     };
 
-    if (showMonthDropdown || showYearDropdown) {
+    if (showMonthDropdown || showYearDropdown || showPageSizeDropdown) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
-  }, [showMonthDropdown, showYearDropdown]);
+  }, [showMonthDropdown, showYearDropdown, showPageSizeDropdown]);
 
   /**
    * Fetch statistics from backend
@@ -136,6 +144,7 @@ function PaymentsPageContent() {
         month: selectedMonth,
         year: selectedYear,
         page: currentPage,
+        page_size: pageSize,
       };
       
       if (debouncedSearch) {
@@ -145,7 +154,7 @@ function PaymentsPageContent() {
       const response: PaymentTrackerListResponse = await apiClient.getPaymentTrackerRecords(params);
       const mappedPayments = response.results.map(mapBackendPaymentTrackerToFrontend);
       setPayments(mappedPayments);
-      setTotalPages(Math.ceil(response.count / 20));
+      setTotalPages(Math.ceil(response.count / pageSize));
     } catch (err: any) {
       console.error('Error fetching payment records:', err);
       setError(err.message || 'Failed to fetch payment records');
@@ -153,7 +162,7 @@ function PaymentsPageContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedMonth, selectedYear, debouncedSearch, currentPage]);
+  }, [selectedMonth, selectedYear, debouncedSearch, currentPage, pageSize]);
 
   // Fetch statistics and payments on mount and when filters change
   useEffect(() => {
@@ -282,6 +291,17 @@ function PaymentsPageContent() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleView = async (payment: ContractWorkerPayment) => {
+    setViewPayment(payment);
+    setShowViewModal(true);
+  };
+
+  const handlePageSizeChange = (newPageSize: number) => {
+    setPageSize(newPageSize);
+    setCurrentPage(1);
+    setShowPageSizeDropdown(false);
   };
 
   return (
@@ -418,6 +438,39 @@ function PaymentsPageContent() {
         )}
 
         <div className="bg-white dark:bg-gray-900 rounded-lg border overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+            <div className="relative page-size-dropdown-container">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mr-2">
+                Rows per page:
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPageSizeDropdown(!showPageSizeDropdown);
+                  setShowMonthDropdown(false);
+                  setShowYearDropdown(false);
+                }}
+                className="rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-left focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 flex items-center justify-between min-w-[80px]"
+              >
+                <span>{pageSize}</span>
+                <ChevronDown className="h-4 w-4 text-gray-400 ml-2" />
+              </button>
+              {showPageSizeDropdown && (
+                <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {[10, 20, 50, 100].map((size) => (
+                    <button
+                      key={size}
+                      type="button"
+                      onClick={() => handlePageSizeChange(size)}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      {size}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
           <table className="w-full">
             <thead className="bg-gray-50 dark:bg-gray-800">
               <tr>
@@ -498,13 +551,22 @@ function PaymentsPageContent() {
                     </td>
                     <td className="px-4 py-3 text-sm">{payment.paymentMode || "-"}</td>
                     <td className="px-4 py-3">
-                      <button
-                        onClick={() => handleDelete(payment)}
-                        className="rounded p-1 text-red-600 hover:bg-red-50 hover:text-red-900 dark:text-red-400 dark:hover:bg-red-900/30"
-                        title="Delete"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleView(payment)}
+                          className="rounded p-1 text-sky-600 hover:bg-sky-50 hover:text-sky-900 dark:text-sky-400 dark:hover:bg-sky-900/30"
+                          title="View Details"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(payment)}
+                          className="rounded p-1 text-red-600 hover:bg-red-50 hover:text-red-900 dark:text-red-400 dark:hover:bg-red-900/30"
+                          title="Delete"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -582,6 +644,16 @@ function PaymentsPageContent() {
           onSave={handleBulkMarkPaidSubmit}
         />
       )}
+
+      {showViewModal && viewPayment && (
+        <ViewPaymentModal
+          payment={viewPayment}
+          onClose={() => {
+            setShowViewModal(false);
+            setViewPayment(null);
+          }}
+        />
+      )}
     </DashboardLayout>
   );
 }
@@ -616,12 +688,53 @@ function UploadSheetModal({
   const [selectedMonth, setSelectedMonth] = useState<number>(currentMonthNum);
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [file, setFile] = useState<File | null>(null);
+  const [showMonthDropdown, setShowMonthDropdown] = useState(false);
+  const [showYearDropdown, setShowYearDropdown] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const years = Array.from({ length: 10 }, (_, i) => currentYear - 5 + i);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.upload-month-dropdown-container')) {
+        setShowMonthDropdown(false);
+      }
+      if (!target.closest('.upload-year-dropdown-container')) {
+        setShowYearDropdown(false);
+      }
+    };
+
+    if (showMonthDropdown || showYearDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showMonthDropdown, showYearDropdown]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
+    }
+  };
+
+  const handleDownloadTemplate = async () => {
+    setIsDownloading(true);
+    try {
+      const blob = await apiClient.downloadPaymentTrackerTemplate();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'payment_tracker_template.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      await showSuccess("Template Downloaded", "Payment tracker template downloaded successfully");
+    } catch (err: any) {
+      await showAlert("Download Failed", err.message || "Failed to download template");
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -649,32 +762,74 @@ function UploadSheetModal({
             <label className="block text-sm font-medium mb-2">
               Month <span className="text-red-500">*</span>
             </label>
-            <select
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(Number(e.target.value))}
-              disabled={isSaving}
-              className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {months.map((month, index) => (
-                <option key={month} value={index + 1}>{month}</option>
-              ))}
-            </select>
+            <div className="relative upload-month-dropdown-container">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMonthDropdown(!showMonthDropdown);
+                  setShowYearDropdown(false);
+                }}
+                disabled={isSaving}
+                className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-left focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span>{months[selectedMonth - 1]}</span>
+                <ChevronDown className="h-4 w-4 text-gray-400 ml-2" />
+              </button>
+              {showMonthDropdown && (
+                <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {months.map((month, index) => (
+                    <button
+                      key={month}
+                      type="button"
+                      onClick={() => {
+                        setSelectedMonth(index + 1);
+                        setShowMonthDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      {month}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div>
             <label className="block text-sm font-medium mb-2">
               Year <span className="text-red-500">*</span>
             </label>
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(Number(e.target.value))}
-              disabled={isSaving}
-              className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {years.map(year => (
-                <option key={year} value={year}>{year}</option>
-              ))}
-            </select>
+            <div className="relative upload-year-dropdown-container">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowYearDropdown(!showYearDropdown);
+                  setShowMonthDropdown(false);
+                }}
+                disabled={isSaving}
+                className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-left focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span>{selectedYear}</span>
+                <ChevronDown className="h-4 w-4 text-gray-400 ml-2" />
+              </button>
+              {showYearDropdown && (
+                <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {years.map(year => (
+                    <button
+                      key={year}
+                      type="button"
+                      onClick={() => {
+                        setSelectedYear(year);
+                        setShowYearDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      {year}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div>
@@ -688,9 +843,31 @@ function UploadSheetModal({
               disabled={isSaving}
               className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100 dark:file:bg-sky-900/30 dark:file:text-sky-400 disabled:opacity-50 disabled:cursor-not-allowed"
             />
-            <p className="text-xs text-gray-500 mt-2">
-              Excel file should contain columns: Sr. No., Worker Name, Place Of Work, Mobile Number, Net Salary, Bank Name, Account Number, IFSC Code
-            </p>
+            <div className="mt-2 flex items-center gap-2">
+              <p className="text-xs text-gray-500 flex-1">
+                Excel file should contain columns: Sr. No., Worker Name, Place Of Work, Mobile Number, Net Salary, Bank Name, Account Number, IFSC Code
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleDownloadTemplate}
+              disabled={isDownloading || isSaving}
+              className="mt-2"
+            >
+              {isDownloading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Downloading...
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 mr-2" />
+                  Download Template
+                </>
+              )}
+            </Button>
           </div>
 
           <div className="flex justify-end gap-3 pt-4">
@@ -711,6 +888,114 @@ function UploadSheetModal({
               )}
             </Button>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ViewPaymentModal({
+  payment,
+  onClose,
+}: {
+  payment: ContractWorkerPayment;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-6 border-b dark:border-gray-800 sticky top-0 bg-white dark:bg-gray-900 z-10">
+          <h2 className="text-xl font-semibold">Contract Worker Payment Details</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-6">
+          {/* Worker Information */}
+          <div>
+            <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Worker Information</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Worker Name</label>
+                <p className="text-base text-gray-900 dark:text-white mt-1">{payment.workerName}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Mobile Number</label>
+                <p className="text-base text-gray-900 dark:text-white mt-1">{payment.mobileNumber}</p>
+              </div>
+              <div className="md:col-span-2">
+                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Place of Work</label>
+                <p className="text-base text-gray-900 dark:text-white mt-1">{payment.placeOfWork}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Payment Information */}
+          <div>
+            <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Payment Information</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Net Salary Payable</label>
+                <p className="text-base font-semibold text-gray-900 dark:text-white mt-1">₹{payment.netSalaryPayable.toLocaleString("en-IN")}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Payment Status</label>
+                <div className="mt-1">
+                  <span className={`inline-flex items-center gap-1 px-3 py-1 text-sm rounded-full ${
+                    payment.paymentStatus === "Paid"
+                      ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                      : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+                  }`}>
+                    {payment.paymentStatus}
+                  </span>
+                </div>
+              </div>
+              {payment.paymentCompletionDate && (
+                <div>
+                  <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Payment Date</label>
+                  <p className="text-base text-gray-900 dark:text-white mt-1">
+                    {format(new Date(payment.paymentCompletionDate), "dd MMM yyyy")}
+                  </p>
+                </div>
+              )}
+              {payment.paymentMode && (
+                <div>
+                  <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Payment Mode</label>
+                  <p className="text-base text-gray-900 dark:text-white mt-1">{payment.paymentMode}</p>
+                </div>
+              )}
+              <div>
+                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Period</label>
+                <p className="text-base text-gray-900 dark:text-white mt-1">{payment.month} {payment.year}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Bank Details */}
+          <div>
+            <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Bank Details</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Bank Name</label>
+                <p className="text-base text-gray-900 dark:text-white mt-1">{payment.bankName || "-"}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Account Number</label>
+                <p className="text-base text-gray-900 dark:text-white mt-1">{payment.bankAccountNumber || "-"}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">IFSC Code</label>
+                <p className="text-base text-gray-900 dark:text-white mt-1">{payment.ifscCode || "-"}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3 p-6 border-t dark:border-gray-800 sticky bottom-0 bg-white dark:bg-gray-900">
+          <Button variant="outline" onClick={onClose}>
+            Close
+          </Button>
         </div>
       </div>
     </div>
