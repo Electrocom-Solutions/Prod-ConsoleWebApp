@@ -56,7 +56,7 @@ function mapVersionToFrontend(version: DocumentTemplateVersion, templateId: numb
 export default function DocumentsPage() {
   const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
   const [firms, setFirms] = useState<Firm[]>([]);
-  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedFirm, setSelectedFirm] = useState<number | 'all'>('all');
@@ -302,7 +302,7 @@ export default function DocumentsPage() {
       link.href = url;
       link.download = 'documents.zip';
       window.document.body.appendChild(link);
-      link.click();
+          link.click();
       window.document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
 
