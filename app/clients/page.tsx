@@ -225,20 +225,9 @@ function ClientsPageContent() {
     try {
     if (formMode === "create") {
         // Map frontend Client to backend format
+        // Client Name -> first_name in User model (NOT split into first_name and last_name)
         const name = (clientData.name || "").trim();
         if (!name) {
-          showAlert("Error", "Client name is required.", "error");
-          setIsSaving(false);
-          return;
-        }
-        
-        // Split name into first and last name
-        const nameParts = name.split(/\s+/).filter(part => part.length > 0);
-        const first_name = nameParts[0] || "";
-        // Use rest of name as last name, or use first name again if only one word
-        const last_name = nameParts.length > 1 ? nameParts.slice(1).join(" ") : first_name;
-
-        if (!first_name) {
           showAlert("Error", "Client name is required.", "error");
           setIsSaving(false);
           return;
@@ -246,7 +235,6 @@ function ClientsPageContent() {
 
         const backendData: {
           first_name: string;
-          last_name: string;
           email?: string;
           phone_number?: string;
           notes?: string;
@@ -257,8 +245,7 @@ function ClientsPageContent() {
           pin_code?: string;
           country?: string;
         } = {
-          first_name,
-          last_name,
+          first_name: name, // Client Name -> first_name in User model
         };
 
         // Add optional fields only if they have values
@@ -297,16 +284,9 @@ function ClientsPageContent() {
         fetchStatistics();
     } else if (editingClient) {
         // Map frontend Client to backend format
-        // Split name into first_name and last_name
-        const name = (clientData.name || editingClient.name || "").trim();
-        const nameParts = name.split(/\s+/).filter(part => part.length > 0);
-        const first_name = nameParts[0] || "";
-        // Use rest of name as last name, or use first name again if only one word
-        const last_name = nameParts.length > 1 ? nameParts.slice(1).join(" ") : "";
-
+        // Client Name -> first_name in User model (NOT split into first_name and last_name)
         const backendData: Partial<{
           first_name: string;
-          last_name: string;
           email: string;
           phone_number: string;
           notes: string;
@@ -318,11 +298,9 @@ function ClientsPageContent() {
           country: string;
         }> = {};
 
-        // CRITICAL: Always send first_name and last_name when editing (even if empty strings)
-        // This ensures the name is always updated correctly
+        // CRITICAL: Client Name -> first_name in User model
         if (clientData.name !== undefined) {
-          backendData.first_name = first_name;
-          backendData.last_name = last_name;
+          backendData.first_name = (clientData.name || "").trim();
         }
         if (clientData.primary_contact_email !== undefined) backendData.email = clientData.primary_contact_email;
         if (clientData.primary_contact_phone !== undefined) backendData.phone_number = clientData.primary_contact_phone;
