@@ -3879,7 +3879,7 @@ Please verify:
     if (data.monthly_salary !== undefined) formData.append('monthly_salary', data.monthly_salary.toString());
     if (data.aadhar_no) formData.append('aadhar_no', data.aadhar_no);
     
-    // Optional fields
+    // Optional fields - send empty strings for updates to clear fields
     if (data.phone_number !== undefined) formData.append('phone_number', data.phone_number || '');
     if (data.date_of_birth) formData.append('date_of_birth', data.date_of_birth);
     if (data.gender) formData.append('gender', data.gender);
@@ -3891,10 +3891,10 @@ Please verify:
     if (data.uan_number !== undefined) formData.append('uan_number', data.uan_number || '');
     if (data.department) formData.append('department', data.department);
     if (data.project !== undefined) formData.append('project', data.project ? data.project.toString() : '');
-    if (data.bank_name) formData.append('bank_name', data.bank_name);
-    if (data.bank_account_number) formData.append('bank_account_number', data.bank_account_number);
-    if (data.ifsc_code) formData.append('ifsc_code', data.ifsc_code);
-    if (data.bank_branch) formData.append('bank_branch', data.bank_branch);
+    if (data.bank_name !== undefined) formData.append('bank_name', data.bank_name || '');
+    if (data.bank_account_number !== undefined) formData.append('bank_account_number', data.bank_account_number || '');
+    if (data.ifsc_code !== undefined) formData.append('ifsc_code', data.ifsc_code || '');
+    if (data.bank_branch !== undefined) formData.append('bank_branch', data.bank_branch || '');
 
     // Ensure we have a CSRF token before making the request
     await this.ensureCsrfToken();
@@ -3960,6 +3960,33 @@ Please verify:
     }
 
     return response.json();
+  }
+
+  /**
+   * Download contract worker bulk import template
+   */
+  async downloadContractWorkerTemplate(): Promise<Blob> {
+    // Ensure we have a CSRF token before making the request
+    await this.ensureCsrfToken();
+    const csrfToken = this.getCsrfToken();
+    const headers: Record<string, string> = {};
+    if (csrfToken) {
+      headers['X-CSRFToken'] = csrfToken;
+    }
+
+    // CRITICAL: credentials: 'include' is required to send cookies (sessionid, csrftoken)
+    const response = await fetch(`${this.baseURL}/api/contract-workers/download-template/`, {
+      method: 'GET',
+      headers,
+      credentials: 'include', // Required for cookies and CSRF protection
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Download failed' }));
+      throw error;
+    }
+
+    return response.blob();
   }
 
   /**

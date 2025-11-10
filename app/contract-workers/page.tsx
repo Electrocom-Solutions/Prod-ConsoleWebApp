@@ -672,16 +672,108 @@ function WorkerModal({ worker, projects, onClose, onSave, isSaving }: {
     uan_number: worker?.uan_number || "",
     department: worker?.department || "",
     project: worker?.project_id?.toString() || "",
+    project_search: worker?.project_name || "",
     bank_name: worker?.bank_name || "",
     bank_account_number: worker?.bank_account_number || "",
     bank_ifsc: worker?.bank_ifsc || "",
     bank_branch: worker?.bank_branch || "",
   });
+  const [showProjectDropdown, setShowProjectDropdown] = useState(false);
+
+  // Update form data when worker changes (for editing)
+  useEffect(() => {
+    if (worker) {
+      setFormData({
+        first_name: worker.first_name || worker.name?.split(' ')[0] || "",
+        last_name: worker.last_name || worker.name?.split(' ').slice(1).join(' ') || "",
+        email: worker.email || "",
+        phone: worker.phone || "",
+        date_of_birth: worker.date_of_birth || "",
+        gender: (worker.gender || "Male") as "Male" | "Female",
+        address: worker.address || "",
+        city: worker.city || "",
+        state: worker.state || "",
+        pincode: worker.pincode || "",
+        country: worker.country || "India",
+        worker_type: (worker.worker_type || "Semi-Skilled") as "Unskilled" | "Semi-Skilled" | "Skilled",
+        monthly_salary: worker.monthly_salary?.toString() || "",
+        aadhar_number: worker.aadhar_number || "",
+        uan_number: worker.uan_number || "",
+        department: worker.department || "",
+        project: worker.project_id?.toString() || "",
+        project_search: worker.project_name || "",
+        bank_name: worker.bank_name || "",
+        bank_account_number: worker.bank_account_number || "",
+        bank_ifsc: worker.bank_ifsc || "",
+        bank_branch: worker.bank_branch || "",
+      });
+    } else {
+      setFormData({
+        first_name: "",
+        last_name: "",
+        email: "",
+        phone: "",
+        date_of_birth: "",
+        gender: "Male" as "Male" | "Female",
+        address: "",
+        city: "",
+        state: "",
+        pincode: "",
+        country: "India",
+        worker_type: "Semi-Skilled" as "Unskilled" | "Semi-Skilled" | "Skilled",
+        monthly_salary: "",
+        aadhar_number: "",
+        uan_number: "",
+        department: "",
+        project: "",
+        project_search: "",
+        bank_name: "",
+        bank_account_number: "",
+        bank_ifsc: "",
+        bank_branch: "",
+      });
+    }
+  }, [worker]);
+
+  // Filter projects based on search
+  const filteredProjects = useMemo(() => {
+    return projects.filter((project) => {
+      const searchTerm = formData.project_search.toLowerCase();
+      if (!searchTerm) return true;
+      const projectName = project.name?.toLowerCase() || "";
+      return projectName.includes(searchTerm);
+    });
+  }, [projects, formData.project_search]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.project-dropdown-container')) {
+        setShowProjectDropdown(false);
+      }
+    };
+
+    if (showProjectDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showProjectDropdown]);
+
+  const handleProjectSelect = (project: BackendProjectListItem) => {
+    setFormData({
+      ...formData,
+      project: project.id.toString(),
+      project_search: project.name,
+    });
+    setShowProjectDropdown(false);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Prepare worker data for API
+    // For updates, send empty strings for optional fields to ensure they are cleared if needed
     const workerData: ContractWorkerCreateData = {
       first_name: formData.first_name,
       last_name: formData.last_name,
@@ -689,7 +781,7 @@ function WorkerModal({ worker, projects, onClose, onSave, isSaving }: {
       worker_type: formData.worker_type,
       monthly_salary: parseFloat(formData.monthly_salary) || 0,
       aadhar_no: formData.aadhar_number,
-      phone_number: formData.phone || undefined,
+      phone_number: formData.phone || (worker ? "" : undefined),
       date_of_birth: formData.date_of_birth || undefined,
       gender: formData.gender === "Male" ? "male" : "female",
       address: formData.address || undefined,
@@ -700,10 +792,10 @@ function WorkerModal({ worker, projects, onClose, onSave, isSaving }: {
       uan_number: formData.uan_number || undefined,
       department: formData.department || undefined,
       project: formData.project ? parseInt(formData.project) : undefined,
-      bank_name: formData.bank_name || undefined,
-      bank_account_number: formData.bank_account_number || undefined,
-      ifsc_code: formData.bank_ifsc || undefined,
-      bank_branch: formData.bank_branch || undefined,
+      bank_name: formData.bank_name || (worker ? "" : undefined),
+      bank_account_number: formData.bank_account_number || (worker ? "" : undefined),
+      ifsc_code: formData.bank_ifsc || (worker ? "" : undefined),
+      bank_branch: formData.bank_branch || (worker ? "" : undefined),
     };
 
     await onSave(workerData);
@@ -916,18 +1008,61 @@ function WorkerModal({ worker, projects, onClose, onSave, isSaving }: {
                 <label className="block text-sm font-medium mb-2 text-gray-900 dark:text-white">
                   Project (Optional)
                 </label>
-                <select
-                  value={formData.project}
-                  onChange={(e) => setFormData({ ...formData, project: e.target.value })}
-                  className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-                >
-                  <option value="">None (Available)</option>
-                  {projects.map(project => (
-                    <option key={project.id} value={project.id.toString()}>
-                      {project.name}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative project-dropdown-container">
+                  <input
+                    type="text"
+                    value={formData.project_search}
+                    onChange={(e) => {
+                      setFormData({
+                        ...formData,
+                        project_search: e.target.value,
+                        project: "",
+                      });
+                      setShowProjectDropdown(true);
+                    }}
+                    onFocus={() => {
+                      if (projects.length > 0) {
+                        setShowProjectDropdown(true);
+                      }
+                    }}
+                    placeholder="Search project by name"
+                    disabled={isSaving}
+                    className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                  {showProjectDropdown && filteredProjects.length > 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData({
+                            ...formData,
+                            project: "",
+                            project_search: "",
+                          });
+                          setShowProjectDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                      >
+                        <div className="font-medium">None (Available)</div>
+                      </button>
+                      {filteredProjects.map((project) => (
+                        <button
+                          key={project.id}
+                          type="button"
+                          onClick={() => handleProjectSelect(project)}
+                          className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                        >
+                          <div className="font-medium">{project.name}</div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {showProjectDropdown && filteredProjects.length === 0 && formData.project_search && (
+                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 text-sm text-gray-500 dark:text-gray-400">
+                      No projects found
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -1095,9 +1230,37 @@ function BulkImportModal({ onClose, onImport, isUploading }: {
 
         <div className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-2 text-gray-900 dark:text-white">
-              Upload Excel File (.xlsx or .xls) <span className="text-red-500">*</span>
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-900 dark:text-white">
+                Upload Excel File (.xlsx or .xls) <span className="text-red-500">*</span>
+              </label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    const blob = await apiClient.downloadContractWorkerTemplate();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'contract_workers_template.xlsx';
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                  } catch (err: any) {
+                    console.error("Failed to download template:", err);
+                    showAlert("Download Failed", err.message || "An error occurred while downloading the template.", "error");
+                  }
+                }}
+                disabled={isUploading}
+                className="flex items-center gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Download Template
+              </Button>
+            </div>
             <input
               type="file"
               accept=".xlsx,.xls"
