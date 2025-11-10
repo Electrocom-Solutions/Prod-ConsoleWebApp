@@ -29,7 +29,8 @@ import {
   BackendTenderDocument,
   BackendTenderActivity,
 } from "@/lib/api";
-import { showDeleteConfirm, showAlert } from "@/lib/sweetalert";
+import { CheckCircle } from "lucide-react";
+import { showDeleteConfirm, showAlert, showConfirm } from "@/lib/sweetalert";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { format } from "date-fns";
 
@@ -46,7 +47,7 @@ function mapBackendTenderDetailToFrontend(backendTender: BackendTenderDetail): T
     start_date: backendTender.start_date,
     end_date: backendTender.end_date,
     estimated_value: parseFloat(backendTender.estimated_value),
-    status: backendTender.status === "Filed" ? "Filed" : backendTender.status === "Awarded" ? "Awarded" : backendTender.status === "Lost" ? "Lost" : "Closed",
+    status: backendTender.status,
     created_at: backendTender.created_at,
     updated_at: backendTender.updated_at,
   };
@@ -94,6 +95,8 @@ function TenderDetailPageContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [backendTenderDetail, setBackendTenderDetail] = useState<BackendTenderDetail | null>(null);
+  const [isMarkingEMD, setIsMarkingEMD] = useState(false);
 
   const [expandedSections, setExpandedSections] = useState({
     financials: true,
@@ -107,6 +110,7 @@ function TenderDetailPageContent() {
     setError(null);
     try {
       const detail = await apiClient.getTender(tenderId);
+      setBackendTenderDetail(detail);
       setTender(mapBackendTenderDetailToFrontend(detail));
       setFinancials(mapBackendTenderDetailToFinancials(detail));
       setDeposits(detail.deposits);
@@ -185,6 +189,33 @@ function TenderDetailPageContent() {
       ...prev,
       [section]: !prev[section],
     }));
+  };
+
+  const handleMarkEMDCollected = async () => {
+    if (!tender) return;
+    
+    const confirmed = await showConfirm(
+      "Mark EMD as Collected",
+      `Are you sure you want to mark EMD as collected for tender "${tender.name}"?`,
+      "question"
+    );
+    
+    if (!confirmed) return;
+    
+    setIsMarkingEMD(true);
+    try {
+      const updated = await apiClient.markTenderEMDCollected(tenderId);
+      setBackendTenderDetail(updated);
+      setTender(mapBackendTenderDetailToFrontend(updated));
+      setFinancials(mapBackendTenderDetailToFinancials(updated));
+      setActivities(updated.activity_feed);
+      showAlert("Success", "EMD marked as collected successfully!", "success");
+    } catch (err: any) {
+      console.error("Failed to mark EMD as collected:", err);
+      showAlert("Error", err.message || "Failed to mark EMD as collected.", "error");
+    } finally {
+      setIsMarkingEMD(false);
+    }
   };
 
   const getStatusBadgeClass = (status: Tender["status"]) => {
@@ -324,13 +355,13 @@ function TenderDetailPageContent() {
           <div className="rounded-lg bg-white p-4 shadow dark:bg-gray-800">
             <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Estimated Value</p>
             <p className="mt-2 text-xl font-bold text-gray-900 dark:text-white">
-              ₹{(tender.estimated_value / 100000).toFixed(2)}L
+              ₹{tender.estimated_value.toLocaleString("en-IN")}
             </p>
           </div>
           <div className="rounded-lg bg-white p-4 shadow dark:bg-gray-800">
             <p className="text-xs font-medium text-gray-500 dark:text-gray-400">EMD (5%)</p>
             <p className="mt-2 text-xl font-bold text-gray-900 dark:text-white">
-              ₹{((financials?.emd_amount || tender.estimated_value * 0.05) / 100000).toFixed(2)}L
+              ₹{(financials?.emd_amount || tender.estimated_value * 0.05).toLocaleString("en-IN")}
             </p>
             {financials?.emd_refundable && (
               <span className="mt-1 inline-flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
@@ -342,13 +373,13 @@ function TenderDetailPageContent() {
           <div className="rounded-lg bg-white p-4 shadow dark:bg-gray-800">
             <p className="text-xs font-medium text-gray-500 dark:text-gray-400">SD1 (2%)</p>
             <p className="mt-2 text-xl font-bold text-gray-900 dark:text-white">
-              ₹{((financials?.sd1_amount || tender.estimated_value * 0.02) / 100000).toFixed(2)}L
+              ₹{(financials?.sd1_amount || tender.estimated_value * 0.02).toLocaleString("en-IN")}
             </p>
           </div>
           <div className="rounded-lg bg-white p-4 shadow dark:bg-gray-800">
             <p className="text-xs font-medium text-gray-500 dark:text-gray-400">SD2 (3%)</p>
             <p className="mt-2 text-xl font-bold text-gray-900 dark:text-white">
-              ₹{((financials?.sd2_amount || tender.estimated_value * 0.03) / 100000).toFixed(2)}L
+              ₹{(financials?.sd2_amount || tender.estimated_value * 0.03).toLocaleString("en-IN")}
             </p>
           </div>
         </div>
@@ -384,7 +415,7 @@ function TenderDetailPageContent() {
                       )}
                     </div>
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      ₹{((financials?.sd1_amount || tender.estimated_value * 0.02) / 100000).toFixed(2)}L
+                      ₹{(financials?.sd1_amount || tender.estimated_value * 0.02).toLocaleString("en-IN")}
                     </p>
                     <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">2% of Estimated Value</p>
                   </div>
@@ -400,7 +431,7 @@ function TenderDetailPageContent() {
                       )}
                     </div>
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      ₹{((financials?.sd2_amount || tender.estimated_value * 0.03) / 100000).toFixed(2)}L
+                      ₹{(financials?.sd2_amount || tender.estimated_value * 0.03).toLocaleString("en-IN")}
                     </p>
                     <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">3% of Estimated Value</p>
                   </div>
@@ -416,16 +447,60 @@ function TenderDetailPageContent() {
                       )}
                     </div>
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      ₹{((financials?.emd_amount || tender.estimated_value * 0.05) / 100000).toFixed(2)}L
+                      ₹{(financials?.emd_amount || tender.estimated_value * 0.05).toLocaleString("en-IN")}
                     </p>
                     <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">5% of Estimated Value</p>
-                    {financials?.emd_refund_date && (
+                    {backendTenderDetail?.emd_collected && backendTenderDetail?.emd_collected_date && (
                       <p className="mt-2 text-xs text-green-600 dark:text-green-400">
-                        Refunded on {format(new Date(financials.emd_refund_date), "dd MMM yyyy")}
+                        Collected on {format(new Date(backendTenderDetail.emd_collected_date), "dd MMM yyyy")}
                       </p>
                     )}
                   </div>
                 </div>
+
+                {/* Mark EMD Collected Button */}
+                {tender && 
+                 (tender.status === "Lost" || tender.status === "Closed") && 
+                 !backendTenderDetail?.emd_collected && (
+                  <div className="mt-4 flex justify-end">
+                    <button
+                      onClick={handleMarkEMDCollected}
+                      disabled={isMarkingEMD}
+                      className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isMarkingEMD ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Marking...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="h-4 w-4" />
+                          Mark EMD as Collected
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+                
+                {/* EMD Collected Status */}
+                {backendTenderDetail?.emd_collected && (
+                  <div className="mt-4 rounded-lg bg-green-50 border border-green-200 p-4 dark:bg-green-900/20 dark:border-green-800">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                      <div>
+                        <p className="text-sm font-medium text-green-900 dark:text-green-300">
+                          EMD Collected
+                        </p>
+                        {backendTenderDetail.emd_collected_date && (
+                          <p className="text-xs text-green-700 dark:text-green-400">
+                            Collected on {format(new Date(backendTenderDetail.emd_collected_date), "dd MMM yyyy")}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Deposits Table */}
                 {deposits.length > 0 && (

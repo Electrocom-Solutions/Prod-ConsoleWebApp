@@ -258,7 +258,9 @@ export interface BackendTenderListItem {
   start_date: string;
   end_date: string;
   estimated_value: string; // Decimal as string
-  status: 'Filed' | 'Awarded' | 'Lost' | 'Closed';
+  status: 'Draft' | 'Filed' | 'Awarded' | 'Lost' | 'Closed';
+  emd_collected: boolean;
+  emd_collected_date?: string;
   total_emd_cost: number;
   security_deposit_1: number;
   security_deposit_2: number;
@@ -283,7 +285,10 @@ export interface BackendTenderDetail {
   start_date: string;
   end_date: string;
   estimated_value: string; // Decimal as string
-  status: 'Filed' | 'Awarded' | 'Lost' | 'Closed';
+  status: 'Draft' | 'Filed' | 'Awarded' | 'Lost' | 'Closed';
+  emd_collected: boolean;
+  emd_collected_date?: string;
+  emd_collected_by?: number;
   total_emd_cost: number;
   security_deposit_1: number;
   security_deposit_2: number;
@@ -2754,7 +2759,7 @@ Please verify:
    */
   async getTenders(params?: {
     search?: string;
-    status?: 'Filed' | 'Awarded' | 'Lost' | 'Closed';
+    status?: 'Draft' | 'Filed' | 'Awarded' | 'Lost' | 'Closed';
     pending_emds?: boolean;
     page?: number;
   }): Promise<BackendTenderListResponse> {
@@ -2792,7 +2797,7 @@ Please verify:
     start_date?: string;
     end_date?: string;
     estimated_value?: number;
-    status?: 'Filed' | 'Awarded' | 'Lost' | 'Closed';
+    status?: 'Draft' | 'Filed' | 'Awarded' | 'Lost' | 'Closed';
     security_deposit_1_dd_date?: string;
     security_deposit_1_dd_number?: string;
     security_deposit_1_dd_amount?: number;
@@ -2847,7 +2852,7 @@ Please verify:
     start_date: string;
     end_date: string;
     estimated_value: number;
-    status: 'Filed' | 'Awarded' | 'Lost' | 'Closed';
+    status: 'Draft' | 'Filed' | 'Awarded' | 'Lost' | 'Closed';
     security_deposit_1_dd_date: string;
     security_deposit_1_dd_number: string;
     security_deposit_1_dd_amount: number;
@@ -2959,6 +2964,20 @@ Please verify:
   async deleteTenderDocument(tenderId: number, documentId: number): Promise<void> {
     await this.request(`/api/tenders/${tenderId}/delete-document/${documentId}/`, {
       method: 'DELETE',
+    });
+  }
+
+  /**
+   * Mark EMD as collected for a tender
+   */
+  async markTenderEMDCollected(tenderId: number, emdCollectedDate?: string): Promise<BackendTenderDetail> {
+    const body: any = {};
+    if (emdCollectedDate) {
+      body.emd_collected_date = emdCollectedDate;
+    }
+    return this.request<BackendTenderDetail>(`/api/tenders/${tenderId}/mark-emd-collected/`, {
+      method: 'POST',
+      body: JSON.stringify(body),
     });
   }
 

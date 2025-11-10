@@ -166,18 +166,26 @@ export default function TenderFormModal({
   const sd1Amount = estimatedValue * 0.02; // 2%
   const sd2Amount = estimatedValue * 0.03; // 3%
   
-  // Auto-update SD amounts when estimated value changes (only for new tenders or when user changes estimated value)
+  // Auto-update SD amounts when estimated value changes (only for new tenders)
   useEffect(() => {
     // Only auto-calculate for new tenders (no existing tender)
     // For existing tenders, user must manually update SD amounts if they change estimated value
-    if (!tender && estimatedValue > 0 && !formData.sd1_amount && !formData.sd2_amount) {
-      setFormData(prev => ({
-        ...prev,
-        sd1_amount: (estimatedValue * 0.02).toString(),
-        sd2_amount: (estimatedValue * 0.03).toString(),
-      }));
+    if (!tender && estimatedValue > 0) {
+      // Only auto-fill if fields are empty
+      if (!formData.sd1_amount || parseFloat(formData.sd1_amount) === 0) {
+        setFormData(prev => ({
+          ...prev,
+          sd1_amount: (estimatedValue * 0.02).toString(),
+        }));
+      }
+      if (!formData.sd2_amount || parseFloat(formData.sd2_amount) === 0) {
+        setFormData(prev => ({
+          ...prev,
+          sd2_amount: (estimatedValue * 0.03).toString(),
+        }));
+      }
     }
-  }, [estimatedValue, tender, formData.sd1_amount, formData.sd2_amount]);
+  }, [estimatedValue, tender]);
 
   if (!isOpen) return null;
 

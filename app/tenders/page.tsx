@@ -45,7 +45,7 @@ function mapBackendTenderListItemToFrontend(backendTender: BackendTenderListItem
     start_date: backendTender.start_date,
     end_date: backendTender.end_date,
     estimated_value: parseFloat(backendTender.estimated_value),
-    status: backendTender.status === "Filed" ? "Filed" : backendTender.status === "Awarded" ? "Awarded" : backendTender.status === "Lost" ? "Lost" : "Closed", // Backend doesn't have "Draft"
+    status: backendTender.status,
     created_at: backendTender.created_at,
     updated_at: backendTender.created_at, // Fallback
   };
@@ -137,14 +137,14 @@ function TendersPageContent() {
     try {
       const params: {
         search?: string;
-        status?: "Filed" | "Awarded" | "Lost" | "Closed";
+        status?: "Draft" | "Filed" | "Awarded" | "Lost" | "Closed";
         pending_emds?: boolean;
         page?: number;
       } = { page: currentPage };
 
       if (debouncedSearchQuery) params.search = debouncedSearchQuery;
       if (statusFilter !== "All") {
-        params.status = statusFilter as "Filed" | "Awarded" | "Lost" | "Closed";
+        params.status = statusFilter as "Draft" | "Filed" | "Awarded" | "Lost" | "Closed";
       }
       if (emdFilter) params.pending_emds = true;
 
@@ -231,7 +231,7 @@ function TendersPageContent() {
         start_date: tenderData.start_date,
         end_date: tenderData.end_date,
         estimated_value: tenderData.estimated_value,
-        status: tenderData.status === "Draft" ? "Filed" : tenderData.status, // Backend doesn't have "Draft"
+        status: tenderData.status,
       };
 
       // Add security deposit data if provided
@@ -527,6 +527,7 @@ function TendersPageContent() {
               className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
             >
               <option value="All">All Status</option>
+              <option value="Draft">Draft</option>
               <option value="Filed">Filed</option>
               <option value="Awarded">Awarded</option>
               <option value="Lost">Lost</option>
