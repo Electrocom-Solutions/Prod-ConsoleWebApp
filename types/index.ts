@@ -374,6 +374,7 @@ export type Resource = {
   unit_of_measure: string;
   stock_count?: number;
   unit_price?: number;
+  min_threshold?: number;
   description?: string;
   created_at: string;
   updated_at: string;

@@ -23,6 +23,7 @@ function mapBackendStockToFrontend(backendStock: BackendStockListItem): Resource
     unit_of_measure: backendStock.unit_of_measure,
     stock_count: parseFloat(backendStock.quantity) || 0,
     unit_price: parseFloat(backendStock.price) || 0,
+    min_threshold: parseFloat(backendStock.min_threshold) || 0,
     description: backendStock.description || undefined,
     created_at: backendStock.created_at,
     updated_at: backendStock.updated_at,
@@ -431,7 +432,28 @@ function ResourceModal({
   const [unitOfMeasure, setUnitOfMeasure] = useState(resource?.unit_of_measure || "");
   const [stockCount, setStockCount] = useState(resource?.stock_count?.toString() || "0");
   const [unitPrice, setUnitPrice] = useState(resource?.unit_price?.toString() || "0");
+  const [minThreshold, setMinThreshold] = useState(resource?.min_threshold?.toString() || "0");
   const [description, setDescription] = useState(resource?.description || "");
+
+  // Update form fields when resource changes (for editing)
+  useEffect(() => {
+    if (resource) {
+      setName(resource.name || "");
+      setUnitOfMeasure(resource.unit_of_measure || "");
+      setStockCount(resource.stock_count?.toString() || "0");
+      setUnitPrice(resource.unit_price?.toString() || "0");
+      setMinThreshold(resource.min_threshold?.toString() || "0");
+      setDescription(resource.description || "");
+    } else {
+      // Reset form for new resource
+      setName("");
+      setUnitOfMeasure("");
+      setStockCount("0");
+      setUnitPrice("0");
+      setMinThreshold("0");
+      setDescription("");
+    }
+  }, [resource]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -440,6 +462,7 @@ function ResourceModal({
       unit_of_measure: unitOfMeasure,
       quantity: stockCount ? parseFloat(stockCount) : 0,
       price: unitPrice ? parseFloat(unitPrice) : 0,
+      min_threshold: minThreshold ? parseFloat(minThreshold) : 0,
       description: description || undefined,
     };
     await onSave(resourceData);
@@ -495,6 +518,7 @@ function ResourceModal({
                 onChange={(e) => setStockCount(e.target.value)}
                 placeholder="0"
                 min="0"
+                step="0.01"
                 required
                 disabled={isSaving}
               />
@@ -515,6 +539,24 @@ function ResourceModal({
                 disabled={isSaving}
               />
             </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              Min Threshold
+            </label>
+            <Input
+              type="number"
+              step="0.01"
+              value={minThreshold}
+              onChange={(e) => setMinThreshold(e.target.value)}
+              placeholder="0"
+              min="0"
+              disabled={isSaving}
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Minimum threshold for stock quantity. If stock count falls below this value, the resource will be considered as "Low Stock".
+            </p>
           </div>
 
           <div>

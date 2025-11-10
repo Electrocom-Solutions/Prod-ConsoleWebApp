@@ -6,10 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search, Plus, Eye, Edit, Send, Trash2, Copy, X, Loader2, Inbox } from "lucide-react";
 import { EmailTemplate } from "@/types";
-import { showDeleteConfirm, showSuccess, showError } from "@/lib/sweetalert";
+import { showDeleteConfirm, showSuccess, showError, showAlert } from "@/lib/sweetalert";
 import { apiClient, BackendEmailTemplateListItem, EmailTemplateDetail, EmailTemplateCreateData, EmailTemplateSendRequest } from "@/lib/api";
 import { useDebounce } from "use-debounce";
 import { ProtectedRoute } from "@/components/auth/protected-route";
+import { DatePicker } from "@/components/ui/date-picker";
+import { format } from "date-fns";
 
 /**
  * Map backend email template list item to frontend EmailTemplate type
@@ -612,7 +614,7 @@ function TemplatePreview({ template, onClose }: { template: EmailTemplate; onClo
 
 function SendEmailModal({ template, onClose }: { template: EmailTemplate; onClose: () => void }) {
   const [recipients, setRecipients] = useState("");
-  const [scheduleDate, setScheduleDate] = useState("");
+  const [scheduleDate, setScheduleDate] = useState<string | undefined>(undefined);
   const [scheduleTime, setScheduleTime] = useState("");
   const [placeholderValues, setPlaceholderValues] = useState<Record<string, string>>({});
   const [isSending, setIsSending] = useState(false);
@@ -628,24 +630,70 @@ function SendEmailModal({ template, onClose }: { template: EmailTemplate; onClos
     }
   }, [template]);
 
+  // Validate email addresses
+  const validateEmails = (emailString: string): boolean => {
+    if (!emailString || !emailString.trim()) {
+      return false;
+    }
+    const emails = emailString.split(',').map(e => e.trim()).filter(e => e);
+    if (emails.length === 0) {
+      return false;
+    }
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emails.every(email => emailPattern.test(email));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate recipients
+    if (!recipients || !recipients.trim()) {
+      showAlert("Validation Error", "Please enter at least one recipient email address", "error");
+      return;
+    }
+
+    if (!validateEmails(recipients)) {
+      showAlert("Validation Error", "Please enter valid email addresses separated by commas", "error");
+      return;
+    }
+
+    // Validate scheduled date/time if provided
+    let scheduled_at: string | null = null;
+    if (scheduleDate) {
+      if (!scheduleTime) {
+        showAlert("Validation Error", "Please select both date and time for scheduling", "error");
+        return;
+      }
+
+      // Combine date and time in local timezone, then convert to ISO string
+      const localDateTime = new Date(`${scheduleDate}T${scheduleTime}`);
+      const now = new Date();
+      
+      // Check if scheduled time is in the past
+      if (localDateTime <= now) {
+        showAlert("Validation Error", "Scheduled date and time must be in the future", "error");
+        return;
+      }
+
+      // Convert to ISO string (backend expects UTC)
+      scheduled_at = localDateTime.toISOString();
+    }
+
     setIsSending(true);
 
     try {
-      let scheduled_at: string | null = null;
-      if (scheduleDate && scheduleTime) {
-        const dateTime = new Date(`${scheduleDate}T${scheduleTime}`);
-        scheduled_at = dateTime.toISOString();
-      } else if (scheduleDate) {
-        const dateTime = new Date(`${scheduleDate}T00:00:00`);
-        scheduled_at = dateTime.toISOString();
-      }
+      // Prepare placeholder values - only include non-empty values
+      const validPlaceholderValues: Record<string, string> = {};
+      Object.keys(placeholderValues).forEach(key => {
+        if (placeholderValues[key] && placeholderValues[key].trim()) {
+          validPlaceholderValues[key] = placeholderValues[key].trim();
+        }
+      });
 
       const sendData: EmailTemplateSendRequest = {
-        recipients: recipients,
+        recipients: recipients.trim(),
         scheduled_at: scheduled_at || null,
-        placeholder_values: Object.keys(placeholderValues).length > 0 ? placeholderValues : undefined,
+        placeholder_values: Object.keys(validPlaceholderValues).length > 0 ? validPlaceholderValues : undefined,
       };
 
       const response = await apiClient.sendEmailUsingTemplate(template.id, sendData);
@@ -656,14 +704,16 @@ function SendEmailModal({ template, onClose }: { template: EmailTemplate; onClos
           `Email sent successfully to ${response.recipients_count} recipient(s)`
         );
       } else if (response.status === 'scheduled') {
+        const scheduledDate = scheduled_at ? new Date(scheduled_at) : null;
         showSuccess(
           "Email Scheduled",
-          `Email scheduled for ${scheduled_at ? new Date(scheduled_at).toLocaleString() : 'future time'}\n\nRecipients: ${response.recipients_count}`
+          `Email scheduled for ${scheduledDate ? scheduledDate.toLocaleString() : 'future time'}\n\nRecipients: ${response.recipients_count}`
         );
       }
 
       onClose();
     } catch (err: any) {
+      console.error("Failed to send email:", err);
       showError("Error", err.message || "Failed to send email");
     } finally {
       setIsSending(false);
@@ -738,21 +788,37 @@ function SendEmailModal({ template, onClose }: { template: EmailTemplate; onClos
             <div>
               <label className="block text-sm font-medium mb-2">Schedule (Optional)</label>
               <div className="grid grid-cols-2 gap-2">
-                <Input
-                  type="date"
+                <DatePicker
                   value={scheduleDate}
-                  onChange={(e) => setScheduleDate(e.target.value)}
+                  onChange={(value) => {
+                    if (value) {
+                      setScheduleDate(value);
+                      // If time is not set, set default time to current time + 1 hour
+                      if (!scheduleTime) {
+                        const now = new Date();
+                        now.setHours(now.getHours() + 1);
+                        setScheduleTime(format(now, "HH:mm"));
+                      }
+                    } else {
+                      setScheduleDate(undefined);
+                      setScheduleTime("");
+                    }
+                  }}
+                  placeholder="Select date"
                   disabled={isSending}
                 />
                 <Input
                   type="time"
                   value={scheduleTime}
                   onChange={(e) => setScheduleTime(e.target.value)}
-                  disabled={isSending}
+                  disabled={isSending || !scheduleDate}
+                  required={!!scheduleDate}
                 />
               </div>
               <p className="text-xs text-gray-500 mt-1">
-                Leave empty to send immediately
+                {scheduleDate 
+                  ? "Email will be sent at the scheduled date and time" 
+                  : "Leave empty to send immediately"}
               </p>
             </div>
 

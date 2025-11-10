@@ -20,13 +20,14 @@ import {
   CheckCircle,
 } from "lucide-react";
 import { NotificationRecord, NotificationType } from "@/types";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, format } from "date-fns";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { showDeleteConfirm, showSuccess, showError } from "@/lib/sweetalert";
+import { showDeleteConfirm, showSuccess, showError, showAlert } from "@/lib/sweetalert";
 import { apiClient, BackendNotificationListItem, NotificationStatisticsResponse } from "@/lib/api";
 import { useDebounce } from "use-debounce";
 import { ProtectedRoute } from "@/components/auth/protected-route";
+import { DatePicker } from "@/components/ui/date-picker";
 
 /**
  * Map backend notification to frontend NotificationRecord
@@ -465,26 +466,48 @@ function CreateNotificationModal({
   const [message, setMessage] = useState("");
   const [type, setType] = useState<NotificationType>("System");
   const [channel, setChannel] = useState<string>("In-App");
-  const [scheduleDate, setScheduleDate] = useState("");
+  const [scheduleDate, setScheduleDate] = useState<string | undefined>(undefined);
   const [scheduleTime, setScheduleTime] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Validate required fields
+    if (!title.trim()) {
+      showAlert("Validation Error", "Title is required", "error");
+      return;
+    }
+
+    if (!message.trim()) {
+      showAlert("Validation Error", "Message is required", "error");
+      return;
+    }
+
+    // Validate scheduled date/time if provided
     let scheduled_at: string | null = null;
-    if (scheduleDate && scheduleTime) {
-      // Combine date and time into ISO format
-      const dateTime = new Date(`${scheduleDate}T${scheduleTime}`);
-      scheduled_at = dateTime.toISOString();
-    } else if (scheduleDate) {
-      // If only date is provided, use start of day
-      const dateTime = new Date(`${scheduleDate}T00:00:00`);
-      scheduled_at = dateTime.toISOString();
+    if (scheduleDate) {
+      if (!scheduleTime) {
+        showAlert("Validation Error", "Please select both date and time for scheduling", "error");
+        return;
+      }
+
+      // Combine date and time in local timezone, then convert to ISO string
+      const localDateTime = new Date(`${scheduleDate}T${scheduleTime}`);
+      const now = new Date();
+      
+      // Check if scheduled time is in the past
+      if (localDateTime <= now) {
+        showAlert("Validation Error", "Scheduled date and time must be in the future", "error");
+        return;
+      }
+
+      // Convert to ISO string (backend expects UTC)
+      scheduled_at = localDateTime.toISOString();
     }
 
     await onSubmit({
-      title,
-      message,
+      title: title.trim(),
+      message: message.trim(),
       type,
       channel,
       scheduled_at,
@@ -572,10 +595,22 @@ function CreateNotificationModal({
               Schedule (Optional)
             </label>
             <div className="grid grid-cols-2 gap-2">
-              <Input
-                type="date"
+              <DatePicker
                 value={scheduleDate}
-                onChange={(e) => setScheduleDate(e.target.value)}
+                onChange={(value) => {
+                  if (value) {
+                    setScheduleDate(value);
+                    // If time is not set, set default time to current time + 1 hour
+                    if (!scheduleTime) {
+                      const now = new Date();
+                      now.setHours(now.getHours() + 1);
+                      setScheduleTime(format(now, "HH:mm"));
+                    }
+                  } else {
+                    setScheduleDate(undefined);
+                    setScheduleTime("");
+                  }
+                }}
                 placeholder="Select date"
                 disabled={isSaving}
               />
@@ -584,11 +619,14 @@ function CreateNotificationModal({
                 value={scheduleTime}
                 onChange={(e) => setScheduleTime(e.target.value)}
                 placeholder="Select time"
-                disabled={isSaving}
+                disabled={isSaving || !scheduleDate}
+                required={!!scheduleDate}
               />
             </div>
             <p className="text-xs text-gray-500 mt-1">
-              Leave empty to send immediately. Notification will be sent to all employees.
+              {scheduleDate 
+                ? "Notification will be sent to all employees at the scheduled date and time" 
+                : "Leave empty to send immediately. Notification will be sent to all employees."}
             </p>
           </div>
 

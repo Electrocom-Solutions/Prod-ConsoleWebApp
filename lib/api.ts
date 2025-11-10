@@ -1085,6 +1085,7 @@ export interface BackendStockListItem {
   unit_of_measure: string;
   quantity: string;
   price: string;
+  min_threshold: string;
   description: string | null;
   created_at: string;
   updated_at: string;
@@ -1103,6 +1104,7 @@ export interface StockDetail {
   unit_of_measure: string;
   quantity: string;
   price: string;
+  min_threshold: string;
   description: string | null;
   created_at: string;
   updated_at: string;
@@ -1115,6 +1117,7 @@ export interface StockCreateData {
   unit_of_measure: string;
   quantity: number;
   price: number;
+  min_threshold?: number;
   description?: string;
 }
 
