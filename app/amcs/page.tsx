@@ -250,15 +250,21 @@ function AMCsPageContent() {
   const handleCreateAMC = async (data: Partial<AMC>) => {
     setIsSaving(true);
     try {
+      // Backend doesn't support 'Pending' status - only 'Active', 'Expired', 'Canceled'
+      // Default to 'Active' if status is 'Pending' or not provided
+      const status = data.status && data.status !== 'Pending' 
+        ? data.status as 'Active' | 'Expired' | 'Canceled'
+        : 'Active';
+      
       const backendData = {
         client: data.client_id!,
-      amc_number: data.amc_number!,
+        amc_number: data.amc_number!,
         amount: data.amount!,
-      start_date: data.start_date!,
-      end_date: data.end_date!,
-      billing_cycle: data.billing_cycle!,
-        status: data.status || 'Pending',
-      notes: data.notes,
+        start_date: data.start_date!,
+        end_date: data.end_date!,
+        billing_cycle: data.billing_cycle!,
+        status: status,
+        notes: data.notes,
       };
 
       await apiClient.createAMC(backendData);
@@ -288,7 +294,7 @@ function AMCsPageContent() {
         start_date: string;
         end_date: string;
         billing_cycle: 'Monthly' | 'Quarterly' | 'Half-yearly' | 'Yearly';
-        status: 'Pending' | 'Active' | 'Expired' | 'Canceled';
+        status: 'Active' | 'Expired' | 'Canceled';
         notes: string;
       }> = {};
 
@@ -298,7 +304,10 @@ function AMCsPageContent() {
       if (data.start_date) backendData.start_date = data.start_date;
       if (data.end_date) backendData.end_date = data.end_date;
       if (data.billing_cycle) backendData.billing_cycle = data.billing_cycle;
-      if (data.status) backendData.status = data.status;
+      // Only include status if it's a valid backend status (exclude 'Pending')
+      if (data.status && data.status !== 'Pending') {
+        backendData.status = data.status as 'Active' | 'Expired' | 'Canceled';
+      }
       if (data.notes !== undefined) backendData.notes = data.notes;
 
       await apiClient.updateAMC(selectedAMC.id, backendData);

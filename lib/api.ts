@@ -2704,7 +2704,7 @@ Please verify:
     start_date: string;
     end_date: string;
     billing_cycle: 'Monthly' | 'Quarterly' | 'Half-yearly' | 'Yearly';
-    status?: 'Pending' | 'Active' | 'Expired' | 'Canceled';
+    status?: 'Active' | 'Expired' | 'Canceled';
     notes?: string;
   }): Promise<BackendAMCDetail> {
     return this.request<BackendAMCDetail>('/api/amcs/', {
