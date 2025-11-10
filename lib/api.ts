@@ -84,6 +84,8 @@ export interface BackendClientListItem {
   email: string;
   phone_number: string;
   has_active_amc: boolean;
+  city: string | null;
+  state: string | null;
   created_at: string;
 }
 

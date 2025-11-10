@@ -47,8 +47,8 @@ function mapBackendClientToFrontend(
     name: backendClient.full_name || `${backendClient.first_name} ${backendClient.last_name}`,
     business_name: undefined, // Not available in list endpoint
     address: "", // Not available in list endpoint
-    city: "", // Not available in list endpoint
-    state: "", // Not available in list endpoint
+    city: backendClient.city || "", // Now available from list endpoint
+    state: backendClient.state || "", // Now available from list endpoint
     pin_code: "", // Not available in list endpoint
     country: "India", // Default
     primary_contact_name: backendClient.full_name || `${backendClient.first_name} ${backendClient.last_name}`,
