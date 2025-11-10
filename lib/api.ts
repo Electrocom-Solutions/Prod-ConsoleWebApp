@@ -659,6 +659,7 @@ export interface BackendEmployeeListItem {
   full_name: string | null;
   email: string | null;
   phone_number: string | null;
+  photo_url: string | null;
   designation: 'Technician' | 'Field Staff' | 'Computer Operator' | 'Other';
   availability_status: string | null; // 'Present' or 'Absent' or null
   created_at: string;
@@ -3083,7 +3084,7 @@ Please verify:
     if (params?.filter) queryParams.append('filter', params.filter);
 
     const queryString = queryParams.toString();
-    const endpoint = `/api/tasks/statistics/${queryString ? `?${queryString}` : ''}`;
+    const endpoint = `/api/tasks/statistics${queryString ? `?${queryString}` : ''}`;
 
     return this.request<TaskStatisticsResponse>(endpoint, {
       method: 'GET',
@@ -3143,9 +3144,23 @@ Please verify:
     location?: string;
     task_description?: string;
   }): Promise<BackendTaskDetail> {
+    const formData = new FormData();
+    
+    // Required fields
+    formData.append('project', data.project.toString());
+    formData.append('task_name', data.task_name);
+    formData.append('deadline', data.deadline);
+    
+    // Optional fields
+    if (data.employee !== undefined) formData.append('employee', data.employee.toString());
+    if (data.status) formData.append('status', data.status);
+    if (data.estimated_time !== undefined) formData.append('estimated_time', data.estimated_time.toString());
+    if (data.location) formData.append('location', data.location);
+    if (data.task_description) formData.append('task_description', data.task_description);
+    
     return this.request<BackendTaskDetail>('/api/tasks/', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: formData,
     });
   }
 
@@ -3163,9 +3178,22 @@ Please verify:
     task_description: string;
     internal_notes: string;
   }>): Promise<BackendTaskDetail> {
+    const formData = new FormData();
+    
+    // Only append fields that are provided (for PATCH, only update provided fields)
+    if (data.project !== undefined) formData.append('project', data.project.toString());
+    if (data.task_name !== undefined) formData.append('task_name', data.task_name);
+    if (data.deadline !== undefined) formData.append('deadline', data.deadline);
+    if (data.employee !== undefined) formData.append('employee', data.employee.toString());
+    if (data.status !== undefined) formData.append('status', data.status);
+    if (data.estimated_time !== undefined) formData.append('estimated_time', data.estimated_time.toString());
+    if (data.location !== undefined) formData.append('location', data.location);
+    if (data.task_description !== undefined) formData.append('task_description', data.task_description);
+    if (data.internal_notes !== undefined) formData.append('internal_notes', data.internal_notes);
+    
     return this.request<BackendTaskDetail>(`/api/tasks/${id}/`, {
       method: 'PATCH',
-      body: JSON.stringify(data),
+      body: formData,
     });
   }
 

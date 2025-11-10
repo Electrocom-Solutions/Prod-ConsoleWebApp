@@ -11,6 +11,7 @@ import { showDeleteConfirm, showSuccess, showError } from "@/lib/sweetalert";
 import { apiClient, HolidayCalendarStatisticsResponse, BackendHolidayCalendarListItem, HolidayCalendarDetail, HolidayCalendarCreateData } from "@/lib/api";
 import { useDebounce } from "use-debounce";
 import { ProtectedRoute } from "@/components/auth/protected-route";
+import { DatePicker } from "@/components/ui/date-picker";
 
 /**
  * Map backend holiday type to frontend type
@@ -428,7 +429,7 @@ function HolidayModal({
 }) {
   const [formData, setFormData] = useState({
     name: holiday?.name || "",
-    date: holiday?.date || "",
+    date: holiday?.date || format(new Date(), "yyyy-MM-dd"),
     type: holiday ? mapBackendTypeToFrontend(holiday.type) : ("Public" as 'Public' | 'Optional' | 'Restricted'),
   });
 
@@ -442,7 +443,7 @@ function HolidayModal({
     } else {
       setFormData({
         name: "",
-        date: "",
+        date: format(new Date(), "yyyy-MM-dd"),
         type: "Public",
       });
     }
@@ -450,6 +451,17 @@ function HolidayModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate required fields
+    if (!formData.name.trim()) {
+      showError("Validation Error", "Holiday name is required");
+      return;
+    }
+    
+    if (!formData.date) {
+      showError("Validation Error", "Date is required");
+      return;
+    }
     
     const holidayData: HolidayCalendarCreateData & { id?: number } = {
       id: holiday?.id,
@@ -493,11 +505,14 @@ function HolidayModal({
             <label className="block text-sm font-medium mb-2">
               Date <span className="text-red-500">*</span>
             </label>
-            <Input
-              type="date"
+            <DatePicker
               value={formData.date}
-              onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-              required
+              onChange={(value) => {
+                if (value) {
+                  setFormData({ ...formData, date: value });
+                }
+              }}
+              placeholder="Select holiday date"
               disabled={isSaving}
             />
           </div>

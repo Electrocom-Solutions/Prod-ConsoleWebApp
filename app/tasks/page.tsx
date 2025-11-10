@@ -41,9 +41,11 @@ import {
   BackendTaskActivity,
   BackendProjectListItem,
   BackendClientListItem,
+  BackendEmployeeListItem,
 } from "@/lib/api";
 import { useDebounce } from "use-debounce";
 import { ProtectedRoute } from "@/components/auth/protected-route";
+import { DatePicker } from "@/components/ui/date-picker";
 
 type PeriodFilter = "today" | "this_week" | "this_month" | "all";
 
@@ -190,7 +192,7 @@ function TaskHubPageContent() {
   const [debouncedSearchQuery] = useDebounce(searchQuery, 500);
   const [statusFilter, setStatusFilter] = useState<TaskStatus | "all">("all");
   const [projectFilter, setProjectFilter] = useState<string>("all");
-  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>("today");
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>("all");
   const [expandedTaskId, setExpandedTaskId] = useState<number | null>(null);
   const [selectedTasks, setSelectedTasks] = useState<number[]>([]);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -207,6 +209,8 @@ function TaskHubPageContent() {
       setStatistics(stats);
     } catch (err: any) {
       console.error("Failed to fetch task statistics:", err);
+      // Don't set error state for statistics, just log it
+      // Statistics failure shouldn't prevent the page from rendering
     }
   }, [periodFilter]);
 
@@ -1084,8 +1088,11 @@ function TaskHubPageContent() {
 
               showSuccess("Task created successfully!");
               setShowCreateModal(false);
-              await fetchTasks();
-              await fetchStatistics();
+              
+              // Refresh tasks and statistics
+              // Note: The task will appear in the list based on the current period filter
+              // If the task deadline is not in the current period, it may not appear until the filter is changed
+              await Promise.all([fetchTasks(), fetchStatistics()]);
             } catch (err: any) {
               console.error("Failed to create task:", err);
               showAlert("Create Failed", err.message || "An error occurred during task creation.", "error");
@@ -1142,34 +1149,67 @@ function CreateTaskModal({
     project_name: "",
     project_search: "",
     description: "",
-    deadline: new Date().toISOString().split("T")[0],
+    deadline: format(new Date(), "yyyy-MM-dd"),
     location: "",
     estimated_time_minutes: 0,
     status: "Open" as TaskStatus, // Maps to "Draft" in backend
   });
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
-  const [employees, setEmployees] = useState<any[]>([]); // TODO: Fetch employees
+  const [employees, setEmployees] = useState<BackendEmployeeListItem[]>([]);
+  const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
+  const [employeeSearch, setEmployeeSearch] = useState("");
+  const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | undefined>(undefined);
+  const [selectedEmployeeName, setSelectedEmployeeName] = useState<string>("");
+
+  // Fetch employees when modal opens
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      setIsLoadingEmployees(true);
+      try {
+        const response = await apiClient.getEmployees({});
+        setEmployees(response.results);
+      } catch (err) {
+        console.error("Failed to fetch employees:", err);
+      } finally {
+        setIsLoadingEmployees(false);
+      }
+    };
+    fetchEmployees();
+  }, []);
 
   // Filter projects based on search
   const filteredProjects = projects.filter((project) =>
     project.name.toLowerCase().includes(formData.project_search.toLowerCase())
   );
 
-  // Close dropdown when clicking outside
+  // Filter employees based on search
+  const filteredEmployees = employees.filter((employee) => {
+    const searchTerm = employeeSearch.toLowerCase();
+    const fullName = employee.full_name?.toLowerCase() || "";
+    const email = employee.email?.toLowerCase() || "";
+    const phone = employee.phone_number?.toLowerCase() || "";
+    const employeeCode = employee.employee_code?.toLowerCase() || "";
+    return fullName.includes(searchTerm) || email.includes(searchTerm) || phone.includes(searchTerm) || employeeCode.includes(searchTerm);
+  });
+
+  // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
       if (!target.closest('.project-dropdown-container')) {
         setShowProjectDropdown(false);
       }
+      if (!target.closest('.employee-dropdown-container')) {
+        setShowEmployeeDropdown(false);
+      }
     };
 
-    if (showProjectDropdown) {
+    if (showProjectDropdown || showEmployeeDropdown) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
-  }, [showProjectDropdown]);
+  }, [showProjectDropdown, showEmployeeDropdown]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1182,6 +1222,12 @@ function CreateTaskModal({
 
     if (!formData.task_name.trim()) {
       showAlert("Validation Error", "Task name is required", "error");
+      return;
+    }
+
+    // Validate deadline is set
+    if (!formData.deadline) {
+      showAlert("Validation Error", "Deadline is required", "error");
       return;
     }
 
@@ -1227,19 +1273,87 @@ function CreateTaskModal({
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            {/* Employee - Optional for now */}
-            <div>
+            {/* Employee - Searchable Dropdown */}
+            <div className="relative employee-dropdown-container">
               <label className="block text-sm font-medium mb-2 text-gray-900 dark:text-white">
                 Assign to Employee (Optional)
               </label>
-              <select
-                value={selectedEmployeeId || ""}
-                onChange={(e) => setSelectedEmployeeId(e.target.value ? parseInt(e.target.value) : undefined)}
-                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2 text-sm text-gray-900 dark:text-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-              >
-                <option value="">Select employee (optional)</option>
-                {/* TODO: Populate with employees from backend */}
-              </select>
+              <div className="relative">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={employeeSearch || selectedEmployeeName}
+                    onChange={(e) => {
+                      setEmployeeSearch(e.target.value);
+                      setShowEmployeeDropdown(true);
+                      if (!e.target.value) {
+                        setSelectedEmployeeId(undefined);
+                        setSelectedEmployeeName("");
+                      }
+                    }}
+                    onFocus={() => {
+                      if (employees.length > 0) {
+                        setShowEmployeeDropdown(true);
+                      }
+                    }}
+                    placeholder="Search employee by name, email, or phone"
+                    className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2 text-sm text-gray-900 dark:text-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  />
+                  {selectedEmployeeId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedEmployeeId(undefined);
+                        setSelectedEmployeeName("");
+                        setEmployeeSearch("");
+                        setShowEmployeeDropdown(false);
+                      }}
+                      className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                      title="Clear selection"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+                {showEmployeeDropdown && !isLoadingEmployees && filteredEmployees.length > 0 && (
+                  <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    {filteredEmployees.map((employee) => (
+                      <button
+                        key={employee.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedEmployeeId(employee.id);
+                          setSelectedEmployeeName(employee.full_name || "");
+                          setEmployeeSearch(employee.full_name || "");
+                          setShowEmployeeDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                      >
+                        <div className="font-medium">{employee.full_name || employee.employee_code}</div>
+                        {employee.email && (
+                          <div className="text-xs text-gray-500 dark:text-gray-400">{employee.email}</div>
+                        )}
+                        {employee.phone_number && (
+                          <div className="text-xs text-gray-500 dark:text-gray-400">{employee.phone_number}</div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {showEmployeeDropdown && isLoadingEmployees && (
+                  <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg p-4 text-sm text-gray-500 dark:text-gray-400">
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading employees...
+                    </div>
+                  </div>
+                )}
+                {showEmployeeDropdown && !isLoadingEmployees && filteredEmployees.length === 0 && employeeSearch && (
+                  <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg p-4 text-sm text-gray-500 dark:text-gray-400">
+                    No employees found
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Project - Searchable Dropdown */}
@@ -1312,12 +1426,10 @@ function CreateTaskModal({
               <label className="block text-sm font-medium mb-2 text-gray-900 dark:text-white">
                 Deadline <span className="text-red-500">*</span>
               </label>
-              <input
-                type="date"
+              <DatePicker
                 value={formData.deadline}
-                onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
-                required
-                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2 text-sm text-gray-900 dark:text-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                onChange={(value) => setFormData({ ...formData, deadline: value || format(new Date(), "yyyy-MM-dd") })}
+                placeholder="Select deadline date"
               />
             </div>
 

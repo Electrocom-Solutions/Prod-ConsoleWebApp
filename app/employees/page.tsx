@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { DatePicker } from "@/components/ui/date-picker";
-import { Plus, Search, Mail, Phone, MapPin, Edit, Trash2, X, User, Briefcase, Loader2, Inbox } from "lucide-react";
+import { Plus, Search, Mail, Phone, MapPin, Edit, Trash2, X, User, Briefcase, Loader2, Inbox, Eye, Calendar, CreditCard, FileText, Building2, MapPin as MapPinIcon, Globe, Award, DollarSign, IdCard } from "lucide-react";
 import { showDeleteConfirm, showAlert, showSuccess } from "@/lib/sweetalert";
 import { apiClient, EmployeeStatisticsResponse, BackendEmployeeListItem, EmployeeDetail, EmployeeCreateData } from "@/lib/api";
 import { useDebounce } from "use-debounce";
@@ -58,6 +58,7 @@ function mapBackendEmployeeListItemToFrontend(backendEmployee: BackendEmployeeLi
     employee_id: backendEmployee.employee_code,
     email: backendEmployee.email || '',
     phone: backendEmployee.phone_number || '',
+    photo: backendEmployee.photo_url || undefined,
     date_of_birth: '',
     gender: "Male",
     address: '',
@@ -135,6 +136,9 @@ function EmployeesPageContent() {
   const [availabilityFilter, setAvailabilityFilter] = useState<string>("all");
   const [showModal, setShowModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [viewEmployee, setViewEmployee] = useState<EmployeeDetail | null>(null);
+  const [isLoadingView, setIsLoadingView] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
@@ -261,6 +265,21 @@ function EmployeesPageContent() {
       showAlert("Error", err.message || "Failed to load employee details.", "error");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Handle view employee - fetch full details and show view modal
+  const handleView = async (employee: Employee) => {
+    try {
+      setIsLoadingView(true);
+      const employeeDetail = await apiClient.getEmployee(employee.id);
+      setViewEmployee(employeeDetail);
+      setShowViewModal(true);
+    } catch (err: any) {
+      console.error("Failed to fetch employee details:", err);
+      showAlert("Error", err.message || "Failed to load employee details.", "error");
+    } finally {
+      setIsLoadingView(false);
     }
   };
 
@@ -483,7 +502,16 @@ function EmployeesPageContent() {
                         <Button
                           variant="ghost"
                           size="sm"
+                          onClick={() => handleView(employee)}
+                          title="View Details"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => handleEdit(employee)}
+                          title="Edit"
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -492,6 +520,7 @@ function EmployeesPageContent() {
                           size="sm"
                           onClick={() => handleDelete(employee.id)}
                           className="text-red-600"
+                          title="Delete"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -547,6 +576,20 @@ function EmployeesPageContent() {
             }
           }}
           isSaving={isSaving}
+        />
+      )}
+
+      {showViewModal && viewEmployee && (
+        <EmployeeViewModal
+          employee={viewEmployee}
+          onClose={() => {
+            setShowViewModal(false);
+            setViewEmployee(null);
+          }}
+          onEdit={() => {
+            setShowViewModal(false);
+            handleEdit(employees.find(e => e.id === viewEmployee.id) || employees[0]);
+          }}
         />
       )}
     </DashboardLayout>
