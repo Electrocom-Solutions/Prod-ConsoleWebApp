@@ -555,7 +555,7 @@ function ResourceModal({
               disabled={isSaving}
             />
             <p className="text-xs text-gray-500 mt-1">
-              Minimum threshold for stock quantity. If stock count falls below this value, the resource will be considered as "Low Stock".
+              Minimum threshold for stock quantity. If stock count falls below this value, the resource will be considered as &quot;Low Stock&quot;.
             </p>
           </div>
 

@@ -580,7 +580,7 @@ function EmployeesPageContent() {
       )}
 
       {showViewModal && viewEmployee && (
-        <EmployeeViewModal
+        <EmployeeViewModalComponent
           employee={viewEmployee}
           onClose={() => {
             setShowViewModal(false);
@@ -593,6 +593,199 @@ function EmployeesPageContent() {
         />
       )}
     </DashboardLayout>
+  );
+}
+
+function EmployeeViewModalComponent({
+  employee,
+  onClose,
+  onEdit,
+}: {
+  employee: EmployeeDetail;
+  onClose: () => void;
+  onEdit: () => void;
+}) {
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return "-";
+    try {
+      return new Date(dateString).toLocaleDateString("en-IN", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+    } catch {
+      return dateString;
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-6 border-b dark:border-gray-800 sticky top-0 bg-white dark:bg-gray-900 z-10">
+          <h2 className="text-2xl font-semibold">Employee Details</h2>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={onEdit}>
+              <Edit className="h-4 w-4 mr-2" />
+              Edit
+            </Button>
+            <button onClick={onClose} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="p-6 space-y-6">
+          {/* Photo and Basic Info */}
+          <div className="flex items-start gap-6">
+            <div className="flex-shrink-0">
+              {employee.photo_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={employee.photo_url}
+                  alt={employee.full_name || "Employee"}
+                  className="h-32 w-32 rounded-full object-cover border-4 border-gray-200 dark:border-gray-700"
+                />
+              ) : (
+                <div className="h-32 w-32 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center border-4 border-gray-200 dark:border-gray-700">
+                  <User className="h-16 w-16 text-gray-400" />
+                </div>
+              )}
+            </div>
+            <div className="flex-1">
+              <h3 className="text-2xl font-bold mb-2">{employee.full_name || "N/A"}</h3>
+              <p className="text-gray-600 dark:text-gray-400 mb-1">
+                <Briefcase className="h-4 w-4 inline mr-2" />
+                {employee.designation}
+              </p>
+              <p className="text-gray-600 dark:text-gray-400 mb-1">
+                <IdCard className="h-4 w-4 inline mr-2" />
+                Employee Code: {employee.employee_code}
+              </p>
+              {employee.email && (
+                <p className="text-gray-600 dark:text-gray-400 mb-1">
+                  <Mail className="h-4 w-4 inline mr-2" />
+                  {employee.email}
+                </p>
+              )}
+              {employee.phone_number && (
+                <p className="text-gray-600 dark:text-gray-400">
+                  <Phone className="h-4 w-4 inline mr-2" />
+                  {employee.phone_number}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Personal Information */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <h4 className="text-lg font-semibold flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Personal Information
+              </h4>
+              <div className="space-y-2">
+                <div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Date of Birth</p>
+                  <p className="font-medium">{formatDate(employee.date_of_birth)}</p>
+                </div>
+                {employee.gender && (
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Gender</p>
+                    <p className="font-medium capitalize">{employee.gender}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h4 className="text-lg font-semibold flex items-center gap-2">
+                <MapPinIcon className="h-5 w-5" />
+                Address
+              </h4>
+              <div className="space-y-2">
+                {employee.address && (
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Street Address</p>
+                    <p className="font-medium">{employee.address}</p>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-2">
+                  {employee.city && (
+                    <div>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">City</p>
+                      <p className="font-medium">{employee.city}</p>
+                    </div>
+                  )}
+                  {employee.state && (
+                    <div>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">State</p>
+                      <p className="font-medium">{employee.state}</p>
+                    </div>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {employee.pin_code && (
+                    <div>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">PIN Code</p>
+                      <p className="font-medium">{employee.pin_code}</p>
+                    </div>
+                  )}
+                  {employee.country && (
+                    <div>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Country</p>
+                      <p className="font-medium">{employee.country}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Employment Information */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <h4 className="text-lg font-semibold flex items-center gap-2">
+                <Briefcase className="h-5 w-5" />
+                Employment Details
+              </h4>
+              <div className="space-y-2">
+                <div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Joining Date</p>
+                  <p className="font-medium">{formatDate(employee.joining_date)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Monthly Salary</p>
+                  <p className="font-medium text-lg">
+                    ₹{parseFloat(employee.monthly_salary || "0").toLocaleString("en-IN")}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h4 className="text-lg font-semibold flex items-center gap-2">
+                <IdCard className="h-5 w-5" />
+                Identification
+              </h4>
+              <div className="space-y-2">
+                {employee.aadhar_number && (
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Aadhar Number</p>
+                    <p className="font-medium">{employee.aadhar_number}</p>
+                  </div>
+                )}
+                {employee.pan_number && (
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">PAN Number</p>
+                    <p className="font-medium">{employee.pan_number}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
