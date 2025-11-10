@@ -17,6 +17,7 @@ type UploadTemplateModalProps = {
   }) => Promise<void>;
   clients: Client[];
   isUploading?: boolean;
+  template?: DocumentTemplate | null;
 };
 
 const categories = ['Work Order', 'Experience Certificate', 'Tender Document', 'Affidavit', 'AMC', 'Invoice', 'Contract', 'Report', 'Other'];
