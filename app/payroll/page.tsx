@@ -18,6 +18,7 @@ import {
   Loader2,
   Inbox,
   Trash2,
+  ChevronDown,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { PayrollRecord, PaymentStatus, PaymentMode } from "@/types";
@@ -28,6 +29,7 @@ import { showSuccess, showError, showDeleteConfirm, showAlert, showConfirm } fro
 import { apiClient, PayrollStatisticsResponse, BackendPayrollListItem, PayrollDetail, PayrollCreateData, BackendEmployeeListItem, EmployeeListResponse } from "@/lib/api";
 import { useDebounce } from "use-debounce";
 import { ProtectedRoute } from "@/components/auth/protected-route";
+import { DatePicker } from "@/components/ui/date-picker";
 
 /**
  * Map backend payroll list item to frontend PayrollRecord type
@@ -142,12 +144,38 @@ function PayrollPageContent() {
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [showMonthDropdown, setShowMonthDropdown] = useState(false);
+  const [showYearDropdown, setShowYearDropdown] = useState(false);
+  const [showStatusFilterDropdown, setShowStatusFilterDropdown] = useState(false);
 
   const years = useMemo(() => {
     const startYear = 2020;
     const endYear = currentYear + 1;
     return Array.from({ length: endYear - startYear + 1 }, (_, i) => startYear + i);
   }, [currentYear]);
+
+  const statusFilterOptions: (PaymentStatus | "all")[] = ["all", "Pending", "Paid"];
+
+  // Close filter dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.month-filter-dropdown-container')) {
+        setShowMonthDropdown(false);
+      }
+      if (!target.closest('.year-filter-dropdown-container')) {
+        setShowYearDropdown(false);
+      }
+      if (!target.closest('.status-filter-dropdown-container')) {
+        setShowStatusFilterDropdown(false);
+      }
+    };
+
+    if (showMonthDropdown || showYearDropdown || showStatusFilterDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showMonthDropdown, showYearDropdown, showStatusFilterDropdown]);
 
   /**
    * Fetch statistics from backend
@@ -473,42 +501,102 @@ function PayrollPageContent() {
         {/* Filters & Actions */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-3">
-            <select
-              value={selectedMonth}
-              onChange={(e) => {
-                setSelectedMonth(Number(e.target.value));
-                setCurrentPage(1);
-              }}
-              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-            >
-              {months.map((month, index) => (
-                <option key={month} value={index + 1}>{month}</option>
-              ))}
-            </select>
-            <select
-              value={selectedYear}
-              onChange={(e) => {
-                setSelectedYear(Number(e.target.value));
-                setCurrentPage(1);
-              }}
-              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-            >
-              {years.map(year => (
-                <option key={year} value={year}>{year}</option>
-              ))}
-            </select>
-            <select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value as PaymentStatus | "all");
-                setCurrentPage(1);
-              }}
-              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-            >
-              <option value="all">All Status</option>
-              <option value="Pending">Pending</option>
-              <option value="Paid">Paid</option>
-            </select>
+            <div className="relative month-filter-dropdown-container">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMonthDropdown(!showMonthDropdown);
+                  setShowYearDropdown(false);
+                  setShowStatusFilterDropdown(false);
+                }}
+                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-left dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 flex items-center justify-between min-w-[140px]"
+              >
+                <span>{months[selectedMonth - 1]}</span>
+                <ChevronDown className="h-4 w-4 text-gray-400 ml-2" />
+              </button>
+              {showMonthDropdown && (
+                <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {months.map((month, index) => (
+                    <button
+                      key={month}
+                      type="button"
+                      onClick={() => {
+                        setSelectedMonth(index + 1);
+                        setCurrentPage(1);
+                        setShowMonthDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      {month}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="relative year-filter-dropdown-container">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowYearDropdown(!showYearDropdown);
+                  setShowMonthDropdown(false);
+                  setShowStatusFilterDropdown(false);
+                }}
+                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-left dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 flex items-center justify-between min-w-[100px]"
+              >
+                <span>{selectedYear}</span>
+                <ChevronDown className="h-4 w-4 text-gray-400 ml-2" />
+              </button>
+              {showYearDropdown && (
+                <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {years.map(year => (
+                    <button
+                      key={year}
+                      type="button"
+                      onClick={() => {
+                        setSelectedYear(year);
+                        setCurrentPage(1);
+                        setShowYearDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      {year}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="relative status-filter-dropdown-container">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowStatusFilterDropdown(!showStatusFilterDropdown);
+                  setShowMonthDropdown(false);
+                  setShowYearDropdown(false);
+                }}
+                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-left dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 flex items-center justify-between min-w-[120px]"
+              >
+                <span>{statusFilter === "all" ? "All Status" : statusFilter}</span>
+                <ChevronDown className="h-4 w-4 text-gray-400 ml-2" />
+              </button>
+              {showStatusFilterDropdown && (
+                <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {statusFilterOptions.map((status) => (
+                    <button
+                      key={status}
+                      type="button"
+                      onClick={() => {
+                        setStatusFilter(status);
+                        setCurrentPage(1);
+                        setShowStatusFilterDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      {status === "all" ? "All Status" : status}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex gap-2">
@@ -1016,6 +1104,8 @@ function CreatePayrollModal({
     notes: "",
   });
   const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const [showPaymentModeDropdown, setShowPaymentModeDropdown] = useState(false);
 
   // Filter employees based on search
   const filteredEmployees = employees.filter((employee) => {
@@ -1027,20 +1117,29 @@ function CreatePayrollModal({
     );
   });
 
-  // Close dropdown when clicking outside
+  // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
       if (!target.closest('.employee-dropdown-container')) {
         setShowEmployeeDropdown(false);
       }
+      if (!target.closest('.status-dropdown-container')) {
+        setShowStatusDropdown(false);
+      }
+      if (!target.closest('.payment-mode-dropdown-container')) {
+        setShowPaymentModeDropdown(false);
+      }
     };
 
-    if (showEmployeeDropdown) {
+    if (showEmployeeDropdown || showStatusDropdown || showPaymentModeDropdown) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
-  }, [showEmployeeDropdown]);
+  }, [showEmployeeDropdown, showStatusDropdown, showPaymentModeDropdown]);
+
+  const payrollStatusOptions: PaymentStatus[] = ["Pending", "Paid"];
+  const paymentModeOptions: PaymentMode[] = ["Cash", "Bank Transfer", "Cheque", "UPI"];
 
   const handleEmployeeSelect = (employee: { id: number; name: string }) => {
     setFormData({
@@ -1155,19 +1254,37 @@ function CreatePayrollModal({
                 </div>
               </div>
 
-              <div>
+              <div className="relative status-dropdown-container">
                 <label className="block text-sm font-medium mb-2 dark:text-gray-200">
                   Payroll Status <span className="text-red-500">*</span>
                 </label>
-                <select
-                  value={formData.payroll_status}
-                  onChange={(e) => setFormData({ ...formData, payroll_status: e.target.value as PaymentStatus })}
-                  required
-                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                >
-                  <option value="Pending">Pending</option>
-                  <option value="Paid">Paid</option>
-                </select>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-left dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 flex items-center justify-between"
+                  >
+                    <span>{formData.payroll_status || "Select Status"}</span>
+                    <ChevronDown className="h-4 w-4 text-gray-400" />
+                  </button>
+                  {showStatusDropdown && (
+                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      {payrollStatusOptions.map((status) => (
+                        <button
+                          key={status}
+                          type="button"
+                          onClick={() => {
+                            setFormData({ ...formData, payroll_status: status });
+                            setShowStatusDropdown(false);
+                          }}
+                          className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                        >
+                          {status}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -1176,12 +1293,12 @@ function CreatePayrollModal({
                 <label className="block text-sm font-medium mb-2 dark:text-gray-200">
                   Period From <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="date"
+                <DatePicker
                   value={formData.period_from}
-                  onChange={(e) => setFormData({ ...formData, period_from: e.target.value })}
+                  onChange={(value) => setFormData({ ...formData, period_from: value })}
+                  placeholder="Select start date"
                   required
-                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  className="w-full"
                 />
               </div>
 
@@ -1189,12 +1306,13 @@ function CreatePayrollModal({
                 <label className="block text-sm font-medium mb-2 dark:text-gray-200">
                   Period To <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="date"
+                <DatePicker
                   value={formData.period_to}
-                  onChange={(e) => setFormData({ ...formData, period_to: e.target.value })}
+                  onChange={(value) => setFormData({ ...formData, period_to: value })}
+                  placeholder="Select end date"
                   required
-                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  minDate={formData.period_from}
+                  className="w-full"
                 />
               </div>
             </div>
@@ -1250,29 +1368,55 @@ function CreatePayrollModal({
                 <label className="block text-sm font-medium mb-2 dark:text-gray-200">
                   Payment Date
                 </label>
-                <input
-                  type="date"
+                <DatePicker
                   value={formData.payment_date}
-                  onChange={(e) => setFormData({ ...formData, payment_date: e.target.value })}
-                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  onChange={(value) => setFormData({ ...formData, payment_date: value })}
+                  placeholder="Select payment date"
+                  className="w-full"
                 />
               </div>
 
-              <div>
+              <div className="relative payment-mode-dropdown-container">
                 <label className="block text-sm font-medium mb-2 dark:text-gray-200">
                   Payment Mode
                 </label>
-                <select
-                  value={formData.payment_mode}
-                  onChange={(e) => setFormData({ ...formData, payment_mode: e.target.value as PaymentMode })}
-                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                >
-                  <option value="">Select Payment Mode</option>
-                  <option value="Cash">Cash</option>
-                  <option value="Bank Transfer">Bank Transfer</option>
-                  <option value="Cheque">Cheque</option>
-                  <option value="UPI">UPI</option>
-                </select>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowPaymentModeDropdown(!showPaymentModeDropdown)}
+                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-left dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 flex items-center justify-between"
+                  >
+                    <span>{formData.payment_mode || "Select Payment Mode"}</span>
+                    <ChevronDown className="h-4 w-4 text-gray-400" />
+                  </button>
+                  {showPaymentModeDropdown && (
+                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData({ ...formData, payment_mode: "" as PaymentMode | "" });
+                          setShowPaymentModeDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                      >
+                        Select Payment Mode
+                      </button>
+                      {paymentModeOptions.map((mode) => (
+                        <button
+                          key={mode}
+                          type="button"
+                          onClick={() => {
+                            setFormData({ ...formData, payment_mode: mode });
+                            setShowPaymentModeDropdown(false);
+                          }}
+                          className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                        >
+                          {mode}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -1355,6 +1499,7 @@ function EditPayrollSlideOver({
   const [formData, setFormData] = useState({
     employee_id: payroll.employee_id || 0,
     employee_name: payroll.employee_name,
+    employee_search: "",
     payroll_status: payroll.payment_status,
     period_from: payroll.period_start,
     period_to: payroll.period_end,
@@ -1366,12 +1511,50 @@ function EditPayrollSlideOver({
     bank_transaction_ref: payroll.bank_transaction_ref || "",
     notes: payroll.notes || "",
   });
+  const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const [showPaymentModeDropdown, setShowPaymentModeDropdown] = useState(false);
+
+  const payrollStatusOptions: PaymentStatus[] = ["Pending", "Paid", "Hold"];
+  const paymentModeOptions: PaymentMode[] = ["Cash", "Bank Transfer", "Cheque", "UPI"];
+
+  // Filter employees based on search
+  const filteredEmployees = employees.filter((employee) => {
+    const searchTerm = formData.employee_search.toLowerCase();
+    if (!searchTerm) return true;
+    return (
+      employee.name.toLowerCase().includes(searchTerm) ||
+      employee.id.toString().includes(formData.employee_search)
+    );
+  });
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.edit-employee-dropdown-container')) {
+        setShowEmployeeDropdown(false);
+      }
+      if (!target.closest('.edit-status-dropdown-container')) {
+        setShowStatusDropdown(false);
+      }
+      if (!target.closest('.edit-payment-mode-dropdown-container')) {
+        setShowPaymentModeDropdown(false);
+      }
+    };
+
+    if (showEmployeeDropdown || showStatusDropdown || showPaymentModeDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showEmployeeDropdown, showStatusDropdown, showPaymentModeDropdown]);
 
   useEffect(() => {
     if (isOpen) {
       setFormData({
         employee_id: payroll.employee_id || 0,
         employee_name: payroll.employee_name,
+        employee_search: payroll.employee_name,
         payroll_status: payroll.payment_status,
         period_from: payroll.period_start,
         period_to: payroll.period_end,
@@ -1441,44 +1624,88 @@ function EditPayrollSlideOver({
             <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-4">
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
+                  <div className="relative edit-employee-dropdown-container">
                     <label className="block text-sm font-medium mb-2 dark:text-gray-200">
                       Employee <span className="text-red-500">*</span>
                     </label>
-                    <select
-                      value={formData.employee_id}
-                      onChange={(e) => {
-                        const employee = employees.find(emp => emp.id === Number(e.target.value));
-                        setFormData({
-                          ...formData,
-                          employee_id: Number(e.target.value),
-                          employee_name: employee?.name || "",
-                        });
-                      }}
-                      required
-                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                    >
-                      <option value={0}>Select Employee</option>
-                      {employees.map(emp => (
-                        <option key={emp.id} value={emp.id}>{emp.name}</option>
-                      ))}
-                    </select>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={formData.employee_search || formData.employee_name}
+                        onChange={(e) => {
+                          setFormData({ ...formData, employee_search: e.target.value, employee_id: 0, employee_name: "" });
+                          setShowEmployeeDropdown(true);
+                        }}
+                        onFocus={() => {
+                          if (employees.length > 0) {
+                            setShowEmployeeDropdown(true);
+                          }
+                        }}
+                        placeholder="Search and select employee"
+                        required
+                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                      />
+                      {showEmployeeDropdown && filteredEmployees.length > 0 && (
+                        <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                          {filteredEmployees.map((employee) => (
+                            <button
+                              key={employee.id}
+                              type="button"
+                              onClick={() => {
+                                setFormData({
+                                  ...formData,
+                                  employee_id: employee.id,
+                                  employee_name: employee.name,
+                                  employee_search: employee.name,
+                                });
+                                setShowEmployeeDropdown(false);
+                              }}
+                              className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                            >
+                              {employee.name}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {showEmployeeDropdown && filteredEmployees.length === 0 && formData.employee_search && (
+                        <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 text-sm text-gray-500 dark:text-gray-400">
+                          No employees found
+                        </div>
+                      )}
+                    </div>
                   </div>
 
-                  <div>
+                  <div className="relative edit-status-dropdown-container">
                     <label className="block text-sm font-medium mb-2 dark:text-gray-200">
                       Payroll Status <span className="text-red-500">*</span>
                     </label>
-                    <select
-                      value={formData.payroll_status}
-                      onChange={(e) => setFormData({ ...formData, payroll_status: e.target.value as PaymentStatus })}
-                      required
-                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                    >
-                      <option value="Pending">Pending</option>
-                      <option value="Paid">Paid</option>
-                      <option value="Hold">Hold</option>
-                    </select>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-left dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 flex items-center justify-between"
+                      >
+                        <span>{formData.payroll_status || "Select Status"}</span>
+                        <ChevronDown className="h-4 w-4 text-gray-400" />
+                      </button>
+                      {showStatusDropdown && (
+                        <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                          {payrollStatusOptions.map((status) => (
+                            <button
+                              key={status}
+                              type="button"
+                              onClick={() => {
+                                setFormData({ ...formData, payroll_status: status });
+                                setShowStatusDropdown(false);
+                              }}
+                              className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                            >
+                              {status}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -1487,12 +1714,12 @@ function EditPayrollSlideOver({
                     <label className="block text-sm font-medium mb-2 dark:text-gray-200">
                       Period From <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="date"
+                    <DatePicker
                       value={formData.period_from}
-                      onChange={(e) => setFormData({ ...formData, period_from: e.target.value })}
+                      onChange={(value) => setFormData({ ...formData, period_from: value })}
+                      placeholder="Select start date"
                       required
-                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                      className="w-full"
                     />
                   </div>
 
@@ -1500,12 +1727,13 @@ function EditPayrollSlideOver({
                     <label className="block text-sm font-medium mb-2 dark:text-gray-200">
                       Period To <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="date"
+                    <DatePicker
                       value={formData.period_to}
-                      onChange={(e) => setFormData({ ...formData, period_to: e.target.value })}
+                      onChange={(value) => setFormData({ ...formData, period_to: value })}
+                      placeholder="Select end date"
                       required
-                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                      minDate={formData.period_from}
+                      className="w-full"
                     />
                   </div>
                 </div>
@@ -1561,29 +1789,55 @@ function EditPayrollSlideOver({
                     <label className="block text-sm font-medium mb-2 dark:text-gray-200">
                       Payment Date
                     </label>
-                    <input
-                      type="date"
+                    <DatePicker
                       value={formData.payment_date}
-                      onChange={(e) => setFormData({ ...formData, payment_date: e.target.value })}
-                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                      onChange={(value) => setFormData({ ...formData, payment_date: value })}
+                      placeholder="Select payment date"
+                      className="w-full"
                     />
                   </div>
 
-                  <div>
+                  <div className="relative edit-payment-mode-dropdown-container">
                     <label className="block text-sm font-medium mb-2 dark:text-gray-200">
                       Payment Mode
                     </label>
-                    <select
-                      value={formData.payment_mode}
-                      onChange={(e) => setFormData({ ...formData, payment_mode: e.target.value as PaymentMode })}
-                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                    >
-                      <option value="">Select Payment Mode</option>
-                      <option value="Cash">Cash</option>
-                      <option value="Bank Transfer">Bank Transfer</option>
-                      <option value="Cheque">Cheque</option>
-                      <option value="UPI">UPI</option>
-                    </select>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setShowPaymentModeDropdown(!showPaymentModeDropdown)}
+                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-left dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 flex items-center justify-between"
+                      >
+                        <span>{formData.payment_mode || "Select Payment Mode"}</span>
+                        <ChevronDown className="h-4 w-4 text-gray-400" />
+                      </button>
+                      {showPaymentModeDropdown && (
+                        <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormData({ ...formData, payment_mode: "" as PaymentMode | "" });
+                              setShowPaymentModeDropdown(false);
+                            }}
+                            className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                          >
+                            Select Payment Mode
+                          </button>
+                          {paymentModeOptions.map((mode) => (
+                            <button
+                              key={mode}
+                              type="button"
+                              onClick={() => {
+                                setFormData({ ...formData, payment_mode: mode });
+                                setShowPaymentModeDropdown(false);
+                              }}
+                              className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                            >
+                              {mode}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
