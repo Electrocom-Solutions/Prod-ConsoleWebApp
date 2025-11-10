@@ -18,6 +18,8 @@ import {
   Inbox,
   MessageSquare,
   CheckCircle,
+  Clock,
+  Calendar,
 } from "lucide-react";
 import { NotificationRecord, NotificationType } from "@/types";
 import { formatDistanceToNow, format } from "date-fns";
@@ -29,6 +31,7 @@ import { useDebounce } from "use-debounce";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { DatePicker } from "@/components/ui/date-picker";
 import { TimePicker } from "@/components/ui/time-picker";
+import { useAuth } from "@/components/providers/auth-provider";
 
 /**
  * Map backend notification to frontend NotificationRecord
@@ -36,8 +39,8 @@ import { TimePicker } from "@/components/ui/time-picker";
 function mapBackendNotificationToFrontend(backendNotif: BackendNotificationListItem): NotificationRecord {
   return {
     id: backendNotif.id,
-    recipient_id: 0, // Not needed for display
-    recipient_name: undefined,
+    recipient_id: backendNotif.recipient || 0,
+    recipient_name: backendNotif.recipient_username || undefined,
     title: backendNotif.title,
     message: backendNotif.message,
     type: backendNotif.type as NotificationType,
@@ -46,6 +49,7 @@ function mapBackendNotificationToFrontend(backendNotif: BackendNotificationListI
     scheduled_at: backendNotif.scheduled_at,
     sent_at: backendNotif.sent_at,
     channel: backendNotif.channel,
+    created_by_username: backendNotif.created_by_username || undefined,
   };
 }
 
@@ -71,11 +75,15 @@ const getNotificationIcon = (type: string) => {
 
 function NotificationsPageContent() {
   const searchParams = useSearchParams();
+  const { user } = useAuth();
+  const isOwner = user?.is_superuser || false; // Check if user is owner/superuser
   const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
   const [statistics, setStatistics] = useState<NotificationStatisticsResponse | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch] = useDebounce(searchQuery, 500);
   const [filterType, setFilterType] = useState<"All" | "Unread" | NotificationType>("All");
+  // For owners: "received" | "sent" | "scheduled", for regular users: "sent" | "scheduled"
+  const [viewMode, setViewMode] = useState<"received" | "sent" | "scheduled">(isOwner ? "received" : "sent");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -111,6 +119,30 @@ function NotificationsPageContent() {
         params.search = debouncedSearch;
       }
 
+      // Add view mode based on user type
+      if (isOwner) {
+        // Owner view: received, sent, or scheduled
+        if (viewMode === "sent") {
+          params.show_sent_by_me = true;
+          params.show_scheduled = false;
+        } else if (viewMode === "scheduled") {
+          params.show_sent_by_me = true;
+          params.show_scheduled = true;
+        } else {
+          // viewMode === "received" (default for owners)
+          params.show_sent_by_me = false;
+          params.show_scheduled = false;
+        }
+      } else {
+        // Regular user view: sent or scheduled
+        if (viewMode === "scheduled") {
+          params.show_scheduled = true;
+        } else {
+          // viewMode === "sent" (default for regular users)
+          params.show_scheduled = false;
+        }
+      }
+
       if (filterType === "Unread") {
         params.is_read = false;
       } else if (filterType !== "All") {
@@ -128,7 +160,7 @@ function NotificationsPageContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [debouncedSearch, filterType, currentPage]);
+  }, [debouncedSearch, filterType, currentPage, viewMode]);
 
   // Fetch statistics and notifications on mount and when filters change
   useEffect(() => {
@@ -292,29 +324,141 @@ function NotificationsPageContent() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 overflow-x-auto pb-2">
-          <Filter className="h-4 w-4 text-gray-500 flex-shrink-0" />
-          {["All", "Unread", "Task", "AMC", "Tender", "Payroll", "System", "Other"].map(
-            (filter) => (
+        {/* View Mode Tabs */}
+        <div className="flex items-center gap-2 mb-4 border-b dark:border-gray-700">
+          {isOwner ? (
+            <>
+              {/* Owner view: 3 tabs */}
               <button
-                key={filter}
                 onClick={() => {
-                  setFilterType(filter as any);
+                  setViewMode("received");
                   setCurrentPage(1);
                 }}
                 className={cn(
-                  "px-4 py-1.5 text-sm rounded-full transition-colors whitespace-nowrap",
-                  filterType === filter
-                    ? "bg-sky-500 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                  "px-4 py-2 text-sm font-medium transition-colors border-b-2",
+                  viewMode === "received"
+                    ? "border-sky-500 text-sky-600 dark:text-sky-400"
+                    : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
                 )}
               >
-                {filter}
-                {filter === "Unread" && statistics && statistics.unread_count > 0 && ` (${statistics.unread_count})`}
+                Received Notifications
               </button>
-            )
+              <button
+                onClick={() => {
+                  setViewMode("sent");
+                  setCurrentPage(1);
+                }}
+                className={cn(
+                  "px-4 py-2 text-sm font-medium transition-colors border-b-2",
+                  viewMode === "sent"
+                    ? "border-sky-500 text-sky-600 dark:text-sky-400"
+                    : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                )}
+              >
+                Sent Notifications
+              </button>
+              <button
+                onClick={() => {
+                  setViewMode("scheduled");
+                  setCurrentPage(1);
+                }}
+                className={cn(
+                  "px-4 py-2 text-sm font-medium transition-colors border-b-2",
+                  viewMode === "scheduled"
+                    ? "border-sky-500 text-sky-600 dark:text-sky-400"
+                    : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                )}
+              >
+                Scheduled Notifications
+              </button>
+            </>
+          ) : (
+            <>
+              {/* Regular user view: 2 tabs */}
+              <button
+                onClick={() => {
+                  setViewMode("sent");
+                  setCurrentPage(1);
+                }}
+                className={cn(
+                  "px-4 py-2 text-sm font-medium transition-colors border-b-2",
+                  viewMode === "sent"
+                    ? "border-sky-500 text-sky-600 dark:text-sky-400"
+                    : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                )}
+              >
+                Sent Notifications
+              </button>
+              <button
+                onClick={() => {
+                  setViewMode("scheduled");
+                  setCurrentPage(1);
+                }}
+                className={cn(
+                  "px-4 py-2 text-sm font-medium transition-colors border-b-2",
+                  viewMode === "scheduled"
+                    ? "border-sky-500 text-sky-600 dark:text-sky-400"
+                    : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                )}
+              >
+                Scheduled Notifications
+              </button>
+            </>
           )}
         </div>
+
+        {/* Filters - Show for received and sent notifications (not scheduled) */}
+        {(viewMode === "received" || viewMode === "sent") && (
+          <div className="flex items-center gap-2 overflow-x-auto pb-2">
+            <Filter className="h-4 w-4 text-gray-500 flex-shrink-0" />
+            {["All", "Unread", "Task", "AMC", "Tender", "Payroll", "System", "Other"].map(
+              (filter) => (
+                <button
+                  key={filter}
+                  onClick={() => {
+                    setFilterType(filter as any);
+                    setCurrentPage(1);
+                  }}
+                  className={cn(
+                    "px-4 py-1.5 text-sm rounded-full transition-colors whitespace-nowrap",
+                    filterType === filter
+                      ? "bg-sky-500 text-white"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                  )}
+                >
+                  {filter}
+                  {filter === "Unread" && statistics && statistics.unread_count > 0 && viewMode === "received" && ` (${statistics.unread_count})`}
+                </button>
+              )
+            )}
+          </div>
+        )}
+
+        {/* Type filter for scheduled notifications */}
+        {viewMode === "scheduled" && (
+          <div className="flex items-center gap-2 overflow-x-auto pb-2">
+            <Filter className="h-4 w-4 text-gray-500 flex-shrink-0" />
+            {["All", "Task", "AMC", "Tender", "Payroll", "System", "Other"].map(
+              (filter) => (
+                <button
+                  key={filter}
+                  onClick={() => {
+                    setFilterType(filter as any);
+                    setCurrentPage(1);
+                  }}
+                  className={cn(
+                    "px-4 py-1.5 text-sm rounded-full transition-colors whitespace-nowrap",
+                    filterType === filter
+                      ? "bg-sky-500 text-white"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                  )}
+                >
+                  {filter}
+                </button>
+              )
+            )}
+          </div>
+        )}
 
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
@@ -325,7 +469,19 @@ function NotificationsPageContent() {
           <div className="bg-white dark:bg-gray-900 rounded-lg border p-12 text-center">
             <Inbox className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <p className="text-gray-500 dark:text-gray-400">
-              {searchQuery || filterType !== "All"
+              {viewMode === "scheduled"
+                ? searchQuery || filterType !== "All"
+                  ? "No scheduled notifications found matching your criteria"
+                  : "No scheduled notifications yet"
+                : viewMode === "sent" && isOwner
+                ? searchQuery || filterType !== "All"
+                  ? "No sent notifications found matching your criteria"
+                  : "No sent notifications yet"
+                : viewMode === "received" && isOwner
+                ? searchQuery || filterType !== "All"
+                  ? "No received notifications found matching your criteria"
+                  : "No received notifications yet"
+                : searchQuery || filterType !== "All"
                 ? "No notifications found matching your criteria"
                 : "No notifications yet"}
             </p>
@@ -338,8 +494,10 @@ function NotificationsPageContent() {
                   key={notification.id}
                   className={cn(
                     "bg-white dark:bg-gray-900 rounded-lg border p-4 transition-all hover:shadow-md",
-                    !notification.is_read &&
-                      "border-l-4 border-l-sky-500 bg-sky-50/30 dark:bg-sky-950/20"
+                    viewMode === "scheduled"
+                      ? "border-l-4 border-l-yellow-500 bg-yellow-50/30 dark:bg-yellow-950/20"
+                      : !notification.is_read &&
+                        "border-l-4 border-l-sky-500 bg-sky-50/30 dark:bg-sky-950/20"
                   )}
                 >
                   <div className="flex items-start gap-4">
@@ -362,26 +520,53 @@ function NotificationsPageContent() {
                           <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                             {notification.message}
                           </p>
-                          <div className="flex items-center gap-4 mt-2">
-                            <span className="text-xs text-gray-500">
-                              {formatDistanceToNow(
-                                new Date(notification.created_at),
-                                { addSuffix: true }
-                              )}
-                            </span>
+                          <div className="flex items-center gap-4 mt-2 flex-wrap">
+                            {viewMode === "scheduled" ? (
+                              <>
+                                <span className="text-xs text-gray-500 flex items-center gap-1">
+                                  <Calendar className="h-3 w-3" />
+                                  Scheduled: {format(new Date(notification.scheduled_at || notification.created_at), "PPp")}
+                                </span>
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 flex items-center gap-1">
+                                  <Clock className="h-3 w-3" />
+                                  {formatDistanceToNow(new Date(notification.scheduled_at || notification.created_at), { addSuffix: true })}
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                <span className="text-xs text-gray-500">
+                                  {notification.sent_at
+                                    ? `Sent: ${formatDistanceToNow(new Date(notification.sent_at), { addSuffix: true })}`
+                                    : formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
+                                </span>
+                                {notification.scheduled_at && (
+                                  <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400">
+                                    Was scheduled: {format(new Date(notification.scheduled_at), "PPp")}
+                                  </span>
+                                )}
+                              </>
+                            )}
                             <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
                               {notification.type}
                             </span>
-                            {notification.scheduled_at && (
-                              <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400">
-                                Scheduled: {new Date(notification.scheduled_at).toLocaleString()}
+                            {/* Show recipient for sent notifications (owner view) */}
+                            {isOwner && viewMode === "sent" && notification.recipient_name && (
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">
+                                To: {notification.recipient_name}
+                              </span>
+                            )}
+                            {/* Show sender for received notifications */}
+                            {viewMode === "received" && notification.created_by_username && (
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
+                                From: {notification.created_by_username}
                               </span>
                             )}
                           </div>
                         </div>
 
                         <div className="flex items-center gap-2 flex-shrink-0">
-                          {!notification.is_read && (
+                          {/* Only show mark as read for received notifications */}
+                          {viewMode === "received" && !notification.is_read && (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -395,7 +580,7 @@ function NotificationsPageContent() {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDelete(notification.id)}
-                            title="Delete"
+                            title={viewMode === "scheduled" ? "Cancel scheduled notification" : "Delete"}
                             className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20"
                           >
                             <X className="h-4 w-4" />

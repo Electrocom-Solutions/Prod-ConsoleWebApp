@@ -356,6 +356,7 @@ export type NotificationRecord = {
   scheduled_at?: string | null;
   sent_at?: string | null;
   channel?: string;
+  created_by_username?: string;
 };
 
 export type EmailTemplate = {

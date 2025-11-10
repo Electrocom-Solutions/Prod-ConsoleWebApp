@@ -1199,6 +1199,8 @@ export interface BackendNotificationListItem {
   created_at: string;
   created_by: number | null;
   created_by_username: string | null;
+  recipient: number | null;
+  recipient_username: string | null;
 }
 
 export interface NotificationListResponse {
@@ -4466,17 +4468,24 @@ Please verify:
     search?: string;
     type?: string;
     is_read?: boolean;
+    show_scheduled?: boolean;
+    show_sent_by_me?: boolean;
     page?: number;
   }): Promise<NotificationListResponse> {
     const queryParams = new URLSearchParams();
     if (params?.search) queryParams.append('search', params.search);
     if (params?.type) queryParams.append('type', params.type);
     if (params?.is_read !== undefined) queryParams.append('is_read', params.is_read.toString());
+    if (params?.show_scheduled !== undefined) queryParams.append('show_scheduled', params.show_scheduled.toString());
+    if (params?.show_sent_by_me !== undefined) queryParams.append('show_sent_by_me', params.show_sent_by_me.toString());
     if (params?.page) queryParams.append('page', params.page.toString());
 
     const queryString = queryParams.toString();
     const endpoint = `/api/notifications/${queryString ? `?${queryString}` : ''}`;
-    return this.request<NotificationListResponse>(endpoint);
+
+    return this.request<NotificationListResponse>(endpoint, {
+      method: 'GET',
+    });
   }
 
   /**
