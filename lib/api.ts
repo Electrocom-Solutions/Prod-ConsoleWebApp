@@ -3297,16 +3297,18 @@ Please verify:
    * Upload a new document template
    */
   async uploadDocumentTemplate(data: {
-    title: string;
+    title?: string;
     category?: string;
     firm?: number;
+    template_id?: number;
     upload_file: File;
     notes?: string;
   }): Promise<DocumentUploadResponse> {
     const formData = new FormData();
-    formData.append('title', data.title);
+    if (data.title) formData.append('title', data.title);
     if (data.category) formData.append('category', data.category);
     if (data.firm) formData.append('firm', data.firm.toString());
+    if (data.template_id) formData.append('template_id', data.template_id.toString());
     formData.append('upload_file', data.upload_file);
     if (data.notes) formData.append('notes', data.notes);
 
@@ -3382,6 +3384,20 @@ Please verify:
     }
 
     return response.blob();
+  }
+
+  /**
+   * Get preview URL for published version of a template
+   */
+  getPreviewPublishedUrl(templateId: number): string {
+    return `${this.baseURL}/api/documents/templates/${templateId}/preview-published/`;
+  }
+
+  /**
+   * Get preview URL for a specific version
+   */
+  getPreviewVersionUrl(templateId: number, versionId: number): string {
+    return `${this.baseURL}/api/documents/templates/${templateId}/preview-version/${versionId}/`;
   }
 
   /**

@@ -65,6 +65,7 @@ export default function DocumentsPage() {
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<DocumentTemplate | null>(null);
   const [selectedVersion, setSelectedVersion] = useState<any | null>(null);
+  const [uploadingForTemplate, setUploadingForTemplate] = useState<DocumentTemplate | null>(null);
   const [expandedVersions, setExpandedVersions] = useState<Record<number, boolean>>({});
   const [selectedTemplates, setSelectedTemplates] = useState<Set<number>>(new Set());
   const [showBulkActions, setShowBulkActions] = useState(false);
@@ -92,7 +93,11 @@ export default function DocumentsPage() {
       }
 
       const response = await apiClient.getDocumentTemplates(params);
-      setTemplates(response.results || []);
+      // Filter to only show templates that have a published version
+      const templatesWithPublished = (response.results || []).filter((template: DocumentTemplate) => {
+        return template.published_version !== null && template.published_version !== undefined;
+      });
+      setTemplates(templatesWithPublished);
     } catch (err: any) {
       console.error('Failed to fetch documents:', err);
       setError(err.message || 'Failed to load documents');
@@ -145,16 +150,30 @@ export default function DocumentsPage() {
       setIsUploading(true);
       setError(null);
 
-      await apiClient.uploadDocumentTemplate({
-      title: data.title,
-        category: data.category,
-        firm: data.firm_id,
+      // If uploading for an existing template (new version), use template_id
+      // Otherwise, use title, category, and firm to create new template
+      const uploadData: any = {
         upload_file: data.file,
         notes: data.notes || undefined,
-      });
+      };
 
-      await showAlert('Success', 'Template uploaded successfully', 'success');
+      if (uploadingForTemplate) {
+        // Uploading new version - use template_id
+        uploadData.template_id = uploadingForTemplate.id;
+      } else {
+        // Creating new template - use title, category, firm
+        uploadData.title = data.title;
+        uploadData.category = data.category;
+        if (data.firm_id) {
+          uploadData.firm = data.firm_id;
+        }
+      }
+
+      await apiClient.uploadDocumentTemplate(uploadData);
+
+      await showAlert('Success', uploadingForTemplate ? 'New version uploaded successfully' : 'Template uploaded successfully', 'success');
     setUploadModalOpen(false);
+      setUploadingForTemplate(null);
       // Refetch documents
       await fetchDocuments();
     } catch (err: any) {
@@ -184,7 +203,14 @@ export default function DocumentsPage() {
     }
 
     if (version) {
-      setSelectedVersion(mapVersionToFrontend(version, templateId));
+      // Use preview endpoint URL instead of file URL
+      const previewUrl = versionId 
+        ? apiClient.getPreviewVersionUrl(templateId, versionId)
+        : apiClient.getPreviewPublishedUrl(templateId);
+      
+      const versionData = mapVersionToFrontend(version, templateId);
+      versionData.file_url = previewUrl; // Override with preview endpoint URL
+      setSelectedVersion(versionData);
       setPreviewModalOpen(true);
     }
   };
@@ -844,10 +870,14 @@ export default function DocumentsPage() {
 
       <UploadTemplateModal
         isOpen={uploadModalOpen}
-        onClose={() => setUploadModalOpen(false)}
+        onClose={() => {
+          setUploadModalOpen(false);
+          setUploadingForTemplate(null);
+        }}
         onUpload={handleUpload}
         clients={firmsAsClients}
         isUploading={isUploading}
+        template={uploadingForTemplate}
       />
 
       {selectedTemplate && (
@@ -871,6 +901,7 @@ export default function DocumentsPage() {
           }}
           onUploadNewVersion={() => {
             setVersionModalOpen(false);
+            setUploadingForTemplate(selectedTemplate);
             setUploadModalOpen(true);
           }}
         />

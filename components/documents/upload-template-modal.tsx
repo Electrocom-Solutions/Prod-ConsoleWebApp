@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Upload, File } from 'lucide-react';
 import { Client } from '@/types';
+import { DocumentTemplate } from '@/lib/api';
 
 type UploadTemplateModalProps = {
   isOpen: boolean;
@@ -20,7 +21,7 @@ type UploadTemplateModalProps = {
 
 const categories = ['Work Order', 'Experience Certificate', 'Tender Document', 'Affidavit', 'AMC', 'Invoice', 'Contract', 'Report', 'Other'];
 
-export function UploadTemplateModal({ isOpen, onClose, onUpload, clients, isUploading = false }: UploadTemplateModalProps) {
+export function UploadTemplateModal({ isOpen, onClose, onUpload, clients, isUploading = false, template }: UploadTemplateModalProps) {
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('');
   const [firmId, setFirmId] = useState<number | ''>('');
@@ -28,6 +29,23 @@ export function UploadTemplateModal({ isOpen, onClose, onUpload, clients, isUplo
   const [notes, setNotes] = useState('');
   const [dragActive, setDragActive] = useState(false);
   const [error, setError] = useState('');
+
+  // Pre-fill form when uploading a new version
+  useEffect(() => {
+    if (isOpen && template) {
+      setTitle(template.title);
+      setCategory(template.category || '');
+      setFirmId(template.firm || '');
+    } else if (isOpen && !template) {
+      // Reset form for new template
+      setTitle('');
+      setCategory('');
+      setFirmId('');
+      setFile(null);
+      setNotes('');
+      setError('');
+    }
+  }, [isOpen, template]);
 
   if (!isOpen) return null;
 
@@ -84,14 +102,17 @@ export function UploadTemplateModal({ isOpen, onClose, onUpload, clients, isUplo
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!title.trim()) {
-      setError('Title is required');
-      return;
-    }
-    
-    if (!category) {
-      setError('Category is required');
-      return;
+    // When uploading a new version, title and category are not required (they come from template)
+    if (!template) {
+      if (!title.trim()) {
+        setError('Title is required');
+        return;
+      }
+      
+      if (!category) {
+        setError('Category is required');
+        return;
+      }
     }
     
     if (!file) {
@@ -101,17 +122,19 @@ export function UploadTemplateModal({ isOpen, onClose, onUpload, clients, isUplo
 
     try {
       await onUpload({ 
-        title, 
-        category, 
+        title: title || template?.title || '', 
+        category: category || template?.category || '', 
         firm_id: firmId === '' ? undefined : firmId,
         file, 
         notes 
       });
       
       // Only clear form if upload was successful
-      setTitle('');
-      setCategory('');
-      setFirmId('');
+      if (!template) {
+        setTitle('');
+        setCategory('');
+        setFirmId('');
+      }
       setFile(null);
       setNotes('');
       setError('');
@@ -135,7 +158,9 @@ export function UploadTemplateModal({ isOpen, onClose, onUpload, clients, isUplo
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="w-full max-w-2xl rounded-lg bg-white dark:bg-gray-900 p-6 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">Upload Template</h2>
+          <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
+            {template ? 'Upload New Version' : 'Upload Template'}
+          </h2>
           <button
             onClick={handleClose}
             className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-300"
@@ -147,25 +172,32 @@ export function UploadTemplateModal({ isOpen, onClose, onUpload, clients, isUplo
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Title <span className="text-red-500">*</span>
+              Title {!template && <span className="text-red-500">*</span>}
             </label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+              disabled={!!template}
+              className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:bg-gray-100 dark:disabled:bg-gray-700 disabled:cursor-not-allowed"
               placeholder="Enter template title"
             />
+            {template && (
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Title is inherited from the template
+              </p>
+            )}
           </div>
 
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Category <span className="text-red-500">*</span>
+              Category {!template && <span className="text-red-500">*</span>}
             </label>
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+              disabled={!!template}
+              className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:bg-gray-100 dark:disabled:bg-gray-700 disabled:cursor-not-allowed"
             >
               <option value="">Select a category</option>
               {categories.map((cat) => (
@@ -174,16 +206,22 @@ export function UploadTemplateModal({ isOpen, onClose, onUpload, clients, isUplo
                 </option>
               ))}
             </select>
+            {template && (
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Category is inherited from the template
+              </p>
+            )}
           </div>
 
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Firm (Optional)
+              Firm {!template && <span className="text-gray-500">(Optional)</span>}
             </label>
             <select
               value={firmId}
               onChange={(e) => setFirmId(e.target.value === '' ? '' : Number(e.target.value))}
-              className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+              disabled={!!template}
+              className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:bg-gray-100 dark:disabled:bg-gray-700 disabled:cursor-not-allowed"
             >
               <option value="">No firm association</option>
               {clients.map((client) => (
@@ -192,6 +230,11 @@ export function UploadTemplateModal({ isOpen, onClose, onUpload, clients, isUplo
                 </option>
               ))}
             </select>
+            {template && (
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Firm is inherited from the template
+              </p>
+            )}
           </div>
 
           <div>
@@ -277,7 +320,7 @@ export function UploadTemplateModal({ isOpen, onClose, onUpload, clients, isUplo
               disabled={isUploading}
               className="rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isUploading ? 'Uploading...' : 'Upload Template'}
+              {isUploading ? 'Uploading...' : template ? 'Upload New Version' : 'Upload Template'}
             </button>
           </div>
         </form>
