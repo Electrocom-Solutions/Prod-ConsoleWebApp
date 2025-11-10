@@ -5,9 +5,10 @@ import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Building2, Plus, Edit, Trash2, X, Search, Loader2 } from "lucide-react";
 import { showSuccess, showDeleteConfirm, showError } from "@/lib/sweetalert";
-import { apiClient, BackendFirmListItem, FirmDetail, FirmCreateData, BackendEmployeeListItem, EmployeeListResponse, ProfileCreateData, CurrentUserProfile } from "@/lib/api";
+import { apiClient, BackendFirmListItem, FirmDetail, FirmCreateData, BackendProfileListItem, ProfileListResponse, ProfileCreateData, CurrentUserProfile } from "@/lib/api";
 import { useDebounce } from "use-debounce";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 
@@ -44,7 +45,7 @@ function mapBackendFirmListItemToFrontend(backendFirm: BackendFirmListItem): {
 
 function SettingsPageContent() {
   const [firms, setFirms] = useState<BackendFirmListItem[]>([]);
-  const [employees, setEmployees] = useState<BackendEmployeeListItem[]>([]);
+  const [profiles, setProfiles] = useState<BackendProfileListItem[]>([]);
   const [showFirmModal, setShowFirmModal] = useState(false);
   const [selectedFirm, setSelectedFirm] = useState<BackendFirmListItem | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -58,15 +59,18 @@ function SettingsPageContent() {
   const [showProfileModal, setShowProfileModal] = useState(false);
 
   /**
-   * Fetch employees for firm owner profile selection
+   * Fetch profiles for firm owner profile selection
    */
-  const fetchEmployees = useCallback(async () => {
+  const fetchProfiles = useCallback(async (search?: string) => {
     try {
-      const response: EmployeeListResponse = await apiClient.getEmployees({});
-      setEmployees(response.results);
+      const response: ProfileListResponse = await apiClient.getProfiles({
+        search: search || undefined,
+        page_size: 100, // Get more profiles for dropdown
+      });
+      setProfiles(response.results);
     } catch (err: any) {
-      console.error('Error fetching employees:', err);
-      // Don't show error for employees, just log it
+      console.error('Error fetching profiles:', err);
+      // Don't show error for profiles, just log it
     }
   }, []);
 
@@ -102,8 +106,8 @@ function SettingsPageContent() {
   }, [debouncedSearch, filterType, currentPage]);
 
   useEffect(() => {
-    fetchEmployees();
-  }, [fetchEmployees]);
+    fetchProfiles();
+  }, [fetchProfiles]);
 
   useEffect(() => {
     fetchFirms();
@@ -365,21 +369,22 @@ function SettingsPageContent() {
         )}
       </div>
 
-      {showFirmModal && (
-        <FirmModal
-          firm={selectedFirm}
-          employees={employees}
-          onClose={() => {
-            setShowFirmModal(false);
-            setSelectedFirm(null);
-          }}
-          onSave={handleSaveFirm}
-          isSaving={isSaving}
-          showProfileModal={showProfileModal}
-          setShowProfileModal={setShowProfileModal}
-          onCreateProfile={handleCreateProfile}
-        />
-      )}
+        {showFirmModal && (
+          <FirmModal
+            firm={selectedFirm}
+            profiles={profiles}
+            onClose={() => {
+              setShowFirmModal(false);
+              setSelectedFirm(null);
+            }}
+            onSave={handleSaveFirm}
+            isSaving={isSaving}
+            showProfileModal={showProfileModal}
+            setShowProfileModal={setShowProfileModal}
+            onCreateProfile={handleCreateProfile}
+            onSearchProfiles={fetchProfiles}
+          />
+        )}
 
       {showProfileModal && (
         <ProfileCreateModal
@@ -396,22 +401,24 @@ function SettingsPageContent() {
 // Firm Modal Component
 function FirmModal({
   firm,
-  employees,
+  profiles,
   onClose,
   onSave,
   isSaving,
   showProfileModal,
   setShowProfileModal,
   onCreateProfile,
+  onSearchProfiles,
 }: {
   firm: BackendFirmListItem | null;
-  employees: BackendEmployeeListItem[];
+  profiles: BackendProfileListItem[];
   onClose: () => void;
   onSave: (firm: FirmCreateData & { id?: number }) => Promise<void>;
   isSaving: boolean;
   showProfileModal: boolean;
   setShowProfileModal: (show: boolean) => void;
   onCreateProfile: (profile: ProfileCreateData) => Promise<void>;
+  onSearchProfiles: (search?: string) => Promise<void>;
 }) {
   const [formData, setFormData] = useState({
     firm_name: firm?.firm_name || "",
@@ -484,24 +491,35 @@ function FirmModal({
     fetchFirmDetail();
   }, [firm]);
 
-  // Filter employees based on search
-  const filteredEmployees = useMemo(() => {
-    const searchTerm = formData.owner_search.toLowerCase().trim();
-    if (!searchTerm) {
-      // Show all employees when search is empty (limit to 50 for performance)
-      return employees.slice(0, 50);
-    }
-    return employees.filter((employee) => {
-      const fullName = employee.full_name?.toLowerCase() || "";
-      const phoneNumber = employee.phone_number?.toLowerCase() || "";
-      return (
-        fullName.includes(searchTerm) ||
-        employee.employee_code.toLowerCase().includes(searchTerm) ||
-        employee.email?.toLowerCase().includes(searchTerm) ||
-        phoneNumber.includes(searchTerm)
-      );
-    });
-  }, [employees, formData.owner_search]);
+  const [searchProfilesDebounced] = useDebounce(formData.owner_search, 500);
+  const [filteredProfiles, setFilteredProfiles] = useState<BackendProfileListItem[]>(profiles);
+  const [isSearchingProfiles, setIsSearchingProfiles] = useState(false);
+
+  // Fetch profiles from backend when search changes
+  useEffect(() => {
+    const searchProfiles = async () => {
+      if (searchProfilesDebounced) {
+        setIsSearchingProfiles(true);
+        try {
+          const response: ProfileListResponse = await apiClient.getProfiles({
+            search: searchProfilesDebounced,
+            page_size: 50,
+          });
+          setFilteredProfiles(response.results);
+        } catch (err: any) {
+          console.error('Error searching profiles:', err);
+          setFilteredProfiles([]);
+        } finally {
+          setIsSearchingProfiles(false);
+        }
+      } else {
+        // Show all profiles when search is empty
+        setFilteredProfiles(profiles.slice(0, 50));
+      }
+    };
+
+    searchProfiles();
+  }, [searchProfilesDebounced, profiles]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -518,15 +536,22 @@ function FirmModal({
     }
   }, [showOwnerDropdown]);
 
-  const handleOwnerSelect = (employee: BackendEmployeeListItem) => {
+  const handleOwnerSelect = (profile: BackendProfileListItem) => {
     setFormData({
       ...formData,
-      firm_owner_profile_id: employee.profile_id,
-      firm_owner_profile_name: employee.full_name || employee.employee_code,
-      owner_search: employee.full_name || employee.employee_code,
+      firm_owner_profile_id: profile.id,
+      firm_owner_profile_name: profile.full_name || profile.username,
+      owner_search: profile.full_name || profile.username,
     });
     setShowOwnerDropdown(false);
   };
+
+  // Update filtered profiles when profiles list changes
+  useEffect(() => {
+    if (!formData.owner_search) {
+      setFilteredProfiles(profiles.slice(0, 50));
+    }
+  }, [profiles, formData.owner_search]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -619,36 +644,41 @@ function FirmModal({
                       setShowOwnerDropdown(true);
                     }}
                     onFocus={() => {
-                      if (employees.length > 0) {
+                      if (profiles.length > 0 || formData.owner_search) {
                         setShowOwnerDropdown(true);
                       }
                     }}
-                    placeholder="Search by name, email, or contact number..."
+                    placeholder="Search by name, email, or phone number..."
                     disabled={isSaving}
                     className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm dark:text-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                   {showOwnerDropdown && (
                     <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                      {filteredEmployees.length > 0 ? (
-                        filteredEmployees.map((employee) => {
-                          const displayName = employee.full_name || employee.employee_code;
+                      {isSearchingProfiles ? (
+                        <div className="p-4 text-sm text-gray-500 dark:text-gray-400 text-center">
+                          <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
+                          Searching...
+                        </div>
+                      ) : filteredProfiles.length > 0 ? (
+                        filteredProfiles.map((profile) => {
+                          const displayName = profile.full_name || profile.username;
                           return (
                             <button
-                              key={employee.id}
+                              key={profile.id}
                               type="button"
-                              onClick={() => handleOwnerSelect(employee)}
+                              onClick={() => handleOwnerSelect(profile)}
                               className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 focus:bg-gray-100 dark:focus:bg-gray-700 focus:outline-none"
                             >
                               <div className="font-medium">{displayName}</div>
                               <div className="text-xs text-gray-500 dark:text-gray-400">
-                                {employee.employee_code} • {employee.email || 'N/A'} • {employee.phone_number || 'N/A'}
+                                {profile.email || 'N/A'} • {profile.phone_number || 'N/A'}
                               </div>
                             </button>
                           );
                         })
                       ) : (
                         <div className="p-4 text-sm text-gray-500 dark:text-gray-400 text-center">
-                          {formData.owner_search ? 'No employees found' : 'Start typing to search...'}
+                          {formData.owner_search ? 'No profiles found' : 'Start typing to search...'}
                         </div>
                       )}
                     </div>
@@ -907,10 +937,10 @@ function ProfileCreateModal({
                 <label className="block text-sm font-medium mb-2 dark:text-gray-200">
                   Date of Birth
                 </label>
-                <Input
-                  type="date"
-                  value={formData.date_of_birth}
-                  onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
+                <DatePicker
+                  value={formData.date_of_birth || undefined}
+                  onChange={(value) => setFormData({ ...formData, date_of_birth: value })}
+                  placeholder="Select date of birth"
                   disabled={isSaving}
                 />
               </div>

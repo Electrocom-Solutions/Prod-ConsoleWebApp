@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { X, Loader2 } from "lucide-react";
 import { Tender, TenderFinancials } from "@/types";
+import { DatePicker } from "@/components/ui/date-picker";
 
 interface TenderFormModalProps {
   isOpen: boolean;

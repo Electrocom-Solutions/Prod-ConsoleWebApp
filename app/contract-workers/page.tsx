@@ -6,6 +6,7 @@ import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Plus, Search, Upload, Edit, Trash2, X, User, Phone, MapPin, Mail, Loader2, Inbox, FileText } from "lucide-react";
 import { showDeleteConfirm, showAlert, showSuccess } from "@/lib/sweetalert";
 import { apiClient, ContractWorkerStatisticsResponse, BackendContractWorkerListItem, ContractWorkerDetail, ContractWorkerCreateData, BulkUploadContractWorkerResponse, BackendProjectListItem } from "@/lib/api";
@@ -757,10 +758,10 @@ function WorkerModal({ worker, projects, onClose, onSave, isSaving }: {
                 <label className="block text-sm font-medium mb-2 text-gray-900 dark:text-white">
                   Date of Birth
                 </label>
-                <Input
-                  type="date"
-                  value={formData.date_of_birth}
-                  onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
+                <DatePicker
+                  value={formData.date_of_birth || undefined}
+                  onChange={(value) => setFormData({ ...formData, date_of_birth: value })}
+                  placeholder="Select date of birth"
                 />
               </div>
               <div>

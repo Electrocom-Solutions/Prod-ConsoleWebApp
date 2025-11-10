@@ -6,6 +6,7 @@ import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Plus, Search, Mail, Phone, MapPin, Edit, Trash2, X, User, Briefcase, Loader2, Inbox } from "lucide-react";
 import { showDeleteConfirm, showAlert, showSuccess } from "@/lib/sweetalert";
 import { apiClient, EmployeeStatisticsResponse, BackendEmployeeListItem, EmployeeDetail, EmployeeCreateData } from "@/lib/api";
@@ -702,10 +703,10 @@ function EmployeeModal({ employee, onClose, onSave, isSaving }: {
                 <label className="block text-sm font-medium mb-2 text-gray-900 dark:text-white">
                   Date of Birth
                 </label>
-                <Input
-                  type="date"
-                  value={formData.date_of_birth}
-                  onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
+                <DatePicker
+                  value={formData.date_of_birth || undefined}
+                  onChange={(value) => setFormData({ ...formData, date_of_birth: value })}
+                  placeholder="Select date of birth"
                 />
               </div>
               <div>
@@ -911,10 +912,10 @@ function EmployeeModal({ employee, onClose, onSave, isSaving }: {
                 <label className="block text-sm font-medium mb-2 text-gray-900 dark:text-white">
                   Joining Date <span className="text-red-500">*</span>
                 </label>
-                <Input
-                  type="date"
-                  value={formData.joining_date}
-                  onChange={(e) => setFormData({ ...formData, joining_date: e.target.value })}
+                <DatePicker
+                  value={formData.joining_date || undefined}
+                  onChange={(value) => setFormData({ ...formData, joining_date: value })}
+                  placeholder="Select joining date"
                   required
                 />
               </div>

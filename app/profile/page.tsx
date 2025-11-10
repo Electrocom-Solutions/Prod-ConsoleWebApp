@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { User, Camera, Save, Loader2 } from "lucide-react";
 import { showSuccess, showError, showAlert } from "@/lib/sweetalert";
 import { apiClient, CurrentUserProfile, CurrentUserProfileUpdateData } from "@/lib/api";
@@ -286,10 +287,10 @@ export default function ProfilePage() {
                   <label className="block text-sm font-medium mb-2 dark:text-gray-200">
                     Date of Birth <span className="text-red-500">*</span>
                   </label>
-                  <Input
-                    type="date"
-                    value={formData.date_of_birth}
-                    onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
+                  <DatePicker
+                    value={formData.date_of_birth || undefined}
+                    onChange={(value) => setFormData({ ...formData, date_of_birth: value })}
+                    placeholder="Select date of birth"
                     required
                     disabled={isSaving}
                   />

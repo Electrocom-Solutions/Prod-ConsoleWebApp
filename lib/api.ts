@@ -616,6 +616,24 @@ export interface ProfileCreateData {
   pan_card?: File;
 }
 
+export interface BackendProfileListItem {
+  id: number;
+  username: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  phone_number: string | null;
+  created_at: string;
+}
+
+export interface ProfileListResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: BackendProfileListItem[];
+}
+
 export interface BulkDownloadRequest {
   version_ids?: number[];
   template_ids?: number[];
@@ -2379,6 +2397,27 @@ Please verify:
     return this.request<CurrentUserProfile>('/api/profile/update/', {
       method: 'PATCH',
       body: formData,
+    });
+  }
+
+  /**
+   * List all profiles with optional search
+   */
+  async getProfiles(params?: {
+    search?: string;
+    page?: number;
+    page_size?: number;
+  }): Promise<ProfileListResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.page_size) queryParams.append('page_size', params.page_size.toString());
+    
+    const queryString = queryParams.toString();
+    const url = `/api/profiles/${queryString ? `?${queryString}` : ''}`;
+    
+    return this.request<ProfileListResponse>(url, {
+      method: 'GET',
     });
   }
 
