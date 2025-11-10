@@ -51,6 +51,7 @@ function mapBackendTenderListItemToFrontend(backendTender: BackendTenderListItem
   };
 }
 
+
 /**
  * Map backend tender detail to frontend Tender type
  */
@@ -103,6 +104,7 @@ function TendersPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [tenders, setTenders] = useState<Tender[]>([]);
+  const [backendTenders, setBackendTenders] = useState<BackendTenderListItem[]>([]); // Store backend data for emd_collected status
   const [statistics, setStatistics] = useState<TenderStatisticsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -149,6 +151,7 @@ function TendersPageContent() {
       if (emdFilter) params.pending_emds = true;
 
       const response = await apiClient.getTenders(params);
+      setBackendTenders(response.results); // Store backend data with emd_collected status
       setTenders(response.results.map(mapBackendTenderListItemToFrontend));
       setTotalPages(Math.ceil(response.count / 20)); // Assuming 20 items per page
     } catch (err: any) {
@@ -291,17 +294,26 @@ function TendersPageContent() {
     const tender = tenders.find((t) => t.id === tenderId);
     if (!tender) return;
 
-    const collectionType = tender.status === "Lost" ? "SD1 (2%)" : "EMD (5%)";
     const confirmed = await showConfirm(
-      "Mark as Collected",
-      `Mark ${collectionType} as collected for tender "${tender.name}"?`,
-      "Yes, mark as collected",
-      "Cancel"
+      "Mark EMD as Collected",
+      `Are you sure you want to mark EMD as collected for tender "${tender.name}"?`,
+      "question"
     );
-    if (confirmed) {
-      // This would require a specific API endpoint for marking EMD as collected.
-      // For now, we'll show an info message.
-      showAlert("Info", "EMD collection marking functionality is a placeholder. This would require a backend API endpoint.", "info");
+
+    if (!confirmed) return;
+
+    setIsSaving(true);
+    try {
+      await apiClient.markTenderEMDCollected(tenderId);
+      showAlert("Success", "EMD marked as collected successfully!", "success");
+      // Refresh tenders and statistics
+      await fetchTenders();
+      await fetchStatistics();
+    } catch (err: any) {
+      console.error("Failed to mark EMD as collected:", err);
+      showAlert("Error", err.message || "Failed to mark EMD as collected.", "error");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -467,7 +479,7 @@ function TendersPageContent() {
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Value</p>
                 <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-                  ₹{(statistics ? statistics.total_value_awarded / 10000000 : 0).toFixed(1)}Cr
+                  ₹{statistics?.total_value_awarded?.toLocaleString("en-IN") ?? "0"}
                 </p>
               </div>
               <div className="rounded-full bg-purple-100 p-3 dark:bg-purple-900/30">
@@ -495,7 +507,7 @@ function TendersPageContent() {
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pending EMD Amt</p>
                 <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-                  ₹{(statistics ? statistics.pending_emd_amount / 100000 : 0).toFixed(1)}L
+                  ₹{statistics?.pending_emd_amount?.toLocaleString("en-IN") ?? "0"}
                 </p>
               </div>
               <div className="rounded-full bg-red-100 p-3 dark:bg-red-900/30">
@@ -641,7 +653,7 @@ function TendersPageContent() {
                           {format(new Date(tender.end_date), "dd MMM yyyy")}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                          ₹{(tender.estimated_value / 100000).toFixed(2)}L
+                          ₹{tender.estimated_value.toLocaleString("en-IN")}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span
@@ -653,19 +665,28 @@ function TendersPageContent() {
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                          {financials ? `₹${(financials.emd_amount / 100000).toFixed(2)}L` : "-"}
+                          {financials ? `₹${financials.emd_amount.toLocaleString("en-IN")}` : "-"}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <div className="flex justify-end gap-2">
-                            {(tender.status === "Closed" || tender.status === "Lost") && (
-                              <button
-                                onClick={() => handleMarkEMDCollected(tender.id)}
-                                className="rounded bg-orange-50 px-2 py-1 text-xs font-medium text-orange-600 hover:bg-orange-100 dark:bg-orange-900/30 dark:text-orange-400 dark:hover:bg-orange-900/50"
-                                title="Mark as Collected"
-                              >
-                                Mark Collected
-                              </button>
-                            )}
+                            {(tender.status === "Closed" || tender.status === "Lost") && (() => {
+                              const backendTender = backendTenders.find((bt) => bt.id === tender.id);
+                              const isEMDCollected = backendTender?.emd_collected || false;
+                              return !isEMDCollected ? (
+                                <button
+                                  onClick={() => handleMarkEMDCollected(tender.id)}
+                                  disabled={isSaving}
+                                  className="rounded bg-orange-50 px-2 py-1 text-xs font-medium text-orange-600 hover:bg-orange-100 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-orange-900/30 dark:text-orange-400 dark:hover:bg-orange-900/50"
+                                  title="Mark EMD as Collected"
+                                >
+                                  Mark Collected
+                                </button>
+                              ) : (
+                                <span className="rounded bg-green-50 px-2 py-1 text-xs font-medium text-green-600 dark:bg-green-900/30 dark:text-green-400" title="EMD Already Collected">
+                                  Collected
+                                </span>
+                              );
+                            })()}
                             <Link
                               href={`/tenders/${tender.id}`}
                               className="rounded p-1 text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white"
@@ -734,7 +755,7 @@ function TendersPageContent() {
                         <div className="mt-3 space-y-2">
                           <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                             <IndianRupee className="h-3 w-3" />
-                            <span>₹{(tender.estimated_value / 100000).toFixed(2)}L</span>
+                            <span>₹{tender.estimated_value.toLocaleString("en-IN")}</span>
                           </div>
                           {tender.filed_date && (
                             <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
@@ -745,7 +766,7 @@ function TendersPageContent() {
                           {financials && (
                             <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                               <AlertCircle className="h-3 w-3" />
-                              <span>EMD: ₹{(financials.emd_amount / 100000).toFixed(2)}L</span>
+                              <span>EMD: ₹{financials.emd_amount.toLocaleString("en-IN")}</span>
                             </div>
                           )}
                         </div>
