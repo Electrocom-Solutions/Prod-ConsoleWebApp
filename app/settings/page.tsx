@@ -410,6 +410,7 @@ function FirmModal({
   setShowProfileModal,
   onCreateProfile,
   onSearchProfiles,
+  onProfileCreated,
 }: {
   firm: BackendFirmListItem | null;
   profiles: BackendProfileListItem[];
@@ -562,7 +563,8 @@ function FirmModal({
         }));
       });
     }
-  }, [onProfileCreated]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Update filtered profiles when profiles list changes
   useEffect(() => {
