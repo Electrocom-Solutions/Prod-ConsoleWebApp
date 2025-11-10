@@ -31,7 +31,7 @@ export default function RootLayout({
       <body className="antialiased">
         <ThemeProvider>
           <AuthProvider>
-            {children}
+        {children}
           </AuthProvider>
         </ThemeProvider>
       </body>

@@ -241,12 +241,12 @@ Error: ${error.message}`;
               }}
               onMouseEnter={(e) => {
                 if (!isLoading) {
-                  e.currentTarget.style.backgroundColor = "#0056CC";
+                e.currentTarget.style.backgroundColor = "#0056CC";
                 }
               }}
               onMouseLeave={(e) => {
                 if (!isLoading) {
-                  e.currentTarget.style.backgroundColor = "#007BFF";
+                e.currentTarget.style.backgroundColor = "#007BFF";
                 }
               }}
             >

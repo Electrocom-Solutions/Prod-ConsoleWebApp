@@ -46,26 +46,26 @@ function DashboardContent() {
 
   const statsTiles = stats
     ? [
-        {
-          title: "Total Clients",
+    {
+      title: "Total Clients",
           value: stats.total_clients.toString(),
-          icon: Users,
-        },
-        {
-          title: "Active AMCs",
+      icon: Users,
+    },
+    {
+      title: "Active AMCs",
           value: stats.active_amcs_count.toString(),
-          icon: FileCheck,
-        },
-        {
-          title: "Active Tenders",
+      icon: FileCheck,
+    },
+    {
+      title: "Active Tenders",
           value: stats.active_tenders_count.toString(),
-          icon: Briefcase,
-        },
-        {
-          title: "Tasks In Progress",
+      icon: Briefcase,
+    },
+    {
+      title: "Tasks In Progress",
           value: stats.in_progress_tasks_count.toString(),
-          icon: CheckSquare,
-        },
+      icon: CheckSquare,
+    },
       ]
     : [];
 
@@ -140,34 +140,34 @@ function DashboardContent() {
             </CardHeader>
             <CardContent>
               {stats.expiring_amcs && stats.expiring_amcs.length > 0 ? (
-                <div className="space-y-4">
+              <div className="space-y-4">
                   {stats.expiring_amcs.map((amc, index) => (
-                    <div
+                  <div
                       key={index}
-                      className="flex items-center justify-between rounded-lg border p-4"
-                    >
-                      <div className="flex-1">
+                    className="flex items-center justify-between rounded-lg border p-4"
+                  >
+                    <div className="flex-1">
                         <p className="font-medium">{amc.client_name}</p>
                         <p className="text-sm text-gray-500">{amc.amc_number}</p>
-                        <p className="text-xs text-gray-400 mt-1">
+                      <p className="text-xs text-gray-400 mt-1">
                           Expires: {formatDate(amc.amc_expiry_date)}
-                        </p>
-                      </div>
-                      <Badge
-                        variant={amc.expiry_count_days <= 7 ? "danger" : "warning"}
-                      >
-                        {amc.expiry_count_days} {amc.expiry_count_days === 1 ? "day" : "days"}
-                      </Badge>
+                      </p>
                     </div>
-                  ))}
+                    <Badge
+                        variant={amc.expiry_count_days <= 7 ? "danger" : "warning"}
+                    >
+                        {amc.expiry_count_days} {amc.expiry_count_days === 1 ? "day" : "days"}
+                    </Badge>
+                  </div>
+                ))}
                   <Button
                     variant="outline"
                     className="w-full"
                     onClick={() => router.push("/amc")}
                   >
-                    View All AMCs
-                  </Button>
-                </div>
+                  View All AMCs
+                </Button>
+              </div>
               ) : (
                 <div className="flex flex-col items-center justify-center py-8 text-center">
                   <Inbox className="h-12 w-12 text-gray-400 mb-4" />
@@ -190,25 +190,25 @@ function DashboardContent() {
             </CardHeader>
             <CardContent>
               {stats.recent_activities && stats.recent_activities.length > 0 ? (
-                <div className="space-y-4">
+              <div className="space-y-4">
                   {stats.recent_activities.map((activity) => (
-                    <div key={activity.id} className="flex gap-4">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-100 dark:bg-sky-900">
-                        <AlertCircle className="h-4 w-4 text-sky-600 dark:text-sky-400" />
-                      </div>
-                      <div className="flex-1 space-y-1">
+                  <div key={activity.id} className="flex gap-4">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-100 dark:bg-sky-900">
+                      <AlertCircle className="h-4 w-4 text-sky-600 dark:text-sky-400" />
+                    </div>
+                    <div className="flex-1 space-y-1">
                         <p className="text-sm font-medium">{activity.action}</p>
-                        <p className="text-sm text-gray-500">
-                          {activity.description}
-                        </p>
+                      <p className="text-sm text-gray-500">
+                        {activity.description}
+                      </p>
                         <p className="text-xs text-gray-400">
                           {formatTimeAgo(activity.created_at)}
                           {activity.created_by_username && ` by ${activity.created_by_username}`}
                         </p>
-                      </div>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
+              </div>
               ) : (
                 <div className="flex flex-col items-center justify-center py-8 text-center">
                   <Inbox className="h-12 w-12 text-gray-400 mb-4" />

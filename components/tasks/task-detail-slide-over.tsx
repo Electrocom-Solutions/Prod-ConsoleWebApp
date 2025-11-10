@@ -122,7 +122,7 @@ export function TaskDetailSlideOver({
         }));
         setResources(mappedResources);
       } else {
-        setResources(initialResources);
+      setResources(initialResources);
       }
 
       setInternalNote(detail.internal_notes || "");
@@ -202,8 +202,8 @@ export function TaskDetailSlideOver({
       }
     } else {
       // Just remove from local state if it's a new resource
-      setResources((prev) => prev.filter((r) => r.id !== resourceId));
-      setHasChanges(true);
+    setResources((prev) => prev.filter((r) => r.id !== resourceId));
+    setHasChanges(true);
     }
   };
 
@@ -219,7 +219,7 @@ export function TaskDetailSlideOver({
     setIsSaving(true);
     try {
       // Update task internal notes
-      if (onSave) {
+    if (onSave) {
         await onSave({ ...task, internal_notes: internalNote }, resources);
       } else {
         // Fallback: update directly via API
@@ -419,67 +419,67 @@ export function TaskDetailSlideOver({
               <p className="ml-3 text-gray-500">Loading task details...</p>
             </div>
           ) : (
-            <div className="space-y-8">
-              {/* Task Info */}
-              <section>
-                <h3 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
-                  Task Information
-                </h3>
-                <div className="space-y-4 rounded-lg bg-gray-50 p-4 dark:bg-gray-900">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                        <Calendar className="h-4 w-4" />
-                        <span>Date</span>
-                      </div>
-                      <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
-                        {format(new Date(task.date), "MMMM dd, yyyy")}
-                      </p>
+          <div className="space-y-8">
+            {/* Task Info */}
+            <section>
+              <h3 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
+                Task Information
+              </h3>
+              <div className="space-y-4 rounded-lg bg-gray-50 p-4 dark:bg-gray-900">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                      <Calendar className="h-4 w-4" />
+                      <span>Date</span>
                     </div>
-                    <div>
-                      <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                        <Clock className="h-4 w-4" />
-                        <span>Time Taken</span>
-                      </div>
-                      <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
-                        {`${task.time_taken_minutes} minutes (${(task.time_taken_minutes / 60).toFixed(1)} hrs)`}
-                      </p>
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                        <MapPin className="h-4 w-4" />
-                        <span>Location</span>
-                      </div>
-                      <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
-                        {task.location || "-"}
-                      </p>
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                        <Briefcase className="h-4 w-4" />
-                        <span>Project</span>
-                      </div>
-                      <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
-                        {task.project_name || "-"}
-                      </p>
-                    </div>
+                    <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
+                      {format(new Date(task.date), "MMMM dd, yyyy")}
+                    </p>
                   </div>
-                  {taskDetail?.task_description && (
-                    <div>
-                      <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                        <FileText className="h-4 w-4" />
-                        <span>Description</span>
-                      </div>
-                      <p className="mt-1 text-sm text-gray-900 dark:text-white">
-                        {taskDetail.task_description}
-                      </p>
+                  <div>
+                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                      <Clock className="h-4 w-4" />
+                      <span>Time Taken</span>
                     </div>
-                  )}
+                    <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
+                        {`${task.time_taken_minutes} minutes (${(task.time_taken_minutes / 60).toFixed(1)} hrs)`}
+                    </p>
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                      <MapPin className="h-4 w-4" />
+                      <span>Location</span>
+                    </div>
+                    <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
+                        {task.location || "-"}
+                    </p>
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                      <Briefcase className="h-4 w-4" />
+                      <span>Project</span>
+                    </div>
+                    <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
+                        {task.project_name || "-"}
+                    </p>
+                  </div>
                 </div>
-              </section>
+                  {taskDetail?.task_description && (
+                <div>
+                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                    <FileText className="h-4 w-4" />
+                    <span>Description</span>
+                  </div>
+                  <p className="mt-1 text-sm text-gray-900 dark:text-white">
+                        {taskDetail.task_description}
+                  </p>
+                </div>
+                  )}
+              </div>
+            </section>
 
             {/* Attachments */}
-            <section>
+              <section>
               <div className="mb-4 flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                   Attachments ({attachments.length})
@@ -555,7 +555,7 @@ export function TaskDetailSlideOver({
                   <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">No attachments</p>
                 </div>
               )}
-            </section>
+              </section>
 
             {/* Resources Used */}
             <section>
@@ -592,127 +592,127 @@ export function TaskDetailSlideOver({
                   </button>
                 </div>
               ) : (
-                <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
-                  <table className="w-full">
-                    <thead className="bg-gray-50 dark:bg-gray-900">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
-                          Resource Name
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
-                          Quantity
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
-                          Unit
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
-                          Unit Cost (₹)
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
-                          Total Cost (₹)
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                      {resources.map((resource) => (
-                        <tr key={resource.id} className="bg-white dark:bg-gray-800">
-                          <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
-                            {resource.resource_name || (
-                              <input
-                                type="text"
-                                placeholder="Enter name"
-                                className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm dark:border-gray-600 dark:bg-gray-700"
-                                onChange={(e) => {
-                                  setResources((prev) =>
-                                    prev.map((r) =>
-                                      r.id === resource.id
-                                        ? { ...r, resource_name: e.target.value }
-                                        : r
-                                    )
-                                  );
-                                  setHasChanges(true);
-                                }}
-                              />
-                            )}
-                          </td>
-                          <td className="px-4 py-3">
+              <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                <table className="w-full">
+                  <thead className="bg-gray-50 dark:bg-gray-900">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
+                        Resource Name
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
+                        Quantity
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
+                        Unit
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
+                        Unit Cost (₹)
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
+                        Total Cost (₹)
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-600 dark:text-gray-400">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                    {resources.map((resource) => (
+                      <tr key={resource.id} className="bg-white dark:bg-gray-800">
+                        <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                          {resource.resource_name || (
+                            <input
+                              type="text"
+                              placeholder="Enter name"
+                              className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm dark:border-gray-600 dark:bg-gray-700"
+                              onChange={(e) => {
+                                setResources((prev) =>
+                                  prev.map((r) =>
+                                    r.id === resource.id
+                                      ? { ...r, resource_name: e.target.value }
+                                      : r
+                                  )
+                                );
+                                setHasChanges(true);
+                              }}
+                            />
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <input
+                            type="number"
+                            value={resource.quantity}
+                            onChange={(e) =>
+                              updateResourceQuantity(
+                                resource.id,
+                                parseFloat(e.target.value) || 0
+                              )
+                            }
+                            className="w-20 rounded border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                            min="0"
+                            step="0.01"
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                          {resource.unit}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="relative">
+                            <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400">
+                              ₹
+                            </span>
                             <input
                               type="number"
-                              value={resource.quantity}
-                              onChange={(e) =>
-                                updateResourceQuantity(
+                              value={resource.unit_cost || ""}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                updateResourceUnitCost(
                                   resource.id,
-                                  parseFloat(e.target.value) || 0
-                                )
-                              }
-                              className="w-20 rounded border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                                  value ? parseFloat(value) : null
+                                );
+                              }}
+                              placeholder="0.00"
+                              className="w-28 rounded border border-gray-300 bg-white py-1 pl-6 pr-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                               min="0"
                               step="0.01"
                             />
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
-                            {resource.unit}
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="relative">
-                              <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400">
-                                ₹
-                              </span>
-                              <input
-                                type="number"
-                                value={resource.unit_cost || ""}
-                                onChange={(e) => {
-                                  const value = e.target.value;
-                                  updateResourceUnitCost(
-                                    resource.id,
-                                    value ? parseFloat(value) : null
-                                  );
-                                }}
-                                placeholder="0.00"
-                                className="w-28 rounded border border-gray-300 bg-white py-1 pl-6 pr-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                                min="0"
-                                step="0.01"
-                              />
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
-                            {resource.total_cost
-                              ? `₹${resource.total_cost.toLocaleString("en-IN")}`
-                              : "—"}
-                          </td>
-                          <td className="px-4 py-3">
-                            <button
-                              onClick={() => removeResource(resource.id)}
-                              className="rounded p-1 text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
-                              title="Remove"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    {resources.length > 0 && (
-                      <tfoot className="bg-gray-50 dark:bg-gray-900">
-                        <tr>
-                          <td
-                            colSpan={4}
-                            className="px-4 py-3 text-right text-sm font-semibold text-gray-900 dark:text-white"
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
+                          {resource.total_cost
+                            ? `₹${resource.total_cost.toLocaleString("en-IN")}`
+                            : "—"}
+                        </td>
+                        <td className="px-4 py-3">
+                          <button
+                            onClick={() => removeResource(resource.id)}
+                            className="rounded p-1 text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                            title="Remove"
                           >
-                            Total Resource Cost:
-                          </td>
-                          <td className="px-4 py-3 text-sm font-bold text-gray-900 dark:text-white">
-                            ₹{calculateTotalResourceCost().toLocaleString("en-IN")}
-                          </td>
-                          <td></td>
-                        </tr>
-                      </tfoot>
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                    {resources.length > 0 && (
+                  <tfoot className="bg-gray-50 dark:bg-gray-900">
+                    <tr>
+                      <td
+                        colSpan={4}
+                        className="px-4 py-3 text-right text-sm font-semibold text-gray-900 dark:text-white"
+                      >
+                        Total Resource Cost:
+                      </td>
+                      <td className="px-4 py-3 text-sm font-bold text-gray-900 dark:text-white">
+                        ₹{calculateTotalResourceCost().toLocaleString("en-IN")}
+                      </td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
                     )}
-                  </table>
-                </div>
+                </table>
+              </div>
               )}
             </section>
 
@@ -739,24 +739,24 @@ export function TaskDetailSlideOver({
                 Activity Feed
               </h3>
               {activities.length > 0 ? (
-                <div className="space-y-4">
-                  {activities.map((activity) => (
-                    <div key={activity.id} className="flex gap-3">
-                      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-sky-100 dark:bg-sky-900/30">
-                        <div className="h-2 w-2 rounded-full bg-sky-600 dark:bg-sky-400"></div>
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm text-gray-900 dark:text-white">
-                          {activity.description}
-                        </p>
-                        <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                          {activity.performed_by} ·{" "}
-                          {format(new Date(activity.timestamp), "MMM dd, yyyy 'at' HH:mm")}
-                        </p>
-                      </div>
+              <div className="space-y-4">
+                {activities.map((activity) => (
+                  <div key={activity.id} className="flex gap-3">
+                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-sky-100 dark:bg-sky-900/30">
+                      <div className="h-2 w-2 rounded-full bg-sky-600 dark:bg-sky-400"></div>
                     </div>
-                  ))}
-                </div>
+                    <div className="flex-1">
+                      <p className="text-sm text-gray-900 dark:text-white">
+                        {activity.description}
+                      </p>
+                      <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                        {activity.performed_by} ·{" "}
+                        {format(new Date(activity.timestamp), "MMM dd, yyyy 'at' HH:mm")}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
               ) : (
                 <div className="rounded-lg border-2 border-dashed border-gray-300 p-8 text-center dark:border-gray-700">
                   <MessageSquare className="mx-auto h-12 w-12 text-gray-400" />
@@ -789,29 +789,29 @@ export function TaskDetailSlideOver({
                 </>
               ) : (
                 <>
-                  <Save className="h-4 w-4" />
-                  Save Changes
+              <Save className="h-4 w-4" />
+              Save Changes
                 </>
               )}
             </button>
             {task.status === "Open" && (
               <>
-                <button
-                  onClick={handleApprove}
+              <button
+                onClick={handleApprove}
                   disabled={isSaving}
                   className="inline-flex items-center gap-2 rounded-lg bg-green-500 px-4 py-2 text-sm font-medium text-white hover:bg-green-600 disabled:opacity-50"
-                >
-                  <Check className="h-4 w-4" />
+              >
+                <Check className="h-4 w-4" />
                   Approve
-                </button>
-                <button
-                  onClick={handleReject}
+              </button>
+              <button
+                onClick={handleReject}
                   disabled={isSaving}
                   className="inline-flex items-center gap-2 rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-600 dark:bg-gray-800 dark:text-red-400 dark:hover:bg-red-900/20 disabled:opacity-50"
-                >
-                  <XCircle className="h-4 w-4" />
-                  Reject
-                </button>
+              >
+                <XCircle className="h-4 w-4" />
+                Reject
+              </button>
               </>
             )}
           </div>

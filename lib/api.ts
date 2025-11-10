@@ -2425,6 +2425,12 @@ Please verify:
     monthly_salary?: number;
     notes?: string;
     profile?: number;
+    primary_contact_name?: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    pin_code?: string;
+    country?: string;
   }): Promise<BackendClientDetail> {
     const formData = new FormData();
     formData.append('first_name', data.first_name);
@@ -2443,6 +2449,12 @@ Please verify:
     if (data.monthly_salary !== undefined) formData.append('monthly_salary', data.monthly_salary.toString());
     if (data.notes) formData.append('notes', data.notes);
     if (data.profile) formData.append('profile', data.profile.toString());
+    if (data.primary_contact_name) formData.append('primary_contact_name', data.primary_contact_name);
+    if (data.address) formData.append('address', data.address);
+    if (data.city) formData.append('city', data.city);
+    if (data.state) formData.append('state', data.state);
+    if (data.pin_code) formData.append('pin_code', data.pin_code);
+    if (data.country) formData.append('country', data.country);
 
     // Use the request method which handles CSRF tokens properly
     // The request method will handle errors and format them correctly
@@ -2472,6 +2484,12 @@ Please verify:
     monthly_salary: number;
     notes: string;
     profile: number;
+    primary_contact_name: string;
+    address: string;
+    city: string;
+    state: string;
+    pin_code: string;
+    country: string;
   }>): Promise<BackendClientDetail> {
     const formData = new FormData();
     if (data.first_name) formData.append('first_name', data.first_name);
@@ -2490,6 +2508,12 @@ Please verify:
     if (data.monthly_salary !== undefined) formData.append('monthly_salary', data.monthly_salary.toString());
     if (data.notes) formData.append('notes', data.notes);
     if (data.profile) formData.append('profile', data.profile.toString());
+    if (data.primary_contact_name) formData.append('primary_contact_name', data.primary_contact_name);
+    if (data.address) formData.append('address', data.address);
+    if (data.city) formData.append('city', data.city);
+    if (data.state) formData.append('state', data.state);
+    if (data.pin_code) formData.append('pin_code', data.pin_code);
+    if (data.country) formData.append('country', data.country);
 
     // Use the request method which handles CSRF tokens properly
     return this.request<BackendClientDetail>(`/api/clients/${id}/`, {

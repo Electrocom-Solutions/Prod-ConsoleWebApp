@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { ClientFormModal } from "@/components/clients/client-form-modal";
+import { ClientSendMailModal } from "@/components/clients/client-send-mail-modal";
 import {
   Plus,
   Search,
@@ -79,7 +80,7 @@ function mapBackendClientDetailToFrontend(
     city: "", // Would need to fetch profile for this
     state: "", // Would need to fetch profile for this
     pin_code: "", // Would need to fetch profile for this
-    country: "India",
+      country: "India",
     primary_contact_name: backendClient.full_name || `${backendClient.first_name} ${backendClient.last_name}`,
     primary_contact_email: backendClient.email || "",
     primary_contact_phone: backendClient.phone_number || "",
@@ -113,10 +114,12 @@ function ClientsPageContent() {
   const [hasActiveAMC, setHasActiveAMC] = useState<string>("all");
   const [selectedTag, setSelectedTag] = useState<string>("all");
   const [selectedClients, setSelectedClients] = useState<Set<number>>(new Set());
-
+  
   const [formModalOpen, setFormModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | undefined>();
   const [formMode, setFormMode] = useState<"create" | "edit">("create");
+  const [sendMailModalOpen, setSendMailModalOpen] = useState(false);
+  const [selectedClientForMail, setSelectedClientForMail] = useState<Client | null>(null);
 
   // Fetch statistics
   const fetchStatistics = useCallback(async () => {
@@ -208,9 +211,9 @@ function ClientsPageContent() {
       // Fetch full client details
       const backendClient = await apiClient.getClient(client.id);
       const fullClient = mapBackendClientDetailToFrontend(backendClient);
-      setFormMode("edit");
+    setFormMode("edit");
       setEditingClient(fullClient);
-      setFormModalOpen(true);
+    setFormModalOpen(true);
     } catch (err: any) {
       console.error("Failed to fetch client details:", err);
       showAlert("Error", err.message || "Failed to load client details.", "error");
@@ -220,7 +223,7 @@ function ClientsPageContent() {
   const handleSaveClient = async (clientData: Partial<Client>) => {
     setIsSaving(true);
     try {
-      if (formMode === "create") {
+    if (formMode === "create") {
         // Map frontend Client to backend format
         const name = (clientData.name || "").trim();
         if (!name) {
@@ -247,6 +250,12 @@ function ClientsPageContent() {
           email?: string;
           phone_number?: string;
           notes?: string;
+          primary_contact_name?: string;
+          address?: string;
+          city?: string;
+          state?: string;
+          pin_code?: string;
+          country?: string;
         } = {
           first_name,
           last_name,
@@ -259,8 +268,26 @@ function ClientsPageContent() {
         if (clientData.primary_contact_phone?.trim()) {
           backendData.phone_number = clientData.primary_contact_phone.trim();
         }
+        if (clientData.primary_contact_name?.trim()) {
+          backendData.primary_contact_name = clientData.primary_contact_name.trim();
+        }
         if (clientData.notes?.trim()) {
           backendData.notes = clientData.notes.trim();
+        }
+        if (clientData.address?.trim()) {
+          backendData.address = clientData.address.trim();
+        }
+        if (clientData.city?.trim()) {
+          backendData.city = clientData.city.trim();
+        }
+        if (clientData.state?.trim()) {
+          backendData.state = clientData.state.trim();
+        }
+        if (clientData.pin_code?.trim()) {
+          backendData.pin_code = clientData.pin_code.trim();
+        }
+        if (clientData.country?.trim()) {
+          backendData.country = clientData.country.trim();
         }
 
         await apiClient.createClient(backendData);
@@ -268,7 +295,7 @@ function ClientsPageContent() {
         setFormModalOpen(false);
         fetchClients();
         fetchStatistics();
-      } else if (editingClient) {
+    } else if (editingClient) {
         // Map frontend Client to backend format
         const nameParts = (clientData.name || editingClient.name || "").split(" ");
         const first_name = nameParts[0] || "";
@@ -280,13 +307,25 @@ function ClientsPageContent() {
           email: string;
           phone_number: string;
           notes: string;
+          primary_contact_name: string;
+          address: string;
+          city: string;
+          state: string;
+          pin_code: string;
+          country: string;
         }> = {};
 
         if (first_name) backendData.first_name = first_name;
         if (last_name) backendData.last_name = last_name;
         if (clientData.primary_contact_email) backendData.email = clientData.primary_contact_email;
         if (clientData.primary_contact_phone) backendData.phone_number = clientData.primary_contact_phone;
+        if (clientData.primary_contact_name) backendData.primary_contact_name = clientData.primary_contact_name;
         if (clientData.notes !== undefined) backendData.notes = clientData.notes;
+        if (clientData.address) backendData.address = clientData.address;
+        if (clientData.city) backendData.city = clientData.city;
+        if (clientData.state) backendData.state = clientData.state;
+        if (clientData.pin_code) backendData.pin_code = clientData.pin_code;
+        if (clientData.country) backendData.country = clientData.country;
 
         await apiClient.updateClient(editingClient.id, backendData);
         showAlert("Success", "Client updated successfully.", "success");
@@ -437,7 +476,7 @@ function ClientsPageContent() {
         const deletePromises = Array.from(selectedClients).map((id) => apiClient.deleteClient(id));
         await Promise.all(deletePromises);
         showAlert("Success", "Selected clients deleted successfully.", "success");
-        setSelectedClients(new Set());
+      setSelectedClients(new Set());
         fetchClients();
         fetchStatistics();
       } catch (err: any) {
@@ -543,36 +582,36 @@ function ClientsPageContent() {
                 />
               </div>
             </div>
-
+            
             <div className="flex items-center gap-2">
               {cities.length > 0 && (
-                <select
-                  value={selectedCity}
-                  onChange={(e) => setSelectedCity(e.target.value)}
-                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-                >
-                  <option value="all">All Cities</option>
-                  {cities.map((city) => (
-                    <option key={city} value={city}>
-                      {city}
-                    </option>
-                  ))}
-                </select>
+              <select
+                value={selectedCity}
+                onChange={(e) => setSelectedCity(e.target.value)}
+                className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+              >
+                <option value="all">All Cities</option>
+                {cities.map((city) => (
+                  <option key={city} value={city}>
+                    {city}
+                  </option>
+                ))}
+              </select>
               )}
 
               {states.length > 0 && (
-                <select
-                  value={selectedState}
-                  onChange={(e) => setSelectedState(e.target.value)}
-                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-                >
-                  <option value="all">All States</option>
-                  {states.map((state) => (
-                    <option key={state} value={state}>
-                      {state}
-                    </option>
-                  ))}
-                </select>
+              <select
+                value={selectedState}
+                onChange={(e) => setSelectedState(e.target.value)}
+                className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+              >
+                <option value="all">All States</option>
+                {states.map((state) => (
+                  <option key={state} value={state}>
+                    {state}
+                  </option>
+                ))}
+              </select>
               )}
 
               <select
@@ -586,18 +625,18 @@ function ClientsPageContent() {
               </select>
 
               {allTags.length > 0 && (
-                <select
-                  value={selectedTag}
-                  onChange={(e) => setSelectedTag(e.target.value)}
-                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-                >
-                  <option value="all">All Tags</option>
-                  {allTags.map((tag) => (
-                    <option key={tag} value={tag}>
-                      {tag}
-                    </option>
-                  ))}
-                </select>
+              <select
+                value={selectedTag}
+                onChange={(e) => setSelectedTag(e.target.value)}
+                className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+              >
+                <option value="all">All Tags</option>
+                {allTags.map((tag) => (
+                  <option key={tag} value={tag}>
+                    {tag}
+                  </option>
+                ))}
+              </select>
               )}
 
               <div className="flex rounded-lg border border-gray-300 dark:border-gray-600">
@@ -671,13 +710,13 @@ function ClientsPageContent() {
                 : "Try adjusting your search or filters"}
             </p>
             {clients.length === 0 && (
-              <button
-                onClick={handleCreateClient}
-                className="mt-4 inline-flex items-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600"
-              >
-                <Plus className="h-4 w-4" />
-                New Client
-              </button>
+            <button
+              onClick={handleCreateClient}
+              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600"
+            >
+              <Plus className="h-4 w-4" />
+              New Client
+            </button>
             )}
           </div>
         ) : viewMode === "grid" ? (
@@ -699,16 +738,16 @@ function ClientsPageContent() {
                       className="h-4 w-4 rounded border-gray-300 text-sky-500 focus:ring-sky-500 dark:border-gray-600"
                     />
                     {client.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {client.tags.map((tag) => (
-                          <span
-                            key={tag}
-                            className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-400"
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
+                    <div className="flex flex-wrap gap-1">
+                      {client.tags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-400"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
                     )}
                   </div>
 
@@ -723,25 +762,25 @@ function ClientsPageContent() {
 
                   <div className="mb-4 space-y-2 text-sm">
                     {(client.city || client.state) && (
-                      <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                        <MapPin className="h-4 w-4" />
-                        <span>
+                    <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                      <MapPin className="h-4 w-4" />
+                      <span>
                           {client.city ? `${client.city}, ` : ""}
                           {client.state || ""}
-                        </span>
-                      </div>
+                      </span>
+                    </div>
                     )}
                     {client.primary_contact_email && (
-                      <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                        <Mail className="h-4 w-4" />
-                        <span className="truncate">{client.primary_contact_email}</span>
-                      </div>
+                    <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                      <Mail className="h-4 w-4" />
+                      <span className="truncate">{client.primary_contact_email}</span>
+                    </div>
                     )}
                     {client.primary_contact_phone && (
-                      <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                        <Phone className="h-4 w-4" />
-                        <span>{client.primary_contact_phone}</span>
-                      </div>
+                    <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                      <Phone className="h-4 w-4" />
+                      <span>{client.primary_contact_phone}</span>
+                    </div>
                     )}
                   </div>
 
@@ -773,7 +812,14 @@ function ClientsPageContent() {
                     >
                       View
                     </button>
-                    <button className="rounded-lg border border-gray-300 p-2 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700">
+                    <button
+                      onClick={() => {
+                        setSelectedClientForMail(client);
+                        setSendMailModalOpen(true);
+                      }}
+                      className="rounded-lg border border-gray-300 p-2 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700"
+                      title="Send Email"
+                    >
                       <Mail className="h-4 w-4" />
                     </button>
                   </div>
@@ -852,16 +898,16 @@ function ClientsPageContent() {
                             </p>
                           )}
                           {client.tags.length > 0 && (
-                            <div className="mt-1 flex flex-wrap gap-1">
-                              {client.tags.map((tag) => (
-                                <span
-                                  key={tag}
-                                  className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-400"
-                                >
-                                  {tag}
-                                </span>
-                              ))}
-                            </div>
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {client.tags.map((tag) => (
+                              <span
+                                key={tag}
+                                className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-400"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
                           )}
                         </div>
                       </td>
@@ -904,6 +950,16 @@ function ClientsPageContent() {
                       <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
                         <div className="flex items-center justify-end gap-2">
                           <button
+                            onClick={() => {
+                              setSelectedClientForMail(client);
+                              setSendMailModalOpen(true);
+                            }}
+                            className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-sky-600 dark:hover:bg-gray-700 dark:hover:text-sky-400"
+                            title="Send Email"
+                          >
+                            <Mail className="h-4 w-4" />
+                          </button>
+                          <button
                             onClick={() => handleEditClient(client)}
                             className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-sky-600 dark:hover:bg-gray-700 dark:hover:text-sky-400"
                             title="View"
@@ -942,6 +998,16 @@ function ClientsPageContent() {
         onSave={handleSaveClient}
         client={editingClient}
         mode={formMode}
+      />
+
+      {/* Send Mail Modal */}
+      <ClientSendMailModal
+        isOpen={sendMailModalOpen}
+        onClose={() => {
+          setSendMailModalOpen(false);
+          setSelectedClientForMail(null);
+        }}
+        client={selectedClientForMail}
       />
     </DashboardLayout>
   );
