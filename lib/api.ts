@@ -2410,10 +2410,11 @@ Please verify:
 
   /**
    * Create a new client
+   * Note: Client Name -> first_name in User model (NOT split into first_name and last_name)
+   * last_name is always set to empty string on the backend
    */
   async createClient(data: {
     first_name: string;
-    last_name: string;
     email?: string;
     phone_number?: string;
     photo?: File;
@@ -2437,7 +2438,8 @@ Please verify:
   }): Promise<BackendClientDetail> {
     const formData = new FormData();
     formData.append('first_name', data.first_name);
-    formData.append('last_name', data.last_name);
+    // last_name is not used - Client Name goes to first_name only
+    // Backend will set last_name to empty string automatically
     if (data.email) formData.append('email', data.email);
     if (data.phone_number) formData.append('phone_number', data.phone_number);
     if (data.photo) formData.append('photo', data.photo);
@@ -2469,10 +2471,11 @@ Please verify:
 
   /**
    * Update a client
+   * Note: Client Name -> first_name in User model (NOT split into first_name and last_name)
+   * last_name is always set to empty string on the backend
    */
   async updateClient(id: number, data: Partial<{
     first_name: string;
-    last_name: string;
     email: string;
     phone_number: string;
     photo: File;
@@ -2495,8 +2498,9 @@ Please verify:
     country: string;
   }>): Promise<BackendClientDetail> {
     const formData = new FormData();
-    if (data.first_name) formData.append('first_name', data.first_name);
-    if (data.last_name) formData.append('last_name', data.last_name);
+    if (data.first_name !== undefined) formData.append('first_name', data.first_name);
+    // last_name is not used - Client Name goes to first_name only
+    // Backend will set last_name to empty string automatically
     if (data.email !== undefined) formData.append('email', data.email);
     if (data.phone_number !== undefined) formData.append('phone_number', data.phone_number);
     if (data.photo) formData.append('photo', data.photo);
