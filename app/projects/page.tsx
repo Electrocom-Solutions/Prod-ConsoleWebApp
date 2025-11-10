@@ -35,6 +35,7 @@ import { showDeleteConfirm, showAlert } from "@/lib/sweetalert";
 import { useDebounce } from "use-debounce";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { format } from "date-fns";
+import { DatePicker } from "@/components/ui/date-picker";
 
 type ProjectWithNames = Project & { client_name?: string; tender_name?: string | null };
 
@@ -544,11 +545,11 @@ function ProjectModal({
   const [name, setName] = useState(project?.name || "");
   const [clientId, setClientId] = useState<number>(project?.client_id || clients[0]?.id || 0);
   const [description, setDescription] = useState(project?.description || "");
-  const [startDate, setStartDate] = useState(
-    project?.start_date ? format(new Date(project.start_date), "yyyy-MM-dd") : ""
+  const [startDate, setStartDate] = useState<string | undefined>(
+    project?.start_date ? format(new Date(project.start_date), "yyyy-MM-dd") : undefined
   );
-  const [endDate, setEndDate] = useState(
-    project?.end_date ? format(new Date(project.end_date), "yyyy-MM-dd") : ""
+  const [endDate, setEndDate] = useState<string | undefined>(
+    project?.end_date ? format(new Date(project.end_date), "yyyy-MM-dd") : undefined
   );
   const [status, setStatus] = useState<
     "Planned" | "In Progress" | "On Hold" | "Completed" | "Canceled"
@@ -560,15 +561,15 @@ function ProjectModal({
       setName(project.name || "");
       setClientId(project.client_id || clients[0]?.id || 0);
       setDescription(project.description || "");
-      setStartDate(project.start_date ? format(new Date(project.start_date), "yyyy-MM-dd") : "");
-      setEndDate(project.end_date ? format(new Date(project.end_date), "yyyy-MM-dd") : "");
+      setStartDate(project.start_date ? format(new Date(project.start_date), "yyyy-MM-dd") : undefined);
+      setEndDate(project.end_date ? format(new Date(project.end_date), "yyyy-MM-dd") : undefined);
       setStatus(project.status || "Planned");
     } else {
       setName("");
       setClientId(clients[0]?.id || 0);
       setDescription("");
-      setStartDate("");
-      setEndDate("");
+      setStartDate(undefined);
+      setEndDate(undefined);
       setStatus("Planned");
     }
     setErrors({});
@@ -593,8 +594,8 @@ function ProjectModal({
       newErrors.endDate = "End date is required";
     }
 
-    if (startDate && endDate && new Date(endDate) <= new Date(startDate)) {
-      newErrors.endDate = "End date must be after start date";
+    if (startDate && endDate && new Date(endDate) < new Date(startDate)) {
+      newErrors.endDate = "End date must be after or equal to start date";
     }
 
     setErrors(newErrors);
@@ -612,8 +613,8 @@ function ProjectModal({
       name,
       client_id: clientId,
       description,
-      start_date: startDate,
-      end_date: endDate,
+      start_date: startDate || "",
+      end_date: endDate || "",
       status,
     };
 
@@ -700,11 +701,10 @@ function ProjectModal({
               <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
                 Start Date <span className="text-red-500">*</span>
               </label>
-              <Input
-                type="date"
+              <DatePicker
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                required
+                onChange={(value) => setStartDate(value)}
+                placeholder="Select start date"
               />
               {errors.startDate && (
                 <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.startDate}</p>
@@ -715,11 +715,10 @@ function ProjectModal({
               <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
                 End Date <span className="text-red-500">*</span>
               </label>
-              <Input
-                type="date"
+              <DatePicker
                 value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                required
+                onChange={(value) => setEndDate(value)}
+                placeholder="Select end date"
               />
               {errors.endDate && (
                 <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.endDate}</p>

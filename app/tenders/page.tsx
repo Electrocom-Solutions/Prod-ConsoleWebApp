@@ -428,7 +428,8 @@ function TendersPageContent() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {/* Row 1: Overview Metrics */}
           <div className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
             <div className="flex items-center justify-between">
               <div>
@@ -474,15 +475,28 @@ function TendersPageContent() {
             </div>
           </div>
 
+          {/* Row 2: Financial & EMD Metrics */}
           <div className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
             <div className="flex items-center justify-between">
-              <div>
+              <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Value</p>
-                <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-                  ₹{statistics?.total_value_awarded?.toLocaleString("en-IN") ?? "0"}
+                <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white truncate">
+                  {(() => {
+                    const value = statistics?.total_value_awarded ?? 0;
+                    if (value >= 10000000) {
+                      // Show in Crores for values >= 1 Cr
+                      const crores = value / 10000000;
+                      return `₹${crores.toFixed(1)}Cr`;
+                    } else if (value >= 100000) {
+                      // Show in Lakhs for values >= 1 L
+                      const lakhs = value / 100000;
+                      return `₹${lakhs.toFixed(2)}L`;
+                    }
+                    return `₹${value.toLocaleString("en-IN")}`;
+                  })()}
                 </p>
               </div>
-              <div className="rounded-full bg-purple-100 p-3 dark:bg-purple-900/30">
+              <div className="flex-shrink-0 rounded-full bg-purple-100 p-3 dark:bg-purple-900/30">
                 <IndianRupee className="h-6 w-6 text-purple-600 dark:text-purple-400" />
               </div>
             </div>

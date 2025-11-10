@@ -804,7 +804,15 @@ function TaskHubPageContent() {
               <Clock className="h-5 w-5 text-blue-500" />
             </div>
             <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-              {statistics ? statistics.total_timings.toFixed(1) : "..."}
+              {(() => {
+                if (!statistics || statistics.total_timings === null || statistics.total_timings === undefined) {
+                  return "...";
+                }
+                const timings = typeof statistics.total_timings === 'string' 
+                  ? parseFloat(statistics.total_timings) 
+                  : statistics.total_timings;
+                return isNaN(timings) ? "0.0" : timings.toFixed(1);
+              })()}
               <span className="ml-1 text-base font-normal text-gray-600 dark:text-gray-400">hrs</span>
             </p>
           </div>

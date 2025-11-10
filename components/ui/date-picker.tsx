@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { format, parse, isValid, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, addYears, subYears, isToday, setMonth, setYear } from "date-fns";
 import { Calendar, ChevronLeft, ChevronRight, X, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -40,6 +41,8 @@ export function DatePicker({
     return { start: currentYear - 12, end: currentYear + 12 };
   });
   const containerRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number; position: 'above' | 'below' } | null>(null);
 
   // Parse value to Date object
   const selectedDate = value ? parse(value, "yyyy-MM-dd", new Date()) : null;
@@ -48,16 +51,101 @@ export function DatePicker({
   // Format display value
   const displayValue = isValidDate ? format(selectedDate, "dd/MM/yyyy") : "";
 
+  // Calculate dropdown position when opened
+  useEffect(() => {
+    if (isOpen && containerRef.current) {
+      const updatePosition = () => {
+        if (!containerRef.current) return;
+
+        const rect = containerRef.current.getBoundingClientRect();
+        const viewportHeight = window.innerHeight;
+        const viewportWidth = window.innerWidth;
+        const dropdownHeight = 400; // Approximate height of the calendar dropdown
+        const dropdownWidth = 320; // w-80 = 320px
+        const spacing = 8; // mt-2 = 8px
+
+        // Calculate available space below and above
+        const spaceBelow = viewportHeight - rect.bottom;
+        const spaceAbove = rect.top;
+
+        // Determine if dropdown should be above or below
+        // Position above if there's not enough space below AND more space above
+        const positionAbove = spaceBelow < dropdownHeight && spaceAbove > spaceBelow;
+        
+        // Calculate vertical position
+        let top: number;
+        if (positionAbove) {
+          top = rect.top - dropdownHeight - spacing;
+        } else {
+          top = rect.bottom + spacing;
+        }
+
+        // Ensure dropdown doesn't go above viewport
+        if (top < 0) {
+          top = spacing;
+        }
+
+        // Ensure dropdown doesn't go below viewport
+        if (top + dropdownHeight > viewportHeight) {
+          top = viewportHeight - dropdownHeight - spacing;
+        }
+
+        // Calculate horizontal position (center aligned with input, but adjust if needed)
+        let left = rect.left;
+        
+        // If dropdown would overflow on the right, align to right edge of viewport
+        if (left + dropdownWidth > viewportWidth) {
+          left = viewportWidth - dropdownWidth - spacing;
+        }
+        
+        // If dropdown would overflow on the left, align to left edge
+        if (left < spacing) {
+          left = spacing;
+        }
+
+        setDropdownPosition({
+          top,
+          left,
+          position: positionAbove ? 'above' : 'below'
+        });
+      };
+
+      updatePosition();
+      
+      // Update position on scroll and resize
+      window.addEventListener('scroll', updatePosition, true);
+      window.addEventListener('resize', updatePosition);
+      
+      // Small delay to ensure DOM is ready
+      setTimeout(updatePosition, 0);
+
+      return () => {
+        window.removeEventListener('scroll', updatePosition, true);
+        window.removeEventListener('resize', updatePosition);
+      };
+    } else {
+      setDropdownPosition(null);
+    }
+  }, [isOpen]);
+
   // Close calendar when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      if (
+        containerRef.current && 
+        !containerRef.current.contains(event.target as Node) &&
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false);
       }
     };
 
     if (isOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
+      // Use a small delay to prevent immediate closure
+      setTimeout(() => {
+        document.addEventListener("mousedown", handleClickOutside);
+      }, 0);
       return () => document.removeEventListener("mousedown", handleClickOutside);
     }
   }, [isOpen]);
@@ -207,8 +295,17 @@ export function DatePicker({
         )}
       </div>
 
-      {isOpen && !disabled && (
-        <div className="absolute z-50 mt-2 w-80 rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900">
+      {isOpen && !disabled && dropdownPosition && typeof window !== 'undefined' && createPortal(
+        <div
+          ref={dropdownRef}
+          className="fixed z-[9999] w-80 rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900"
+          style={{
+            top: `${dropdownPosition.top}px`,
+            left: `${dropdownPosition.left}px`,
+            maxHeight: '90vh',
+            overflowY: 'auto',
+          }}
+        >
           {/* Calendar Header */}
           <div className="flex items-center justify-between border-b border-gray-200 p-4 dark:border-gray-700">
             {viewMode === 'calendar' && (
@@ -384,7 +481,8 @@ export function DatePicker({
               })}
             </div>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
