@@ -156,17 +156,27 @@ function SettingsPageContent() {
       const createdProfile: CurrentUserProfile = await apiClient.createProfile(profileData);
       showSuccess("Success", "Profile created successfully");
       
-      // Refresh employees list to include the new profile
-      await fetchEmployees();
+      // Refresh profiles list to include the new profile
+      await fetchProfiles();
       
       // Set the newly created profile as the selected owner
-      const newEmployee = employees.find(emp => emp.profile_id === createdProfile.id);
-      if (newEmployee) {
+      const newProfile = profiles.find(prof => prof.id === createdProfile.id);
+      if (newProfile) {
+        const fullName = createdProfile.first_name + (createdProfile.last_name ? ` ${createdProfile.last_name}` : '');
         setFormData((prev) => ({
           ...prev,
-          firm_owner_profile_id: newEmployee.profile_id,
-          firm_owner_profile_name: createdProfile.first_name + (createdProfile.last_name ? ` ${createdProfile.last_name}` : ''),
-          owner_search: createdProfile.first_name + (createdProfile.last_name ? ` ${createdProfile.last_name}` : ''),
+          firm_owner_profile_id: newProfile.id,
+          firm_owner_profile_name: fullName || createdProfile.username || '',
+          owner_search: fullName || createdProfile.username || '',
+        }));
+      } else {
+        // If profile not found in list yet, use the created profile data directly
+        const fullName = createdProfile.first_name + (createdProfile.last_name ? ` ${createdProfile.last_name}` : '');
+        setFormData((prev) => ({
+          ...prev,
+          firm_owner_profile_id: createdProfile.id,
+          firm_owner_profile_name: fullName || createdProfile.username || '',
+          owner_search: fullName || createdProfile.username || '',
         }));
       }
       
