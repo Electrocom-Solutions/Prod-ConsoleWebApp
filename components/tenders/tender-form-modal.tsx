@@ -171,20 +171,23 @@ export default function TenderFormModal({
     // Only auto-calculate for new tenders (no existing tender)
     // For existing tenders, user must manually update SD amounts if they change estimated value
     if (!tender && estimatedValue > 0) {
-      // Only auto-fill if fields are empty
-      if (!formData.sd1_amount || parseFloat(formData.sd1_amount) === 0) {
-        setFormData(prev => ({
+      setFormData(prev => {
+        // Only auto-fill if fields are empty or zero
+        const shouldUpdateSd1 = !prev.sd1_amount || parseFloat(prev.sd1_amount) === 0;
+        const shouldUpdateSd2 = !prev.sd2_amount || parseFloat(prev.sd2_amount) === 0;
+        
+        if (!shouldUpdateSd1 && !shouldUpdateSd2) {
+          return prev; // No changes needed
+        }
+        
+        return {
           ...prev,
-          sd1_amount: (estimatedValue * 0.02).toString(),
-        }));
-      }
-      if (!formData.sd2_amount || parseFloat(formData.sd2_amount) === 0) {
-        setFormData(prev => ({
-          ...prev,
-          sd2_amount: (estimatedValue * 0.03).toString(),
-        }));
-      }
+          ...(shouldUpdateSd1 && { sd1_amount: (estimatedValue * 0.02).toString() }),
+          ...(shouldUpdateSd2 && { sd2_amount: (estimatedValue * 0.03).toString() }),
+        };
+      });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [estimatedValue, tender]);
 
   if (!isOpen) return null;

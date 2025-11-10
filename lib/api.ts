@@ -2819,7 +2819,7 @@ Please verify:
     if (data.start_date !== undefined && data.start_date !== '') formData.append('start_date', data.start_date);
     if (data.end_date !== undefined && data.end_date !== '') formData.append('end_date', data.end_date);
     if (data.estimated_value !== undefined) formData.append('estimated_value', data.estimated_value.toString());
-    if (data.status !== undefined && data.status !== '') formData.append('status', data.status);
+    if (data.status !== undefined) formData.append('status', data.status);
     
     // Security Deposit 1 fields (only append if provided and not empty)
     if (data.security_deposit_1_dd_date !== undefined && data.security_deposit_1_dd_date !== '') formData.append('security_deposit_1_dd_date', data.security_deposit_1_dd_date);
@@ -2874,7 +2874,7 @@ Please verify:
     if (data.start_date !== undefined && data.start_date !== '') formData.append('start_date', data.start_date);
     if (data.end_date !== undefined && data.end_date !== '') formData.append('end_date', data.end_date);
     if (data.estimated_value !== undefined) formData.append('estimated_value', data.estimated_value.toString());
-    if (data.status !== undefined && data.status !== '') formData.append('status', data.status);
+    if (data.status !== undefined) formData.append('status', data.status);
     
     // Security Deposit 1 fields (only append if provided and not empty)
     if (data.security_deposit_1_dd_date !== undefined && data.security_deposit_1_dd_date !== '') formData.append('security_deposit_1_dd_date', data.security_deposit_1_dd_date);
