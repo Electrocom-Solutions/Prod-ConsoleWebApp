@@ -473,20 +473,20 @@ export default function DocumentsPage() {
             </select>
           </div>
 
-          <div className="flex rounded-lg border border-gray-300 dark:border-gray-600">
+          <div className="flex rounded-lg border border-gray-300 dark:border-gray-600 overflow-hidden">
             <button
               onClick={() => setViewMode('grid')}
-              className={`p-2 ${
+              className={`p-2 transition-colors ${
                 viewMode === 'grid'
                   ? 'bg-sky-500 text-white'
                   : 'bg-white text-gray-600 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
-              }`}
+              } ${viewMode === 'grid' ? 'border-r border-gray-300 dark:border-gray-600' : ''}`}
             >
               <Grid3x3 className="h-4 w-4" />
             </button>
             <button
               onClick={() => setViewMode('table')}
-              className={`p-2 ${
+              className={`p-2 transition-colors ${
                 viewMode === 'table'
                   ? 'bg-sky-500 text-white'
                   : 'bg-white text-gray-600 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'

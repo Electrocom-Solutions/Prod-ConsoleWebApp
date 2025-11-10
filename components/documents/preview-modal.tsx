@@ -1,7 +1,7 @@
 'use client';
 
-import { X, Download, ZoomIn, ZoomOut, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useState } from 'react';
+import { X, Download, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
 type PreviewModalProps = {
   isOpen: boolean;
@@ -22,6 +22,18 @@ export function PreviewModal({
 }: PreviewModalProps) {
   const [zoom, setZoom] = useState(100);
   const [currentPage, setCurrentPage] = useState(1);
+  const [loadError, setLoadError] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setLoadError(false);
+      // Validate URL format
+      if (fileUrl && !fileUrl.startsWith('http://') && !fileUrl.startsWith('https://')) {
+        console.error('Invalid file URL format:', fileUrl);
+        setLoadError(true);
+      }
+    }
+  }, [isOpen, fileUrl]);
 
   if (!isOpen) return null;
 
@@ -100,11 +112,32 @@ export function PreviewModal({
           style={{ width: `${zoom}%`, maxWidth: '1200px' }}
         >
           {fileType === 'pdf' ? (
-            <iframe
-              src={fileUrl}
-              className="h-[800px] w-full"
-              title={fileName}
-            />
+            loadError ? (
+              <div className="flex h-[800px] flex-col items-center justify-center p-8">
+                <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
+                <p className="text-lg font-medium text-gray-900 mb-2">Failed to load PDF</p>
+                <p className="text-sm text-gray-600 mb-4">The PDF could not be displayed in the browser.</p>
+                <button
+                  onClick={onDownload}
+                  className="flex items-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600"
+                >
+                  <Download className="h-4 w-4" />
+                  Download to View
+                </button>
+              </div>
+            ) : (
+              <iframe
+                src={fileUrl}
+                className="h-[800px] w-full border-0"
+                title={fileName}
+                allow="fullscreen"
+                onError={() => setLoadError(true)}
+                onLoad={() => {
+                  // Reset error state on successful load
+                  setLoadError(false);
+                }}
+              />
+            )
           ) : (
             <div className="flex h-[800px] items-center justify-center">
               <div className="text-center">
