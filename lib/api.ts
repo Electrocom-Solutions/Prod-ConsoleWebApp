@@ -86,6 +86,7 @@ export interface BackendClientListItem {
   has_active_amc: boolean;
   city: string | null;
   state: string | null;
+  primary_contact_name: string | null;
   created_at: string;
 }
 
@@ -594,6 +595,25 @@ export interface CurrentUserProfileUpdateData {
   current_password?: string;
   new_password?: string;
   confirm_password?: string;
+}
+
+export interface ProfileCreateData {
+  first_name: string;
+  last_name?: string;
+  email: string;
+  phone_number?: string;
+  photo?: File;
+  date_of_birth?: string;
+  gender?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  pin_code?: string;
+  country?: string;
+  aadhar_number?: string;
+  pan_number?: string;
+  aadhar_card?: File;
+  pan_card?: File;
 }
 
 export interface BulkDownloadRequest {
@@ -2358,6 +2378,38 @@ Please verify:
 
     return this.request<CurrentUserProfile>('/api/profile/update/', {
       method: 'PATCH',
+      body: formData,
+    });
+  }
+
+  /**
+   * Create a new profile with user
+   */
+  async createProfile(data: ProfileCreateData): Promise<CurrentUserProfile> {
+    const formData = new FormData();
+
+    // Required fields
+    formData.append('first_name', data.first_name);
+    formData.append('email', data.email);
+
+    // Optional fields
+    if (data.last_name !== undefined) formData.append('last_name', data.last_name || '');
+    if (data.phone_number !== undefined) formData.append('phone_number', data.phone_number || '');
+    if (data.photo) formData.append('photo', data.photo);
+    if (data.date_of_birth) formData.append('date_of_birth', data.date_of_birth);
+    if (data.gender) formData.append('gender', data.gender);
+    if (data.address) formData.append('address', data.address);
+    if (data.city) formData.append('city', data.city);
+    if (data.state) formData.append('state', data.state);
+    if (data.pin_code) formData.append('pin_code', data.pin_code);
+    if (data.country) formData.append('country', data.country);
+    if (data.aadhar_number) formData.append('aadhar_number', data.aadhar_number);
+    if (data.pan_number) formData.append('pan_number', data.pan_number);
+    if (data.aadhar_card) formData.append('aadhar_card', data.aadhar_card);
+    if (data.pan_card) formData.append('pan_card', data.pan_card);
+
+    return this.request<CurrentUserProfile>('/api/profile/create/', {
+      method: 'POST',
       body: formData,
     });
   }

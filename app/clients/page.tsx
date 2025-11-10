@@ -51,7 +51,7 @@ function mapBackendClientToFrontend(
     state: backendClient.state || "", // Now available from list endpoint
     pin_code: "", // Not available in list endpoint
     country: "India", // Default
-    primary_contact_name: backendClient.full_name || `${backendClient.first_name} ${backendClient.last_name}`,
+    primary_contact_name: backendClient.primary_contact_name || "",
     primary_contact_email: backendClient.email || "",
     primary_contact_phone: backendClient.phone_number || "",
     secondary_contact: undefined,

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Building2, Plus, Edit, Trash2, X, Search, Loader2 } from "lucide-react";
 import { showSuccess, showDeleteConfirm, showError } from "@/lib/sweetalert";
-import { apiClient, BackendFirmListItem, FirmDetail, FirmCreateData, BackendEmployeeListItem, EmployeeListResponse } from "@/lib/api";
+import { apiClient, BackendFirmListItem, FirmDetail, FirmCreateData, BackendEmployeeListItem, EmployeeListResponse, ProfileCreateData, CurrentUserProfile } from "@/lib/api";
 import { useDebounce } from "use-debounce";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 
@@ -55,6 +55,7 @@ function SettingsPageContent() {
   const [isSaving, setIsSaving] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
   /**
    * Fetch employees for firm owner profile selection
@@ -140,6 +141,34 @@ function SettingsPageContent() {
       setSelectedFirm(null);
     } catch (err: any) {
       showError("Error", err.message || "Failed to save firm");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCreateProfile = async (profileData: ProfileCreateData) => {
+    setIsSaving(true);
+    try {
+      const createdProfile: CurrentUserProfile = await apiClient.createProfile(profileData);
+      showSuccess("Success", "Profile created successfully");
+      
+      // Refresh employees list to include the new profile
+      await fetchEmployees();
+      
+      // Set the newly created profile as the selected owner
+      const newEmployee = employees.find(emp => emp.profile_id === createdProfile.id);
+      if (newEmployee) {
+        setFormData((prev) => ({
+          ...prev,
+          firm_owner_profile_id: newEmployee.profile_id,
+          firm_owner_profile_name: createdProfile.first_name + (createdProfile.last_name ? ` ${createdProfile.last_name}` : ''),
+          owner_search: createdProfile.first_name + (createdProfile.last_name ? ` ${createdProfile.last_name}` : ''),
+        }));
+      }
+      
+      setShowProfileModal(false);
+    } catch (err: any) {
+      showError("Error", err.message || "Failed to create profile");
     } finally {
       setIsSaving(false);
     }
@@ -346,6 +375,18 @@ function SettingsPageContent() {
           }}
           onSave={handleSaveFirm}
           isSaving={isSaving}
+          showProfileModal={showProfileModal}
+          setShowProfileModal={setShowProfileModal}
+          onCreateProfile={handleCreateProfile}
+        />
+      )}
+
+      {showProfileModal && (
+        <ProfileCreateModal
+          isOpen={showProfileModal}
+          onClose={() => setShowProfileModal(false)}
+          onSave={handleCreateProfile}
+          isSaving={isSaving}
         />
       )}
     </DashboardLayout>
@@ -359,12 +400,18 @@ function FirmModal({
   onClose,
   onSave,
   isSaving,
+  showProfileModal,
+  setShowProfileModal,
+  onCreateProfile,
 }: {
   firm: BackendFirmListItem | null;
   employees: BackendEmployeeListItem[];
   onClose: () => void;
   onSave: (firm: FirmCreateData & { id?: number }) => Promise<void>;
   isSaving: boolean;
+  showProfileModal: boolean;
+  setShowProfileModal: (show: boolean) => void;
+  onCreateProfile: (profile: ProfileCreateData) => Promise<void>;
 }) {
   const [formData, setFormData] = useState({
     firm_name: firm?.firm_name || "",
@@ -439,15 +486,19 @@ function FirmModal({
 
   // Filter employees based on search
   const filteredEmployees = useMemo(() => {
+    const searchTerm = formData.owner_search.toLowerCase().trim();
+    if (!searchTerm) {
+      // Show all employees when search is empty (limit to 50 for performance)
+      return employees.slice(0, 50);
+    }
     return employees.filter((employee) => {
-      const searchTerm = formData.owner_search.toLowerCase();
-      if (!searchTerm) return true;
       const fullName = employee.full_name?.toLowerCase() || "";
+      const phoneNumber = employee.phone_number?.toLowerCase() || "";
       return (
         fullName.includes(searchTerm) ||
         employee.employee_code.toLowerCase().includes(searchTerm) ||
         employee.email?.toLowerCase().includes(searchTerm) ||
-        employee.phone_number?.includes(searchTerm)
+        phoneNumber.includes(searchTerm)
       );
     });
   }, [employees, formData.owner_search]);
@@ -553,53 +604,65 @@ function FirmModal({
               <label className="block text-sm font-medium mb-2 dark:text-gray-200">
                 Firm Owner Profile
               </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={formData.owner_search || formData.firm_owner_profile_name}
-                  onChange={(e) => {
-                    setFormData({
-                      ...formData,
-                      owner_search: e.target.value,
-                      firm_owner_profile_id: 0,
-                      firm_owner_profile_name: "",
-                    });
-                    setShowOwnerDropdown(true);
-                  }}
-                  onFocus={() => {
-                    if (employees.length > 0) {
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <input
+                    type="text"
+                    value={formData.owner_search || formData.firm_owner_profile_name}
+                    onChange={(e) => {
+                      setFormData({
+                        ...formData,
+                        owner_search: e.target.value,
+                        firm_owner_profile_id: 0,
+                        firm_owner_profile_name: "",
+                      });
                       setShowOwnerDropdown(true);
-                    }
-                  }}
-                  placeholder="Search by employee ID, name, email, or phone number"
+                    }}
+                    onFocus={() => {
+                      if (employees.length > 0) {
+                        setShowOwnerDropdown(true);
+                      }
+                    }}
+                    placeholder="Search by name, email, or contact number..."
+                    disabled={isSaving}
+                    className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm dark:text-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                  {showOwnerDropdown && (
+                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      {filteredEmployees.length > 0 ? (
+                        filteredEmployees.map((employee) => {
+                          const displayName = employee.full_name || employee.employee_code;
+                          return (
+                            <button
+                              key={employee.id}
+                              type="button"
+                              onClick={() => handleOwnerSelect(employee)}
+                              className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 focus:bg-gray-100 dark:focus:bg-gray-700 focus:outline-none"
+                            >
+                              <div className="font-medium">{displayName}</div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                {employee.employee_code} • {employee.email || 'N/A'} • {employee.phone_number || 'N/A'}
+                              </div>
+                            </button>
+                          );
+                        })
+                      ) : (
+                        <div className="p-4 text-sm text-gray-500 dark:text-gray-400 text-center">
+                          {formData.owner_search ? 'No employees found' : 'Start typing to search...'}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowProfileModal(true)}
                   disabled={isSaving}
-                  className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm dark:text-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                />
-                {showOwnerDropdown && filteredEmployees.length > 0 && (
-                  <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                    {filteredEmployees.map((employee) => {
-                      const displayName = employee.full_name || employee.employee_code;
-                      return (
-                        <button
-                          key={employee.id}
-                          type="button"
-                          onClick={() => handleOwnerSelect(employee)}
-                          className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
-                        >
-                          <div className="font-medium">{displayName}</div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            {employee.employee_code} • {employee.email || 'N/A'} • {employee.phone_number || 'N/A'}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-                {showOwnerDropdown && filteredEmployees.length === 0 && formData.owner_search && (
-                  <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 text-sm text-gray-500 dark:text-gray-400">
-                    No employees found
-                  </div>
-                )}
+                  className="flex items-center justify-center w-10 h-10 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Create New Profile"
+                >
+                  <Plus className="h-5 w-5" />
+                </button>
               </div>
             </div>
 
@@ -685,6 +748,330 @@ function FirmModal({
             </div>
           </form>
         )}
+      </div>
+    </div>
+  );
+}
+
+// Profile Create Modal Component
+function ProfileCreateModal({
+  isOpen,
+  onClose,
+  onSave,
+  isSaving,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (profile: ProfileCreateData) => Promise<void>;
+  isSaving: boolean;
+}) {
+  const [formData, setFormData] = useState<ProfileCreateData>({
+    first_name: "",
+    last_name: "",
+    email: "",
+    phone_number: "",
+    date_of_birth: "",
+    gender: "",
+    address: "",
+    city: "",
+    state: "",
+    pin_code: "",
+    country: "",
+    aadhar_number: "",
+    pan_number: "",
+  });
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [aadharCard, setAadharCard] = useState<File | null>(null);
+  const [panCard, setPanCard] = useState<File | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) {
+      // Reset form when modal closes
+      setFormData({
+        first_name: "",
+        last_name: "",
+        email: "",
+        phone_number: "",
+        date_of_birth: "",
+        gender: "",
+        address: "",
+        city: "",
+        state: "",
+        pin_code: "",
+        country: "",
+        aadhar_number: "",
+        pan_number: "",
+      });
+      setPhoto(null);
+      setAadharCard(null);
+      setPanCard(null);
+    }
+  }, [isOpen]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.first_name || !formData.email) {
+      showError("Error", "First name and email are required");
+      return;
+    }
+
+    const profileData: ProfileCreateData = {
+      ...formData,
+      photo: photo || undefined,
+      aadhar_card: aadharCard || undefined,
+      pan_card: panCard || undefined,
+    };
+
+    await onSave(profileData);
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-6 border-b dark:border-gray-800 sticky top-0 bg-white dark:bg-gray-900 z-10">
+          <h2 className="text-xl font-semibold">Create New Profile</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700"
+            disabled={isSaving}
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {/* User Information */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium border-b dark:border-gray-800 pb-2">User Information</h3>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2 dark:text-gray-200">
+                  First Name <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  value={formData.first_name}
+                  onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+                  required
+                  disabled={isSaving}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2 dark:text-gray-200">
+                  Last Name
+                </label>
+                <Input
+                  value={formData.last_name}
+                  onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+                  disabled={isSaving}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2 dark:text-gray-200">
+                  Email <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  required
+                  disabled={isSaving}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2 dark:text-gray-200">
+                  Phone Number
+                </label>
+                <Input
+                  type="tel"
+                  value={formData.phone_number}
+                  onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
+                  disabled={isSaving}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Profile Information */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium border-b dark:border-gray-800 pb-2">Profile Information</h3>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2 dark:text-gray-200">
+                  Date of Birth
+                </label>
+                <Input
+                  type="date"
+                  value={formData.date_of_birth}
+                  onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
+                  disabled={isSaving}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2 dark:text-gray-200">
+                  Gender
+                </label>
+                <select
+                  value={formData.gender}
+                  onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                  disabled={isSaving}
+                  className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <option value="">Select Gender</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2 dark:text-gray-200">
+                Photo
+              </label>
+              <Input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setPhoto(e.target.files?.[0] || null)}
+                disabled={isSaving}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2 dark:text-gray-200">
+                Address
+              </label>
+              <textarea
+                value={formData.address}
+                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                rows={3}
+                disabled={isSaving}
+                className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm dark:text-white focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2 dark:text-gray-200">
+                  City
+                </label>
+                <Input
+                  value={formData.city}
+                  onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                  disabled={isSaving}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2 dark:text-gray-200">
+                  State
+                </label>
+                <Input
+                  value={formData.state}
+                  onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                  disabled={isSaving}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2 dark:text-gray-200">
+                  Pin Code
+                </label>
+                <Input
+                  value={formData.pin_code}
+                  onChange={(e) => setFormData({ ...formData, pin_code: e.target.value })}
+                  disabled={isSaving}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2 dark:text-gray-200">
+                Country
+              </label>
+              <Input
+                value={formData.country}
+                onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                disabled={isSaving}
+              />
+            </div>
+          </div>
+
+          {/* Identity Documents */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium border-b dark:border-gray-800 pb-2">Identity Documents</h3>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2 dark:text-gray-200">
+                  Aadhar Number
+                </label>
+                <Input
+                  value={formData.aadhar_number}
+                  onChange={(e) => setFormData({ ...formData, aadhar_number: e.target.value })}
+                  disabled={isSaving}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2 dark:text-gray-200">
+                  PAN Number
+                </label>
+                <Input
+                  value={formData.pan_number}
+                  onChange={(e) => setFormData({ ...formData, pan_number: e.target.value.toUpperCase() })}
+                  maxLength={10}
+                  disabled={isSaving}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2 dark:text-gray-200">
+                  Aadhar Card
+                </label>
+                <Input
+                  type="file"
+                  accept=".pdf,image/*"
+                  onChange={(e) => setAadharCard(e.target.files?.[0] || null)}
+                  disabled={isSaving}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2 dark:text-gray-200">
+                  PAN Card
+                </label>
+                <Input
+                  type="file"
+                  accept=".pdf,image/*"
+                  onChange={(e) => setPanCard(e.target.files?.[0] || null)}
+                  disabled={isSaving}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t dark:border-gray-800">
+            <Button type="button" variant="secondary" onClick={onClose} disabled={isSaving}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSaving}>
+              {isSaving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                "Create Profile"
+              )}
+            </Button>
+          </div>
+        </form>
       </div>
     </div>
   );
