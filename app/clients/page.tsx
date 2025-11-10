@@ -74,14 +74,14 @@ function mapBackendClientDetailToFrontend(
 ): Client {
   return {
     id: backendClient.id,
-    name: backendClient.full_name || `${backendClient.first_name} ${backendClient.last_name}`,
+    name: backendClient.full_name || `${backendClient.first_name || ''} ${backendClient.last_name || ''}`.trim() || 'Client',
     business_name: undefined,
-    address: "", // Would need to fetch profile for this
-    city: "", // Would need to fetch profile for this
-    state: "", // Would need to fetch profile for this
-    pin_code: "", // Would need to fetch profile for this
-      country: "India",
-    primary_contact_name: backendClient.full_name || `${backendClient.first_name} ${backendClient.last_name}`,
+    address: backendClient.address || "",
+    city: backendClient.city || "",
+    state: backendClient.state || "",
+    pin_code: backendClient.pin_code || "",
+    country: backendClient.country || "India",
+    primary_contact_name: backendClient.primary_contact_name || backendClient.full_name || `${backendClient.first_name || ''} ${backendClient.last_name || ''}`.trim(),
     primary_contact_email: backendClient.email || "",
     primary_contact_phone: backendClient.phone_number || "",
     secondary_contact: undefined,
@@ -297,9 +297,12 @@ function ClientsPageContent() {
         fetchStatistics();
     } else if (editingClient) {
         // Map frontend Client to backend format
-        const nameParts = (clientData.name || editingClient.name || "").split(" ");
+        // Split name into first_name and last_name
+        const name = (clientData.name || editingClient.name || "").trim();
+        const nameParts = name.split(/\s+/).filter(part => part.length > 0);
         const first_name = nameParts[0] || "";
-        const last_name = nameParts.slice(1).join(" ") || "";
+        // Use rest of name as last name, or use first name again if only one word
+        const last_name = nameParts.length > 1 ? nameParts.slice(1).join(" ") : "";
 
         const backendData: Partial<{
           first_name: string;
@@ -315,8 +318,12 @@ function ClientsPageContent() {
           country: string;
         }> = {};
 
-        if (first_name) backendData.first_name = first_name;
-        if (last_name) backendData.last_name = last_name;
+        // CRITICAL: Always send first_name and last_name when editing (even if empty strings)
+        // This ensures the name is always updated correctly
+        if (clientData.name !== undefined) {
+          backendData.first_name = first_name;
+          backendData.last_name = last_name;
+        }
         if (clientData.primary_contact_email !== undefined) backendData.email = clientData.primary_contact_email;
         if (clientData.primary_contact_phone !== undefined) backendData.phone_number = clientData.primary_contact_phone;
         // CRITICAL: Send primary_contact_name even if empty string to allow clearing the field

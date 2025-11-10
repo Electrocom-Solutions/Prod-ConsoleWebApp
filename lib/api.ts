@@ -109,11 +109,14 @@ export interface BackendClientDetail {
   pan_number?: string;
   aadhar_card_url?: string;
   pan_card_url?: string;
-  designation?: string;
-  joining_date?: string;
-  monthly_salary?: number;
+  primary_contact_name?: string;
   notes?: string;
   profile?: number;
+  address?: string;
+  city?: string;
+  state?: string;
+  pin_code?: string;
+  country?: string;
   created_at: string;
   updated_at: string;
   created_by?: number;
