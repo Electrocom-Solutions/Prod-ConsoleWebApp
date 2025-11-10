@@ -150,6 +150,8 @@ function SettingsPageContent() {
     }
   };
 
+  const [onProfileCreatedCallback, setOnProfileCreatedCallback] = useState<((profile: CurrentUserProfile) => void) | null>(null);
+
   const handleCreateProfile = async (profileData: ProfileCreateData) => {
     setIsSaving(true);
     try {
@@ -159,28 +161,12 @@ function SettingsPageContent() {
       // Refresh profiles list to include the new profile
       await fetchProfiles();
       
-      // Set the newly created profile as the selected owner
-      const newProfile = profiles.find(prof => prof.id === createdProfile.id);
-      if (newProfile) {
-        const fullName = createdProfile.first_name + (createdProfile.last_name ? ` ${createdProfile.last_name}` : '');
-        setFormData((prev) => ({
-          ...prev,
-          firm_owner_profile_id: newProfile.id,
-          firm_owner_profile_name: fullName || createdProfile.username || '',
-          owner_search: fullName || createdProfile.username || '',
-        }));
-      } else {
-        // If profile not found in list yet, use the created profile data directly
-        const fullName = createdProfile.first_name + (createdProfile.last_name ? ` ${createdProfile.last_name}` : '');
-        setFormData((prev) => ({
-          ...prev,
-          firm_owner_profile_id: createdProfile.id,
-          firm_owner_profile_name: fullName || createdProfile.username || '',
-          owner_search: fullName || createdProfile.username || '',
-        }));
-      }
-      
       setShowProfileModal(false);
+      
+      // Call the callback if it exists (from FirmModal) to update form data
+      if (onProfileCreatedCallback) {
+        onProfileCreatedCallback(createdProfile);
+      }
     } catch (err: any) {
       showError("Error", err.message || "Failed to create profile");
     } finally {
@@ -386,6 +372,7 @@ function SettingsPageContent() {
             onClose={() => {
               setShowFirmModal(false);
               setSelectedFirm(null);
+              setOnProfileCreatedCallback(null);
             }}
             onSave={handleSaveFirm}
             isSaving={isSaving}
@@ -393,6 +380,10 @@ function SettingsPageContent() {
             setShowProfileModal={setShowProfileModal}
             onCreateProfile={handleCreateProfile}
             onSearchProfiles={fetchProfiles}
+            onProfileCreated={(callback) => {
+              // Store the callback from FirmModal to update its form data
+              setOnProfileCreatedCallback(callback);
+            }}
           />
         )}
 
@@ -429,6 +420,7 @@ function FirmModal({
   setShowProfileModal: (show: boolean) => void;
   onCreateProfile: (profile: ProfileCreateData) => Promise<void>;
   onSearchProfiles: (search?: string) => Promise<void>;
+  onProfileCreated?: (callback: (profile: CurrentUserProfile) => void) => void;
 }) {
   const [formData, setFormData] = useState({
     firm_name: firm?.firm_name || "",
@@ -555,6 +547,22 @@ function FirmModal({
     });
     setShowOwnerDropdown(false);
   };
+
+  // Set up callback to update form data when profile is created
+  useEffect(() => {
+    if (onProfileCreated) {
+      // Pass a callback function that updates form data
+      onProfileCreated((createdProfile: CurrentUserProfile) => {
+        const fullName = createdProfile.first_name + (createdProfile.last_name ? ` ${createdProfile.last_name}` : '');
+        setFormData((prev) => ({
+          ...prev,
+          firm_owner_profile_id: createdProfile.id,
+          firm_owner_profile_name: fullName || createdProfile.username || '',
+          owner_search: fullName || createdProfile.username || '',
+        }));
+      });
+    }
+  }, [onProfileCreated]);
 
   // Update filtered profiles when profiles list changes
   useEffect(() => {
