@@ -160,7 +160,7 @@ function NotificationsPageContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [debouncedSearch, filterType, currentPage, viewMode]);
+  }, [debouncedSearch, filterType, currentPage, viewMode, isOwner]);
 
   // Fetch statistics and notifications on mount and when filters change
   useEffect(() => {

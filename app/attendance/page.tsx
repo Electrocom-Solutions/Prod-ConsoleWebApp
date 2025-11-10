@@ -70,6 +70,7 @@ function AttendancePageContent() {
   const [showBulkPresentModal, setShowBulkPresentModal] = useState(false);
   const [editingRecord, setEditingRecord] = useState<AttendanceRecord | null>(null);
   const [selectedEmployees, setSelectedEmployees] = useState<number[]>([]);
+  const [selectedAttendanceRecords, setSelectedAttendanceRecords] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -498,16 +499,19 @@ function AttendancePageContent() {
           </div>
         </div>
 
-        {selectedEmployees.length > 0 && (
+        {selectedAttendanceRecords.length > 0 && (
           <div className="bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 rounded-lg p-4 flex items-center justify-between">
             <div className="text-sm font-medium dark:text-sky-200">
-              {selectedEmployees.length} employee{selectedEmployees.length > 1 ? 's' : ''} selected
+              {selectedAttendanceRecords.length} employee{selectedAttendanceRecords.length > 1 ? 's' : ''} selected
             </div>
             <div className="flex gap-2">
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => setSelectedEmployees([])}
+                onClick={() => {
+                  setSelectedEmployees([]);
+                  setSelectedAttendanceRecords([]);
+                }}
               >
                 Clear Selection
               </Button>
@@ -531,11 +535,16 @@ function AttendancePageContent() {
                     <th className="px-6 py-3 w-12">
                       <input
                         type="checkbox"
-                        checked={selectedEmployees.length > 0 && selectedEmployees.length === activeEmployees.length}
+                        checked={selectedAttendanceRecords.length > 0 && selectedAttendanceRecords.length === attendance.length}
                         onChange={(e) => {
                           if (e.target.checked) {
-                            setSelectedEmployees(activeEmployees.map(emp => emp.id));
+                            const allRecordIds = attendance.map(record => record.id);
+                            setSelectedAttendanceRecords(allRecordIds);
+                            // Also update selectedEmployees for backward compatibility
+                            const uniqueEmployeeIds = [...new Set(attendance.map(record => record.employee_id))];
+                            setSelectedEmployees(uniqueEmployeeIds);
                           } else {
+                            setSelectedAttendanceRecords([]);
                             setSelectedEmployees([]);
                           }
                         }}
@@ -597,12 +606,26 @@ function AttendancePageContent() {
                             {employee && (
                               <input
                                 type="checkbox"
-                                checked={selectedEmployees.includes(employee.id)}
+                                checked={selectedAttendanceRecords.includes(record.id)}
                                 onChange={(e) => {
                                   if (e.target.checked) {
-                                    setSelectedEmployees(prev => [...prev, employee.id]);
+                                    setSelectedAttendanceRecords(prev => [...prev, record.id]);
+                                    // Also update selectedEmployees for backward compatibility
+                                    if (!selectedEmployees.includes(employee.id)) {
+                                      setSelectedEmployees(prev => [...prev, employee.id]);
+                                    }
                                   } else {
-                                    setSelectedEmployees(prev => prev.filter(id => id !== employee.id));
+                                    setSelectedAttendanceRecords(prev => prev.filter(id => id !== record.id));
+                                    // Check if there are any other records for this employee selected
+                                    const otherRecordsForEmployee = attendance.filter(
+                                      r => r.employee_id === employee.id && r.id !== record.id
+                                    );
+                                    const hasOtherSelected = otherRecordsForEmployee.some(
+                                      r => selectedAttendanceRecords.includes(r.id)
+                                    );
+                                    if (!hasOtherSelected) {
+                                      setSelectedEmployees(prev => prev.filter(id => id !== employee.id));
+                                    }
                                   }
                                 }}
                                 className="rounded border-gray-300 dark:border-gray-600 text-sky-600 focus:ring-sky-500"
