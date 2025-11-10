@@ -156,6 +156,13 @@ function SettingsPageContent() {
     setIsSaving(true);
     try {
       const createdProfile: CurrentUserProfile = await apiClient.createProfile(profileData);
+      
+      // Validate that the profile was created successfully
+      if (!createdProfile || !createdProfile.id) {
+        showError("Error", "Profile was created but invalid data was returned");
+        return;
+      }
+      
       showSuccess("Success", "Profile created successfully");
       
       // Refresh profiles list to include the new profile
@@ -164,7 +171,8 @@ function SettingsPageContent() {
       setShowProfileModal(false);
       
       // Call the callback if it exists (from FirmModal) to update form data
-      if (onProfileCreatedCallback) {
+      // Only call if profile is valid
+      if (onProfileCreatedCallback && createdProfile) {
         onProfileCreatedCallback(createdProfile);
       }
     } catch (err: any) {
@@ -554,7 +562,16 @@ function FirmModal({
     if (onProfileCreated) {
       // Pass a callback function that updates form data
       onProfileCreated((createdProfile: CurrentUserProfile) => {
-        const fullName = createdProfile.first_name + (createdProfile.last_name ? ` ${createdProfile.last_name}` : '');
+        // Add null check to prevent runtime errors
+        if (!createdProfile) {
+          console.error('Created profile is null or undefined');
+          return;
+        }
+        
+        const firstName = createdProfile.first_name || '';
+        const lastName = createdProfile.last_name || '';
+        const fullName = (firstName + (lastName ? ` ${lastName}` : '')).trim();
+        
         setFormData((prev) => ({
           ...prev,
           firm_owner_profile_id: createdProfile.id,
