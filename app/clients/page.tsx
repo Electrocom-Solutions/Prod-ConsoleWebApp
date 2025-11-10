@@ -317,15 +317,17 @@ function ClientsPageContent() {
 
         if (first_name) backendData.first_name = first_name;
         if (last_name) backendData.last_name = last_name;
-        if (clientData.primary_contact_email) backendData.email = clientData.primary_contact_email;
-        if (clientData.primary_contact_phone) backendData.phone_number = clientData.primary_contact_phone;
-        if (clientData.primary_contact_name) backendData.primary_contact_name = clientData.primary_contact_name;
+        if (clientData.primary_contact_email !== undefined) backendData.email = clientData.primary_contact_email;
+        if (clientData.primary_contact_phone !== undefined) backendData.phone_number = clientData.primary_contact_phone;
+        // CRITICAL: Send primary_contact_name even if empty string to allow clearing the field
+        if (clientData.primary_contact_name !== undefined) backendData.primary_contact_name = clientData.primary_contact_name;
         if (clientData.notes !== undefined) backendData.notes = clientData.notes;
-        if (clientData.address) backendData.address = clientData.address;
-        if (clientData.city) backendData.city = clientData.city;
-        if (clientData.state) backendData.state = clientData.state;
-        if (clientData.pin_code) backendData.pin_code = clientData.pin_code;
-        if (clientData.country) backendData.country = clientData.country;
+        // CRITICAL: Send address fields even if empty strings to allow clearing/updating them
+        if (clientData.address !== undefined) backendData.address = clientData.address;
+        if (clientData.city !== undefined) backendData.city = clientData.city;
+        if (clientData.state !== undefined) backendData.state = clientData.state;
+        if (clientData.pin_code !== undefined) backendData.pin_code = clientData.pin_code;
+        if (clientData.country !== undefined) backendData.country = clientData.country;
 
         await apiClient.updateClient(editingClient.id, backendData);
         showAlert("Success", "Client updated successfully.", "success");

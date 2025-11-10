@@ -2494,8 +2494,8 @@ Please verify:
     const formData = new FormData();
     if (data.first_name) formData.append('first_name', data.first_name);
     if (data.last_name) formData.append('last_name', data.last_name);
-    if (data.email) formData.append('email', data.email);
-    if (data.phone_number) formData.append('phone_number', data.phone_number);
+    if (data.email !== undefined) formData.append('email', data.email);
+    if (data.phone_number !== undefined) formData.append('phone_number', data.phone_number);
     if (data.photo) formData.append('photo', data.photo);
     if (data.date_of_birth) formData.append('date_of_birth', data.date_of_birth);
     if (data.gender) formData.append('gender', data.gender);
@@ -2506,14 +2506,16 @@ Please verify:
     if (data.designation) formData.append('designation', data.designation);
     if (data.joining_date) formData.append('joining_date', data.joining_date);
     if (data.monthly_salary !== undefined) formData.append('monthly_salary', data.monthly_salary.toString());
-    if (data.notes) formData.append('notes', data.notes);
+    if (data.notes !== undefined) formData.append('notes', data.notes || '');
     if (data.profile) formData.append('profile', data.profile.toString());
-    if (data.primary_contact_name) formData.append('primary_contact_name', data.primary_contact_name);
-    if (data.address) formData.append('address', data.address);
-    if (data.city) formData.append('city', data.city);
-    if (data.state) formData.append('state', data.state);
-    if (data.pin_code) formData.append('pin_code', data.pin_code);
-    if (data.country) formData.append('country', data.country);
+    // CRITICAL: Send primary_contact_name even if empty string to allow clearing the field
+    if (data.primary_contact_name !== undefined) formData.append('primary_contact_name', data.primary_contact_name || '');
+    // CRITICAL: Send address fields even if empty strings to allow clearing/updating them
+    if (data.address !== undefined) formData.append('address', data.address || '');
+    if (data.city !== undefined) formData.append('city', data.city || '');
+    if (data.state !== undefined) formData.append('state', data.state || '');
+    if (data.pin_code !== undefined) formData.append('pin_code', data.pin_code || '');
+    if (data.country !== undefined) formData.append('country', data.country || '');
 
     // Use the request method which handles CSRF tokens properly
     return this.request<BackendClientDetail>(`/api/clients/${id}/`, {
