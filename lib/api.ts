@@ -1367,10 +1367,24 @@ class ApiClient {
     
     try {
       // Get CSRF token from cookies
-      // Django sets it as 'csrftoken' (lowercase)
-      const cookies = document.cookie.split(';');
+      // Django sets it as 'csrftoken' (lowercase) with domain '.electrocomsolutions.in' in production
+      // document.cookie only shows cookies accessible to the current page's domain
+      // If cookie is set with domain=.electrocomsolutions.in, it should be readable from console.electrocomsolutions.in
+      
+      const cookieString = document.cookie;
+      
+      // If no cookies at all, return null
+      if (!cookieString || cookieString.trim() === '') {
+        if (process.env.NODE_ENV === 'development') {
+          console.debug('[API] No cookies found in document.cookie');
+        }
+        return null;
+      }
+      
+      const cookies = cookieString.split(';');
       
       // Try to find csrftoken cookie (case-insensitive search)
+      // Django sets it as 'csrftoken' (lowercase), but we search case-insensitively
       let csrfCookie = cookies.find(cookie => {
         const trimmed = cookie.trim();
         return trimmed.toLowerCase().startsWith('csrftoken=');
@@ -1378,25 +1392,44 @@ class ApiClient {
       
       if (csrfCookie) {
         // Extract the token value
-        const parts = csrfCookie.split('=');
-        if (parts.length >= 2) {
-          // Join all parts after the first '=' in case the token contains '='
-          const tokenValue = parts.slice(1).join('=').trim();
-          const token = decodeURIComponent(tokenValue);
+        const trimmed = csrfCookie.trim();
+        const equalIndex = trimmed.indexOf('=');
+        
+        if (equalIndex !== -1 && equalIndex < trimmed.length - 1) {
+          // Get everything after the first '=' sign
+          // This handles tokens that might contain '=' characters
+          const tokenValue = trimmed.substring(equalIndex + 1).trim();
+          
+          // Decode URI component in case the token is URL-encoded
+          let token: string;
+          try {
+            token = decodeURIComponent(tokenValue);
+          } catch (e) {
+            // If decoding fails, use the raw value
+            token = tokenValue;
+          }
           
           if (token && token.length > 0) {
             if (process.env.NODE_ENV === 'development') {
               // Log token info for debugging (first 10 chars only for security)
-              console.debug('[API] Found CSRF token, length:', token.length);
+              console.debug('[API] Found CSRF token, length:', token.length, 'first 10 chars:', token.substring(0, 10));
             }
             return token;
           }
         }
       }
       
+      // Debug: Log available cookies (names only) if token not found
       if (process.env.NODE_ENV === 'development') {
-        console.debug('[API] No CSRF token found in cookies');
-        console.debug('[API] All cookies:', document.cookie);
+        console.warn('[API] CSRF token not found in cookies');
+        const cookieNames = cookies.map(c => c.trim().split('=')[0]).filter(Boolean);
+        console.warn('[API] Available cookie names:', cookieNames);
+        console.warn('[API] Current domain:', window.location.hostname);
+        console.warn('[API] Current protocol:', window.location.protocol);
+        console.warn('[API] Cookie string length:', cookieString.length);
+        console.warn('[API] Expected cookie domain: .electrocomsolutions.in');
+        console.warn('[API] Expected cookie name: csrftoken');
+        console.warn('[API] Full cookie string (first 200 chars):', cookieString.substring(0, 200));
       }
       
       return null;
@@ -1428,21 +1461,25 @@ class ApiClient {
     // Always fetch a fresh token to ensure it matches the current session
     // This is critical after login when a new session is created
     try {
-      // Make a GET request to any endpoint - Django will set the CSRF token cookie
-      // Use a simple endpoint that should work regardless of auth status
-      // We'll try /api/user/ first (requires auth), but any endpoint should work
+      // CRITICAL: Make a GET request with credentials: 'include' to receive cookies
+      // Django will set the CSRF token cookie in the Set-Cookie header
+      // The cookie will be set with domain=.electrocomsolutions.in in production
+      // This allows the cookie to be accessible from both console.electrocomsolutions.in and consoleapi.electrocomsolutions.in
+      
+      // Try /api/user/ first (requires auth) - this ensures we get a token for the current session
       const response = await fetch(`${this.baseURL}/api/user/`, {
         method: 'GET',
-        credentials: 'include',
+        credentials: 'include', // CRITICAL: Required to receive cookies
         mode: 'cors',
         headers: {
           'Accept': 'application/json',
         },
       }).catch(async () => {
-        // If /api/user/ fails, try the API root
+        // If /api/user/ fails (401/403), try the API root
+        // Even unauthenticated requests should set CSRF cookie
         return fetch(`${this.baseURL}/api/`, {
           method: 'GET',
-          credentials: 'include',
+          credentials: 'include', // CRITICAL: Required to receive cookies
           mode: 'cors',
           headers: {
             'Accept': 'application/json',
@@ -1450,53 +1487,91 @@ class ApiClient {
         });
       });
       
-      // Check response status - even 401/403 should set CSRF cookie
-      if (response && (response.status === 200 || response.status === 401 || response.status === 403)) {
-        // Django sets the CSRF token cookie in the response headers
-        // Wait longer for the browser to process and store the cookie
-        // This is important because cookie setting is asynchronous and might take time
-        await new Promise(resolve => setTimeout(resolve, 200));
+      // Check response status - even 401/403/404 should set CSRF cookie
+      // Django sets CSRF cookie on any request, regardless of auth status
+      if (response && (response.status === 200 || response.status === 401 || response.status === 403 || response.status === 404)) {
+        // Django sets the CSRF token cookie in the Set-Cookie header
+        // The browser automatically processes this and stores it
+        // CRITICAL: In production with cross-subdomain cookies (.electrocomsolutions.in),
+        // the cookie might take longer to be available in document.cookie
+        // We need to wait longer and retry more times
+        
+        // Initial wait for browser to process the Set-Cookie header
+        // In production with cross-subdomain, this can take 500-1000ms
+        await new Promise(resolve => setTimeout(resolve, 500));
         
         // Try multiple times to read the token (cookie might not be immediately available)
+        // In production with cross-subdomain cookies, it might take longer
         let token: string | null = null;
-        for (let i = 0; i < 3; i++) {
+        const maxRetries = 10; // Increased from 5 to 10 for production reliability
+        for (let i = 0; i < maxRetries; i++) {
           token = this.getCsrfToken();
-          if (token) break;
-          await new Promise(resolve => setTimeout(resolve, 100));
+          if (token) {
+            if (process.env.NODE_ENV === 'development') {
+              console.debug('[API] CSRF token obtained on attempt', i + 1, 'length:', token.length);
+            }
+            break;
+          }
+          // Wait progressively longer between retries (100ms, 200ms, 300ms, etc.)
+          // Total max wait: 500ms initial + 100+200+...+1000ms = ~6 seconds
+          await new Promise(resolve => setTimeout(resolve, 100 * (i + 1)));
         }
         
         if (process.env.NODE_ENV === 'development') {
           if (token) {
-            console.debug('[API] CSRF token obtained, length:', token.length);
+            console.debug('[API] CSRF token successfully obtained, length:', token.length);
           } else {
             console.warn('[API] CSRF token not found after fetch');
             console.warn('[API] Response status:', response.status);
-            // Never log full cookies or headers as they may contain sensitive data
-            if (process.env.NODE_ENV === 'development') {
-              // Only log cookie names, not values
-              if (typeof document !== 'undefined') {
-                const cookieNames = document.cookie.split(';').map(c => c.trim().split('=')[0]);
+            console.warn('[API] Response URL:', response.url);
+            // Only log cookie names, not values
+            if (typeof document !== 'undefined') {
+              const cookieString = document.cookie;
+              if (cookieString) {
+                const cookieNames = cookieString.split(';').map(c => c.trim().split('=')[0]).filter(Boolean);
                 console.warn('[API] Available cookie names:', cookieNames);
+                console.warn('[API] Cookie string length:', cookieString.length);
+              } else {
+                console.warn('[API] No cookies found in document.cookie');
               }
+              console.warn('[API] Current domain:', window.location.hostname);
+              console.warn('[API] API base URL:', this.baseURL);
             }
-            console.warn('[API] Cookie domain/path issues might prevent reading the token');
+            console.warn('[API] Possible causes:');
+            console.warn('[API] 1. Cookie domain mismatch - check CSRF_COOKIE_DOMAIN in Django (should be .electrocomsolutions.in)');
+            console.warn('[API]    Current frontend domain:', typeof window !== 'undefined' ? window.location.hostname : 'N/A');
+            console.warn('[API]    Expected cookie domain: .electrocomsolutions.in');
+            console.warn('[API] 2. Cookie path mismatch - check CSRF_COOKIE_PATH in Django (should be /)');
+            console.warn('[API] 3. Cookie Secure flag - if HTTPS, CSRF_COOKIE_SECURE must be True');
+            console.warn('[API]    Current protocol:', typeof window !== 'undefined' ? window.location.protocol : 'N/A');
+            console.warn('[API] 4. Cookie SameSite restrictions - check CSRF_COOKIE_SAMESITE (should be Lax)');
+            console.warn('[API] 5. CORS not allowing credentials - check CORS_ALLOW_CREDENTIALS in Django (should be True)');
+            console.warn('[API] 6. Cookie HttpOnly flag - check CSRF_COOKIE_HTTPONLY (should be False for JavaScript access)');
+            console.warn('[API] 7. Browser blocking third-party cookies - check browser settings');
           }
         }
         
         if (!token) {
           console.error('[API] CRITICAL: Could not obtain CSRF token after fetch');
           console.error('[API] This will cause CSRF errors on state-changing requests');
-          console.error('[API] Possible causes:');
-          console.error('[API] 1. Cookie domain mismatch (check CSRF_COOKIE_DOMAIN in Django settings)');
-          console.error('[API] 2. Cookie path mismatch');
-          console.error('[API] 3. Cookie Secure flag mismatch (HTTP vs HTTPS)');
-          console.error('[API] 4. Cookie SameSite restrictions');
+          console.error('[API] Frontend domain:', typeof window !== 'undefined' ? window.location.hostname : 'N/A');
+          console.error('[API] Backend URL:', this.baseURL);
+          console.error('[API] Check Django settings:');
+          console.error('[API] - CSRF_COOKIE_DOMAIN should be .electrocomsolutions.in');
+          console.error('[API] - CSRF_COOKIE_SECURE should match HTTPS (True for HTTPS, False for HTTP)');
+          console.error('[API] - CSRF_COOKIE_HTTPONLY should be False (to allow JavaScript access)');
+          console.error('[API] - CORS_ALLOW_CREDENTIALS should be True');
         }
       } else {
         console.warn('[API] Unexpected response status when fetching CSRF token:', response?.status);
+        console.warn('[API] Response URL:', response?.url);
       }
     } catch (error) {
       console.error('[API] Error fetching CSRF token:', error);
+      if (error instanceof Error) {
+        console.error('[API] Error message:', error.message);
+        console.error('[API] Error stack:', error.stack);
+      }
       // Don't throw - we'll try to use existing token if available
     }
   }
@@ -1522,11 +1597,17 @@ class ApiClient {
         },
       });
       
-      // Wait a moment for the cookie to be set
-      await new Promise(resolve => setTimeout(resolve, 50));
+      // Wait longer for cookie to be set in production with cross-subdomain cookies
+      // Django sets cookie with domain=.electrocomsolutions.in which might take longer
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      // Return the refreshed token
-      const token = this.getCsrfToken();
+      // Try multiple times to read the refreshed token
+      let token: string | null = null;
+      for (let i = 0; i < 5; i++) {
+        token = this.getCsrfToken();
+        if (token) break;
+        await new Promise(resolve => setTimeout(resolve, 100 * (i + 1)));
+      }
       if (process.env.NODE_ENV === 'development') {
         if (token) {
           console.debug('[API] CSRF token refreshed:', token.substring(0, 10) + '...');
@@ -1556,34 +1637,53 @@ class ApiClient {
       console.log(`[API] ${method} ${url}`);
     }
     
-    // Get CSRF token for POST, PUT, DELETE, PATCH requests
-    // Check if we have a token first, only refresh if we don't have one
-    // This avoids unnecessary token refreshes that might cause timing issues
+    // CRITICAL: Get CSRF token for POST, PUT, DELETE, PATCH requests
+    // Django requires CSRF token for all state-changing requests
+    // The token is stored in a cookie (csrftoken) and must be sent in X-CSRFToken header
+    // In production, the cookie is set with domain=.electrocomsolutions.in
+    // This allows the cookie to be accessible from both console.electrocomsolutions.in and consoleapi.electrocomsolutions.in
     let csrfToken: string | null = null;
     if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
-      // First check if we already have a token
-      csrfToken = this.getCsrfToken();
-      
-      // Only fetch a new token if we don't have one
-      // This is more efficient and avoids potential timing issues
-      if (!csrfToken) {
-        if (process.env.NODE_ENV === 'development') {
-          console.debug('[API] No CSRF token found, fetching one...');
+      // CRITICAL: Always fetch a fresh CSRF token for state-changing requests
+      // This ensures the token matches the current session, especially after login
+      // In production with cross-subdomain cookies, stale tokens can cause CSRF errors
+      // Even if we have a token, we fetch a fresh one to ensure it's valid
+      if (process.env.NODE_ENV === 'development') {
+        const existingToken = this.getCsrfToken();
+        if (existingToken) {
+          console.debug('[API] Found existing CSRF token, but fetching fresh one to ensure it matches session...');
+        } else {
+          console.debug('[API] No CSRF token found in cookies, fetching one...');
         }
-        await this.ensureCsrfToken();
-        csrfToken = this.getCsrfToken();
       }
       
+      // Always fetch a fresh token to ensure it matches the current session
+      // This is especially important after login when a new session is created
+      await this.ensureCsrfToken();
+      csrfToken = this.getCsrfToken();
+      
       // If we still don't have a token after fetching, this is a critical error
+      // The request will fail with a CSRF error
       if (!csrfToken) {
         console.error('[API] CRITICAL ERROR: No CSRF token available for', method, 'request to', endpoint);
         console.error('[API] This request will fail with a CSRF error');
+        console.error('[API] Frontend domain:', typeof window !== 'undefined' ? window.location.hostname : 'N/A');
+        console.error('[API] Backend URL:', this.baseURL);
+        console.error('[API] Check Django settings:');
+        console.error('[API] - CSRF_COOKIE_DOMAIN should be .electrocomsolutions.in');
+        console.error('[API] - CSRF_COOKIE_SECURE should match HTTPS (True for HTTPS, False for HTTP)');
+        console.error('[API] - CSRF_COOKIE_HTTPONLY should be False (to allow JavaScript access)');
+        console.error('[API] - CORS_ALLOW_CREDENTIALS should be True');
         // Never log full cookies as they may contain sensitive session data
-        if (process.env.NODE_ENV === 'development') {
+        if (process.env.NODE_ENV === 'development' && typeof document !== 'undefined') {
           // Only log cookie names, not values
-          if (typeof document !== 'undefined') {
-            const cookieNames = document.cookie.split(';').map(c => c.trim().split('=')[0]);
+          const cookieString = document.cookie;
+          if (cookieString) {
+            const cookieNames = cookieString.split(';').map(c => c.trim().split('=')[0]).filter(Boolean);
             console.error('[API] Available cookie names:', cookieNames);
+            console.error('[API] Cookie string length:', cookieString.length);
+          } else {
+            console.error('[API] No cookies found in document.cookie');
           }
         }
       } else {
@@ -1714,32 +1814,49 @@ class ApiClient {
           console.warn('[API] Current CSRF token from cookie:', this.getCsrfToken()?.substring(0, 20) + '...');
           
           // Clear any existing token cookie (might be stale)
+          // CRITICAL: In production with domain=.electrocomsolutions.in, we need to clear with the domain
           if (typeof document !== 'undefined') {
-            // Try to clear the cookie by setting it to expire
-            document.cookie = 'csrftoken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=;';
+            const currentDomain = window.location.hostname;
+            const rootDomain = currentDomain.includes('.') 
+              ? '.' + currentDomain.split('.').slice(-2).join('.') 
+              : currentDomain;
+            
+            // Clear with root domain (for production: .electrocomsolutions.in)
+            if (rootDomain.startsWith('.')) {
+              document.cookie = `csrftoken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${rootDomain};`;
+            }
+            // Clear without domain (for current domain)
             document.cookie = 'csrftoken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+            // Clear with empty domain
+            document.cookie = 'csrftoken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=;';
           }
           
           // Wait a bit before fetching new token
-          await new Promise(resolve => setTimeout(resolve, 100));
+          await new Promise(resolve => setTimeout(resolve, 200));
           
           // Refresh the CSRF token by making a GET request
           // This will get a fresh token that matches the current session
           try {
             const tokenResponse = await fetch(`${this.baseURL}/api/user/`, {
               method: 'GET',
-              credentials: 'include',
+              credentials: 'include', // CRITICAL: Required to receive cookies
               mode: 'cors',
               headers: {
                 'Accept': 'application/json',
               },
             });
             
-            // Wait for cookie to be set
-            await new Promise(resolve => setTimeout(resolve, 200));
+            // Wait longer for cookie to be set in production with cross-subdomain cookies
+            // Django sets cookie with domain=.electrocomsolutions.in which might take longer
+            await new Promise(resolve => setTimeout(resolve, 500));
             
-            // Get the new token
-            const newToken = this.getCsrfToken();
+            // Try multiple times to read the new token
+            let newToken: string | null = null;
+            for (let i = 0; i < 5; i++) {
+              newToken = this.getCsrfToken();
+              if (newToken) break;
+              await new Promise(resolve => setTimeout(resolve, 100 * (i + 1)));
+            }
             
             if (newToken) {
               console.warn('[API] New CSRF token obtained:', newToken.substring(0, 20) + '...');
@@ -1979,36 +2096,52 @@ class ApiClient {
       
       // Login successful - Django has created a new session
       // We MUST get a fresh CSRF token that matches the new session
-      // Wait a moment for the session cookie to be set, then fetch CSRF token
+      // CRITICAL: In production with cross-subdomain cookies, we need to wait longer
+      // Wait for the session cookie to be set, then fetch CSRF token
       if (typeof document !== 'undefined') {
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Wait longer for session cookie to be set in production
+        await new Promise(resolve => setTimeout(resolve, 300));
         
         // Fetch a fresh CSRF token that matches the new session
         try {
           await fetch(`${this.baseURL}/api/user/`, {
             method: 'GET',
-            credentials: 'include',
+            credentials: 'include', // CRITICAL: Required to receive cookies
             mode: 'cors',
             headers: {
               'Accept': 'application/json',
             },
           });
           
-          // Wait for cookie to be set
-          await new Promise(resolve => setTimeout(resolve, 100));
+          // Wait longer for cookie to be set in production with cross-subdomain cookies
+          // Django sets cookie with domain=.electrocomsolutions.in which might take longer
+          await new Promise(resolve => setTimeout(resolve, 500));
           
-          const newToken = this.getCsrfToken();
+          // Try multiple times to read the new token
+          let newToken: string | null = null;
+          for (let i = 0; i < 5; i++) {
+            newToken = this.getCsrfToken();
+            if (newToken) break;
+            await new Promise(resolve => setTimeout(resolve, 100 * (i + 1)));
+          }
+          
           if (newToken) {
             if (process.env.NODE_ENV === 'development') {
               console.debug('[API] CSRF token refreshed after login:', newToken.substring(0, 10) + '...');
             }
           } else {
             console.warn('[API] WARNING: Could not get CSRF token after login. Future requests may fail.');
+            console.warn('[API] This might be due to:');
+            console.warn('[API] 1. Cookie domain mismatch - check CSRF_COOKIE_DOMAIN in Django');
+            console.warn('[API] 2. Cookie Secure flag - if HTTPS, CSRF_COOKIE_SECURE must be True');
+            console.warn('[API] 3. Cookie HttpOnly flag - CSRF_COOKIE_HTTPONLY must be False');
             if (typeof document !== 'undefined') {
               // Never log full cookies as they may contain sensitive session data
               if (process.env.NODE_ENV === 'development') {
-                const cookieNames = document.cookie.split(';').map(c => c.trim().split('=')[0]);
+                const cookieNames = document.cookie.split(';').map(c => c.trim().split('=')[0]).filter(Boolean);
                 console.warn('[API] Available cookie names:', cookieNames);
+                console.warn('[API] Current domain:', window.location.hostname);
+                console.warn('[API] Current protocol:', window.location.protocol);
               }
             }
           }
@@ -2112,19 +2245,39 @@ Please verify:
         method: 'POST',
       });
       
-      // Clear CSRF token from cookies
+      // Clear CSRF token from cookies - need to clear with domain for production
       if (typeof document !== 'undefined') {
-        // Clear CSRF token cookie
+        const currentDomain = window.location.hostname;
+        const rootDomain = currentDomain.includes('.') 
+          ? '.' + currentDomain.split('.').slice(-2).join('.') 
+          : currentDomain;
+        
+        // Clear with root domain (for production: .electrocomsolutions.in)
+        if (rootDomain.startsWith('.')) {
+          document.cookie = `csrftoken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${rootDomain};`;
+          document.cookie = `sessionid=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${rootDomain};`;
+        }
+        // Clear without domain (for current domain)
         document.cookie = 'csrftoken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-        // Clear session cookie (if any)
         document.cookie = 'sessionid=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
       }
     } catch (error) {
       // Even if logout fails, clear local state and cookies
       console.error('Logout error:', error);
       
-      // Clear cookies even if request failed
+      // Clear cookies even if request failed - need to clear with domain for production
       if (typeof document !== 'undefined') {
+        const currentDomain = window.location.hostname;
+        const rootDomain = currentDomain.includes('.') 
+          ? '.' + currentDomain.split('.').slice(-2).join('.') 
+          : currentDomain;
+        
+        // Clear with root domain (for production: .electrocomsolutions.in)
+        if (rootDomain.startsWith('.')) {
+          document.cookie = `csrftoken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${rootDomain};`;
+          document.cookie = `sessionid=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${rootDomain};`;
+        }
+        // Clear without domain (for current domain)
         document.cookie = 'csrftoken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
         document.cookie = 'sessionid=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
       }
