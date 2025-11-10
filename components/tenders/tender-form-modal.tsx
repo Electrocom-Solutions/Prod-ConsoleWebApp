@@ -282,13 +282,13 @@ export default function TenderFormModal({
                           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                             Filed Date
                           </label>
-                          <input
-                            type="date"
-                            value={formData.filed_date}
-                            onChange={(e) =>
-                              setFormData({ ...formData, filed_date: e.target.value })
+                          <DatePicker
+                            value={formData.filed_date || undefined}
+                            onChange={(value) =>
+                              setFormData({ ...formData, filed_date: value })
                             }
-                            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                            placeholder="Select filed date"
+                            className="mt-1"
                           />
                           {errors.filed_date && (
                             <p className="mt-1 text-sm text-red-600 dark:text-red-400">
@@ -302,13 +302,15 @@ export default function TenderFormModal({
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                               Start Date <span className="text-red-500">*</span>
                             </label>
-                            <input
-                              type="date"
-                              value={formData.start_date}
-                              onChange={(e) =>
-                                setFormData({ ...formData, start_date: e.target.value })
+                            <DatePicker
+                              value={formData.start_date || undefined}
+                              onChange={(value) =>
+                                setFormData({ ...formData, start_date: value })
                               }
-                              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                              placeholder="Select start date"
+                              required
+                              className="mt-1"
+                              maxDate={formData.end_date || undefined}
                             />
                             {errors.start_date && (
                               <p className="mt-1 text-sm text-red-600 dark:text-red-400">
@@ -321,13 +323,15 @@ export default function TenderFormModal({
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                               End Date <span className="text-red-500">*</span>
                             </label>
-                            <input
-                              type="date"
-                              value={formData.end_date}
-                              onChange={(e) =>
-                                setFormData({ ...formData, end_date: e.target.value })
+                            <DatePicker
+                              value={formData.end_date || undefined}
+                              onChange={(value) =>
+                                setFormData({ ...formData, end_date: value })
                               }
-                              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                              placeholder="Select end date"
+                              required
+                              className="mt-1"
+                              minDate={formData.start_date || undefined}
                             />
                             {errors.end_date && (
                               <p className="mt-1 text-sm text-red-600 dark:text-red-400">

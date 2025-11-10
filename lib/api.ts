@@ -150,7 +150,7 @@ export interface BackendAMCListItem {
   amount: string; // Decimal as string
   start_date: string;
   end_date: string;
-  status: 'Pending' | 'Active' | 'Expired' | 'Canceled';
+  status: 'Active' | 'Expired' | 'Canceled';
   billing_cycle: 'Monthly' | 'Quarterly' | 'Half-yearly' | 'Yearly';
   days_until_expiry: number | null;
   created_at: string;
@@ -172,7 +172,7 @@ export interface BackendAMCDetail {
   amount: string; // Decimal as string
   start_date: string;
   end_date: string;
-  status: 'Pending' | 'Active' | 'Expired' | 'Canceled';
+  status: 'Active' | 'Expired' | 'Canceled';
   billing_cycle: 'Monthly' | 'Quarterly' | 'Half-yearly' | 'Yearly';
   notes?: string;
   total_amount: number;
@@ -2718,7 +2718,7 @@ Please verify:
     start_date: string;
     end_date: string;
     billing_cycle: 'Monthly' | 'Quarterly' | 'Half-yearly' | 'Yearly';
-    status: 'Pending' | 'Active' | 'Expired' | 'Canceled';
+    status: 'Active' | 'Expired' | 'Canceled';
     notes: string;
   }>): Promise<BackendAMCDetail> {
     return this.request<BackendAMCDetail>(`/api/amcs/${id}/`, {
