@@ -162,8 +162,9 @@ export default function TenderFormModal({
   // Calculate financials for display
   const estimatedValue = parseFloat(formData.estimated_value) || 0;
   const emdAmount = estimatedValue * 0.05; // 5%
-  const sd1Amount = parseFloat(formData.sd1_amount) || estimatedValue * 0.02; // 2%
-  const sd2Amount = parseFloat(formData.sd2_amount) || estimatedValue * 0.03; // 3%
+  // Always calculate from estimated value for display, not from formData
+  const sd1Amount = estimatedValue * 0.02; // 2%
+  const sd2Amount = estimatedValue * 0.03; // 3%
   
   // Auto-update SD amounts when estimated value changes (only for new tenders or when user changes estimated value)
   useEffect(() => {
@@ -415,7 +416,7 @@ export default function TenderFormModal({
                                 setFormData({ ...formData, sd1_amount: e.target.value })
                               }
                               className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                              placeholder="Auto-calculated"
+                              placeholder={estimatedValue > 0 ? `₹${sd1Amount.toLocaleString("en-IN")} (2%)` : "Auto-calculated"}
                             />
                           </div>
                           <div>
@@ -429,7 +430,7 @@ export default function TenderFormModal({
                                 setFormData({ ...formData, sd2_amount: e.target.value })
                               }
                               className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                              placeholder="Auto-calculated"
+                              placeholder={estimatedValue > 0 ? `₹${sd2Amount.toLocaleString("en-IN")} (3%)` : "Auto-calculated"}
                             />
                           </div>
                         </div>
@@ -447,13 +448,13 @@ export default function TenderFormModal({
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                               DD Date
                             </label>
-                            <input
-                              type="date"
-                              value={formData.dd_date}
-                              onChange={(e) =>
-                                setFormData({ ...formData, dd_date: e.target.value })
+                            <DatePicker
+                              value={formData.dd_date || undefined}
+                              onChange={(value) =>
+                                setFormData({ ...formData, dd_date: value })
                               }
-                              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                              placeholder="Select DD date"
+                              className="mt-1"
                             />
                           </div>
                           <div>

@@ -2804,9 +2804,35 @@ Please verify:
     security_deposit_2_dd_bank_name?: string;
     security_deposit_2_dd_beneficiary_name?: string;
   }): Promise<BackendTenderDetail> {
+    const formData = new FormData();
+    
+    // Required fields
+    formData.append('name', data.name);
+    if (data.reference_number !== undefined && data.reference_number !== '') formData.append('reference_number', data.reference_number);
+    if (data.description !== undefined && data.description !== '') formData.append('description', data.description);
+    if (data.filed_date !== undefined && data.filed_date !== '') formData.append('filed_date', data.filed_date);
+    if (data.start_date !== undefined && data.start_date !== '') formData.append('start_date', data.start_date);
+    if (data.end_date !== undefined && data.end_date !== '') formData.append('end_date', data.end_date);
+    if (data.estimated_value !== undefined) formData.append('estimated_value', data.estimated_value.toString());
+    if (data.status !== undefined && data.status !== '') formData.append('status', data.status);
+    
+    // Security Deposit 1 fields (only append if provided and not empty)
+    if (data.security_deposit_1_dd_date !== undefined && data.security_deposit_1_dd_date !== '') formData.append('security_deposit_1_dd_date', data.security_deposit_1_dd_date);
+    if (data.security_deposit_1_dd_number !== undefined && data.security_deposit_1_dd_number !== '') formData.append('security_deposit_1_dd_number', data.security_deposit_1_dd_number);
+    if (data.security_deposit_1_dd_amount !== undefined) formData.append('security_deposit_1_dd_amount', data.security_deposit_1_dd_amount.toString());
+    if (data.security_deposit_1_dd_bank_name !== undefined && data.security_deposit_1_dd_bank_name !== '') formData.append('security_deposit_1_dd_bank_name', data.security_deposit_1_dd_bank_name);
+    if (data.security_deposit_1_dd_beneficiary_name !== undefined && data.security_deposit_1_dd_beneficiary_name !== '') formData.append('security_deposit_1_dd_beneficiary_name', data.security_deposit_1_dd_beneficiary_name);
+    
+    // Security Deposit 2 fields (only append if provided and not empty)
+    if (data.security_deposit_2_dd_date !== undefined && data.security_deposit_2_dd_date !== '') formData.append('security_deposit_2_dd_date', data.security_deposit_2_dd_date);
+    if (data.security_deposit_2_dd_number !== undefined && data.security_deposit_2_dd_number !== '') formData.append('security_deposit_2_dd_number', data.security_deposit_2_dd_number);
+    if (data.security_deposit_2_dd_amount !== undefined) formData.append('security_deposit_2_dd_amount', data.security_deposit_2_dd_amount.toString());
+    if (data.security_deposit_2_dd_bank_name !== undefined && data.security_deposit_2_dd_bank_name !== '') formData.append('security_deposit_2_dd_bank_name', data.security_deposit_2_dd_bank_name);
+    if (data.security_deposit_2_dd_beneficiary_name !== undefined && data.security_deposit_2_dd_beneficiary_name !== '') formData.append('security_deposit_2_dd_beneficiary_name', data.security_deposit_2_dd_beneficiary_name);
+    
     return this.request<BackendTenderDetail>('/api/tenders/', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: formData,
     });
   }
 
@@ -2833,9 +2859,35 @@ Please verify:
     security_deposit_2_dd_bank_name: string;
     security_deposit_2_dd_beneficiary_name: string;
   }>): Promise<BackendTenderDetail> {
+    const formData = new FormData();
+    
+    // Append only provided fields (skip undefined and empty strings for optional fields)
+    if (data.name !== undefined && data.name !== '') formData.append('name', data.name);
+    if (data.reference_number !== undefined && data.reference_number !== '') formData.append('reference_number', data.reference_number);
+    if (data.description !== undefined && data.description !== '') formData.append('description', data.description);
+    if (data.filed_date !== undefined && data.filed_date !== '') formData.append('filed_date', data.filed_date);
+    if (data.start_date !== undefined && data.start_date !== '') formData.append('start_date', data.start_date);
+    if (data.end_date !== undefined && data.end_date !== '') formData.append('end_date', data.end_date);
+    if (data.estimated_value !== undefined) formData.append('estimated_value', data.estimated_value.toString());
+    if (data.status !== undefined && data.status !== '') formData.append('status', data.status);
+    
+    // Security Deposit 1 fields (only append if provided and not empty)
+    if (data.security_deposit_1_dd_date !== undefined && data.security_deposit_1_dd_date !== '') formData.append('security_deposit_1_dd_date', data.security_deposit_1_dd_date);
+    if (data.security_deposit_1_dd_number !== undefined && data.security_deposit_1_dd_number !== '') formData.append('security_deposit_1_dd_number', data.security_deposit_1_dd_number);
+    if (data.security_deposit_1_dd_amount !== undefined) formData.append('security_deposit_1_dd_amount', data.security_deposit_1_dd_amount.toString());
+    if (data.security_deposit_1_dd_bank_name !== undefined && data.security_deposit_1_dd_bank_name !== '') formData.append('security_deposit_1_dd_bank_name', data.security_deposit_1_dd_bank_name);
+    if (data.security_deposit_1_dd_beneficiary_name !== undefined && data.security_deposit_1_dd_beneficiary_name !== '') formData.append('security_deposit_1_dd_beneficiary_name', data.security_deposit_1_dd_beneficiary_name);
+    
+    // Security Deposit 2 fields (only append if provided and not empty)
+    if (data.security_deposit_2_dd_date !== undefined && data.security_deposit_2_dd_date !== '') formData.append('security_deposit_2_dd_date', data.security_deposit_2_dd_date);
+    if (data.security_deposit_2_dd_number !== undefined && data.security_deposit_2_dd_number !== '') formData.append('security_deposit_2_dd_number', data.security_deposit_2_dd_number);
+    if (data.security_deposit_2_dd_amount !== undefined) formData.append('security_deposit_2_dd_amount', data.security_deposit_2_dd_amount.toString());
+    if (data.security_deposit_2_dd_bank_name !== undefined && data.security_deposit_2_dd_bank_name !== '') formData.append('security_deposit_2_dd_bank_name', data.security_deposit_2_dd_bank_name);
+    if (data.security_deposit_2_dd_beneficiary_name !== undefined && data.security_deposit_2_dd_beneficiary_name !== '') formData.append('security_deposit_2_dd_beneficiary_name', data.security_deposit_2_dd_beneficiary_name);
+    
     return this.request<BackendTenderDetail>(`/api/tenders/${id}/`, {
       method: 'PATCH',
-      body: JSON.stringify(data),
+      body: formData,
     });
   }
 
