@@ -503,14 +503,21 @@ function TendersPageContent() {
           </div>
 
           <div className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pending EMD Amt</p>
-                <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-                  ₹{statistics?.pending_emd_amount?.toLocaleString("en-IN") ?? "0"}
+                <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-white truncate">
+                  {(() => {
+                    const amount = statistics?.pending_emd_amount ?? 0;
+                    if (amount >= 100000) {
+                      const lakhs = amount / 100000;
+                      return `₹${lakhs.toFixed(2)} L`;
+                    }
+                    return `₹${amount.toLocaleString("en-IN")}`;
+                  })()}
                 </p>
               </div>
-              <div className="rounded-full bg-red-100 p-3 dark:bg-red-900/30">
+              <div className="flex-shrink-0 rounded-full bg-red-100 p-3 dark:bg-red-900/30">
                 <IndianRupee className="h-6 w-6 text-red-600 dark:text-red-400" />
               </div>
             </div>
@@ -618,6 +625,12 @@ function TendersPageContent() {
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                       EMD
                     </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                      SD1
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                      SD2
+                    </th>
                     <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                       Actions
                     </th>
@@ -666,6 +679,22 @@ function TendersPageContent() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                           {financials ? `₹${financials.emd_amount.toLocaleString("en-IN")}` : "-"}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                          {(() => {
+                            const backendTender = backendTenders.find((bt) => bt.id === tender.id);
+                            return backendTender?.security_deposit_1 
+                              ? `₹${backendTender.security_deposit_1.toLocaleString("en-IN")}` 
+                              : "-";
+                          })()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                          {(() => {
+                            const backendTender = backendTenders.find((bt) => bt.id === tender.id);
+                            return backendTender?.security_deposit_2 
+                              ? `₹${backendTender.security_deposit_2.toLocaleString("en-IN")}` 
+                              : "-";
+                          })()}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <div className="flex justify-end gap-2">
@@ -764,10 +793,29 @@ function TendersPageContent() {
                             </div>
                           )}
                           {financials && (
-                            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                              <AlertCircle className="h-3 w-3" />
-                              <span>EMD: ₹{financials.emd_amount.toLocaleString("en-IN")}</span>
-                            </div>
+                            <>
+                              <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                                <AlertCircle className="h-3 w-3" />
+                                <span>EMD: ₹{financials.emd_amount.toLocaleString("en-IN")}</span>
+                              </div>
+                              {(() => {
+                                const backendTender = backendTenders.find((bt) => bt.id === tender.id);
+                                return (
+                                  <>
+                                    {backendTender?.security_deposit_1 && (
+                                      <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                                        <span>SD1: ₹{backendTender.security_deposit_1.toLocaleString("en-IN")}</span>
+                                      </div>
+                                    )}
+                                    {backendTender?.security_deposit_2 && (
+                                      <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                                        <span>SD2: ₹{backendTender.security_deposit_2.toLocaleString("en-IN")}</span>
+                                      </div>
+                                    )}
+                                  </>
+                                );
+                              })()}
+                            </>
                           )}
                         </div>
 

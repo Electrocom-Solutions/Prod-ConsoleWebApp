@@ -458,6 +458,26 @@ function TenderDetailPageContent() {
                   </div>
                 </div>
 
+                {/* Pending EMD Amount - Only show if tender has pending EMD */}
+                {backendTenderDetail && backendTenderDetail.pending_emd_amount > 0 && (
+                  <div className="mt-4 rounded-lg border border-orange-200 bg-gradient-to-br from-orange-50 to-white p-4 dark:border-orange-800 dark:from-orange-900/20 dark:to-gray-800">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-medium text-gray-900 dark:text-white">
+                        Pending EMD Amount
+                      </h3>
+                      <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                    </div>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                      ₹{backendTenderDetail.pending_emd_amount.toLocaleString("en-IN")}
+                    </p>
+                    <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                      {backendTenderDetail.status === "Lost" 
+                        ? "Security Deposit 1 to be collected" 
+                        : "Total EMD to be collected"}
+                    </p>
+                  </div>
+                )}
+
                 {/* Mark EMD Collected Button */}
                 {tender && 
                  (tender.status === "Lost" || tender.status === "Closed") && 
