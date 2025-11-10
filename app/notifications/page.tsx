@@ -28,6 +28,7 @@ import { apiClient, BackendNotificationListItem, NotificationStatisticsResponse 
 import { useDebounce } from "use-debounce";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { DatePicker } from "@/components/ui/date-picker";
+import { TimePicker } from "@/components/ui/time-picker";
 
 /**
  * Map backend notification to frontend NotificationRecord
@@ -614,10 +615,9 @@ function CreateNotificationModal({
                 placeholder="Select date"
                 disabled={isSaving}
               />
-              <Input
-                type="time"
+              <TimePicker
                 value={scheduleTime}
-                onChange={(e) => setScheduleTime(e.target.value)}
+                onChange={(value) => setScheduleTime(value)}
                 placeholder="Select time"
                 disabled={isSaving || !scheduleDate}
                 required={!!scheduleDate}

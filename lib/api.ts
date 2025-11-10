@@ -1301,6 +1301,7 @@ export interface EmailTemplateSendResponse {
   scheduled_at?: string | null;
   sent_at?: string | null;
   errors?: string[];
+  warning?: string;
 }
 
 /**

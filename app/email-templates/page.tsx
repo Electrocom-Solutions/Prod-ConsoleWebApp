@@ -699,16 +699,33 @@ function SendEmailModal({ template, onClose }: { template: EmailTemplate; onClos
       const response = await apiClient.sendEmailUsingTemplate(template.id, sendData);
 
       if (response.status === 'sent') {
-        showSuccess(
-          "Email Sent",
-          `Email sent successfully to ${response.recipients_count} recipient(s)`
-        );
+        let message = `Email sent successfully to ${response.recipients_count} recipient(s)`;
+        
+        // Show warning if email backend is console
+        if (response.warning) {
+          message += `\n\n⚠️ Warning: ${response.warning}`;
+        }
+        
+        // Show errors if any occurred
+        if (response.errors && response.errors.length > 0) {
+          message += `\n\n❌ Errors:\n${response.errors.join('\n')}`;
+        }
+        
+        if (response.warning || (response.errors && response.errors.length > 0)) {
+          showAlert("Email Sent (with issues)", message, response.warning ? "warning" : "error");
+        } else {
+          showSuccess("Email Sent", message);
+        }
       } else if (response.status === 'scheduled') {
         const scheduledDate = scheduled_at ? new Date(scheduled_at) : null;
-        showSuccess(
-          "Email Scheduled",
-          `Email scheduled for ${scheduledDate ? scheduledDate.toLocaleString() : 'future time'}\n\nRecipients: ${response.recipients_count}`
-        );
+        let message = `Email scheduled for ${scheduledDate ? scheduledDate.toLocaleString() : 'future time'}\n\nRecipients: ${response.recipients_count}`;
+        
+        if (response.warning) {
+          message += `\n\n⚠️ Warning: ${response.warning}`;
+          showAlert("Email Scheduled (with warning)", message, "warning");
+        } else {
+          showSuccess("Email Scheduled", message);
+        }
       }
 
       onClose();
