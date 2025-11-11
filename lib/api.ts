@@ -1196,6 +1196,7 @@ export interface BackendNotificationListItem {
   is_read: boolean;
   scheduled_at: string | null;
   sent_at: string | null;
+  recipient_count?: number | null;
   created_at: string;
   created_by: number | null;
   created_by_username: string | null;
@@ -4620,6 +4621,12 @@ Please verify:
   async deleteNotification(id: number): Promise<void> {
     await this.request(`/api/notifications/${id}/`, {
       method: 'DELETE',
+    });
+  }
+
+  async cancelScheduledNotification(id: number): Promise<{ cancelled_count: number; message: string }> {
+    return this.request<{ cancelled_count: number; message: string }>(`/api/notifications/${id}/cancel-scheduled/`, {
+      method: 'POST',
     });
   }
 

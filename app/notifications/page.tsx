@@ -50,6 +50,7 @@ function mapBackendNotificationToFrontend(backendNotif: BackendNotificationListI
     sent_at: backendNotif.sent_at,
     channel: backendNotif.channel,
     created_by_username: backendNotif.created_by_username || undefined,
+    recipient_count: backendNotif.recipient_count || undefined,
   };
 }
 
@@ -205,6 +206,19 @@ function NotificationsPageContent() {
         showSuccess("Success", "Notification deleted successfully");
       } catch (err: any) {
         showError("Error", err.message || "Failed to delete notification");
+      }
+    }
+  };
+
+  const handleCancelScheduled = async (id: number) => {
+    const confirmed = await showDeleteConfirm("this scheduled notification");
+    if (confirmed) {
+      try {
+        const result = await apiClient.cancelScheduledNotification(id);
+        refetchData();
+        showSuccess("Success", result.message || `Successfully cancelled ${result.cancelled_count} scheduled notification(s)`);
+      } catch (err: any) {
+        showError("Error", err.message || "Failed to cancel scheduled notification");
       }
     }
   };
@@ -531,6 +545,11 @@ function NotificationsPageContent() {
                                   <Clock className="h-3 w-3" />
                                   {formatDistanceToNow(new Date(notification.scheduled_at || notification.created_at), { addSuffix: true })}
                                 </span>
+                                {notification.recipient_count && notification.recipient_count > 0 && (
+                                  <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">
+                                    {notification.recipient_count} recipient{notification.recipient_count !== 1 ? 's' : ''}
+                                  </span>
+                                )}
                               </>
                             ) : (
                               <>
@@ -576,15 +595,27 @@ function NotificationsPageContent() {
                               <Check className="h-4 w-4" />
                             </Button>
                           )}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(notification.id)}
-                            title={viewMode === "scheduled" ? "Cancel scheduled notification" : "Delete"}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20"
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
+                          {viewMode === "scheduled" ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleCancelScheduled(notification.id)}
+                              title="Cancel scheduled notification"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(notification.id)}
+                              title="Delete"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </div>

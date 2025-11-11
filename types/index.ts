@@ -357,6 +357,7 @@ export type NotificationRecord = {
   sent_at?: string | null;
   channel?: string;
   created_by_username?: string;
+  recipient_count?: number;
 };
 
 export type EmailTemplate = {

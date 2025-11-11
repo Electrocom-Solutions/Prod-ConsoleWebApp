@@ -482,13 +482,9 @@ function AttendancePageContent() {
             <div className="flex items-center gap-2">
               <label className="text-sm font-medium dark:text-gray-300">Date:</label>
               <DatePicker
-                value={selectedDate ? new Date(selectedDate) : undefined}
-                onChange={(date) => {
-                  if (date) {
-                    setSelectedDate(format(date, "yyyy-MM-dd"));
-                  } else {
-                    setSelectedDate("");
-                  }
+                value={selectedDate || undefined}
+                onChange={(dateString) => {
+                  setSelectedDate(dateString || "");
                 }}
                 placeholder="Select date"
               />
