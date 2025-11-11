@@ -3278,6 +3278,21 @@ Please verify:
   }
 
   /**
+   * Get preview URL for a task document (for inline display in iframe)
+   * This endpoint allows iframe embedding by using xframe_options_exempt
+   */
+  getTaskDocumentPreviewUrl(taskId: number, documentId: number): string {
+    return `${this.baseURL}/api/tasks/${taskId}/preview-document/${documentId}/`;
+  }
+
+  /**
+   * Get download URL for a task document
+   */
+  getTaskDocumentDownloadUrl(taskId: number, documentId: number): string {
+    return `${this.baseURL}/api/tasks/${taskId}/download-document/${documentId}/`;
+  }
+
+  /**
    * Delete a task document
    */
   async deleteTaskDocument(taskId: number, documentId: number): Promise<void> {

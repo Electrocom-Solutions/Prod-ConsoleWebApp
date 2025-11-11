@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Loader2 } from "lucide-react";
+import { X, Loader2, ChevronDown } from "lucide-react";
 import { Tender, TenderFinancials } from "@/types";
 import { DatePicker } from "@/components/ui/date-picker";
 
@@ -44,6 +44,22 @@ export default function TenderFormModal({
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+
+  // Close status dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.status-dropdown-container')) {
+        setShowStatusDropdown(false);
+      }
+    };
+
+    if (showStatusDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showStatusDropdown]);
 
   // Populate form when editing
   useEffect(() => {
@@ -87,6 +103,8 @@ export default function TenderFormModal({
       });
     }
     setErrors({});
+    // Close dropdown when modal opens/closes
+    setShowStatusDropdown(false);
   }, [tender, existingFinancials, isOpen]);
 
   const validate = () => {
@@ -527,19 +545,33 @@ export default function TenderFormModal({
                     {/* Status */}
                     <div className="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
                       <h3 className="mb-4 text-sm font-medium text-gray-900 dark:text-white">Status</h3>
-                      <select
-                        value={formData.status}
-                        onChange={(e) =>
-                          setFormData({ ...formData, status: e.target.value as Tender["status"] })
-                        }
-                        className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                      >
-                        <option value="Draft">Draft</option>
-                        <option value="Filed">Filed</option>
-                        <option value="Awarded">Awarded</option>
-                        <option value="Lost">Lost</option>
-                        <option value="Closed">Closed</option>
-                      </select>
+                      <div className="relative status-dropdown-container">
+                        <button
+                          type="button"
+                          onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+                          className="w-full rounded-md border border-gray-300 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-left text-gray-900 dark:text-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 flex items-center justify-between"
+                        >
+                          <span>{formData.status}</span>
+                          <ChevronDown className="h-4 w-4 text-gray-400 ml-2" />
+                        </button>
+                        {showStatusDropdown && (
+                          <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                            {['Draft', 'Filed', 'Awarded', 'Lost', 'Closed'].map((status) => (
+                              <button
+                                key={status}
+                                type="button"
+                                onClick={() => {
+                                  setFormData({ ...formData, status: status as Tender["status"] });
+                                  setShowStatusDropdown(false);
+                                }}
+                                className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                              >
+                                {status}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>

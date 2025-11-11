@@ -75,11 +75,22 @@ export function TaskDetailSlideOver({
         else if (fileName.match(/\.(jpg|jpeg|png|gif|webp)$/)) fileType = "image";
         else if (fileName.match(/\.(doc|docx)$/)) fileType = "doc";
 
+        // Use preview endpoint for iframe embedding (allows X-Frame-Options exemption)
+        // For images, we can use the direct URL, but for PDFs and other files, use preview endpoint
+        let previewUrl = att.file_url;
+        if (fileType === "pdf" || fileType === "doc") {
+          // Use preview endpoint for PDFs and docs to allow iframe embedding
+          previewUrl = apiClient.getTaskDocumentPreviewUrl(task.id, att.id);
+        } else if (att.file_url && !att.file_url.startsWith('http://') && !att.file_url.startsWith('https://')) {
+          // For other file types, ensure URL is absolute
+          previewUrl = apiClient.getTaskDocumentUrl(task.id, att.file_url);
+        }
+
         return {
           id: att.id,
           task_id: task.id,
           file_name: att.file_name,
-          file_url: att.file_url,
+          file_url: previewUrl, // Use preview URL for PDFs/docs, direct URL for images
           file_type: fileType,
           file_size: 0,
           uploaded_by: att.created_by_username || "Unknown",
@@ -311,11 +322,22 @@ export function TaskDetailSlideOver({
       else if (fileName.match(/\.(jpg|jpeg|png|gif|webp)$/)) fileType = "image";
       else if (fileName.match(/\.(doc|docx)$/)) fileType = "doc";
 
+      // Use preview endpoint for iframe embedding (allows X-Frame-Options exemption)
+      // For images, we can use the direct URL, but for PDFs and other files, use preview endpoint
+      let previewUrl = attachment.file_url;
+      if (fileType === "pdf" || fileType === "doc") {
+        // Use preview endpoint for PDFs and docs to allow iframe embedding
+        previewUrl = apiClient.getTaskDocumentPreviewUrl(task.id, attachment.id);
+      } else if (attachment.file_url && !attachment.file_url.startsWith('http://') && !attachment.file_url.startsWith('https://')) {
+        // For other file types, ensure URL is absolute
+        previewUrl = apiClient.getTaskDocumentUrl(task.id, attachment.file_url);
+      }
+
       const mappedAttachment: TaskAttachment = {
         id: attachment.id,
         task_id: task.id,
         file_name: attachment.file_name,
-        file_url: attachment.file_url,
+        file_url: previewUrl, // Use preview URL for PDFs/docs, direct URL for images
         file_type: fileType,
         file_size: 0,
         uploaded_by: attachment.created_by_username || "Unknown",
@@ -869,6 +891,24 @@ export function TaskDetailSlideOver({
                     PDF preview. If the document doesn&apos;t display, please download it to view.
                   </p>
                 </div>
+              ) : previewAttachment.file_type === "doc" ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <FileText className="h-16 w-16 text-gray-400 mb-4" />
+                  <p className="text-gray-900 dark:text-white font-medium">
+                    Word document preview not available in browser
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                    Please download the file to view it
+                  </p>
+                  <a
+                    href={apiClient.getTaskDocumentDownloadUrl(task.id, previewAttachment.id)}
+                    download={previewAttachment.file_name}
+                    className="mt-4 inline-flex items-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600"
+                  >
+                    <Download className="h-4 w-4" />
+                    Download Document
+                  </a>
+                </div>
               ) : (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
                   <FileText className="h-16 w-16 text-gray-400 mb-4" />
@@ -889,7 +929,7 @@ export function TaskDetailSlideOver({
                   Uploaded by {previewAttachment.uploaded_by} · {format(new Date(previewAttachment.uploaded_at), "MMM dd, yyyy 'at' HH:mm")}
                 </div>
                 <a
-                  href={previewAttachment.file_url}
+                  href={apiClient.getTaskDocumentDownloadUrl(task.id, previewAttachment.id)}
                   download={previewAttachment.file_name}
                   className="inline-flex items-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600"
                 >

@@ -589,6 +589,40 @@ function ProjectModal({
     "Planned" | "In Progress" | "On Hold" | "Completed" | "Canceled"
   >(project?.status || "Planned");
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [clientSearch, setClientSearch] = useState("");
+  const [showClientDropdown, setShowClientDropdown] = useState(false);
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.client-dropdown-container')) {
+        setShowClientDropdown(false);
+      }
+      if (!target.closest('.status-dropdown-container')) {
+        setShowStatusDropdown(false);
+      }
+    };
+
+    if (showClientDropdown || showStatusDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showClientDropdown, showStatusDropdown]);
+
+  // Filter clients based on search
+  const filteredClients = clients.filter((client) => {
+    const searchTerm = clientSearch.toLowerCase();
+    const fullName = client.full_name || `${client.first_name} ${client.last_name}`;
+    return (
+      fullName.toLowerCase().includes(searchTerm) ||
+      client.first_name?.toLowerCase().includes(searchTerm) ||
+      client.last_name?.toLowerCase().includes(searchTerm) ||
+      client.email?.toLowerCase().includes(searchTerm) ||
+      client.phone?.toLowerCase().includes(searchTerm)
+    );
+  });
 
   useEffect(() => {
     if (project) {
@@ -598,6 +632,9 @@ function ProjectModal({
       setStartDate(project.start_date ? format(new Date(project.start_date), "yyyy-MM-dd") : undefined);
       setEndDate(project.end_date ? format(new Date(project.end_date), "yyyy-MM-dd") : undefined);
       setStatus(project.status || "Planned");
+      // Set client search to client name when editing
+      const selectedClient = clients.find(c => c.id === project.client_id);
+      setClientSearch(selectedClient ? (selectedClient.full_name || `${selectedClient.first_name} ${selectedClient.last_name}`) : "");
     } else {
       setName("");
       setClientId(clients[0]?.id || 0);
@@ -605,8 +642,12 @@ function ProjectModal({
       setStartDate(undefined);
       setEndDate(undefined);
       setStatus("Planned");
+      setClientSearch("");
     }
     setErrors({});
+    // Close dropdowns when modal opens/closes
+    setShowClientDropdown(false);
+    setShowStatusDropdown(false);
   }, [project, clients]);
 
   const validate = () => {
@@ -764,18 +805,33 @@ function ProjectModal({
             <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
               Status <span className="text-red-500">*</span>
             </label>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value as any)}
-              className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-sky-500"
-              required
-            >
-              <option value="Planned">Planned</option>
-              <option value="In Progress">In Progress</option>
-              <option value="On Hold">On Hold</option>
-              <option value="Completed">Completed</option>
-              <option value="Canceled">Canceled</option>
-            </select>
+            <div className="relative status-dropdown-container">
+              <button
+                type="button"
+                onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+                className="w-full rounded-md border border-gray-300 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-left text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-sky-500 flex items-center justify-between"
+              >
+                <span>{status}</span>
+                <ChevronDown className="h-4 w-4 text-gray-400 ml-2" />
+              </button>
+              {showStatusDropdown && (
+                <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {['Planned', 'In Progress', 'On Hold', 'Completed', 'Canceled'].map((statusOption) => (
+                    <button
+                      key={statusOption}
+                      type="button"
+                      onClick={() => {
+                        setStatus(statusOption as any);
+                        setShowStatusDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      {statusOption}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex justify-end gap-3 pt-4">

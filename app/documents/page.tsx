@@ -60,6 +60,8 @@ export default function DocumentsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedFirm, setSelectedFirm] = useState<number | 'all'>('all');
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [showFirmDropdown, setShowFirmDropdown] = useState(false);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [versionModalOpen, setVersionModalOpen] = useState(false);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
@@ -118,6 +120,24 @@ export default function DocumentsPage() {
       setFirms([]);
     }
   }, []);
+
+  // Close filter dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.category-filter-dropdown-container')) {
+        setShowCategoryDropdown(false);
+      }
+      if (!target.closest('.firm-filter-dropdown-container')) {
+        setShowFirmDropdown(false);
+      }
+    };
+
+    if (showCategoryDropdown || showFirmDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showCategoryDropdown, showFirmDropdown]);
 
   // Initial load
   useEffect(() => {
@@ -470,33 +490,74 @@ export default function DocumentsPage() {
 
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-            >
-              {categories.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat === 'all' ? 'All Categories' : cat}
-                </option>
-              ))}
-            </select>
+            <div className="relative category-filter-dropdown-container">
+              <button
+                type="button"
+                onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
+                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-left text-gray-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white flex items-center justify-between min-w-[150px]"
+              >
+                <span>{selectedCategory === 'all' ? 'All Categories' : selectedCategory}</span>
+                <ChevronDown className="h-4 w-4 text-gray-400 ml-2" />
+              </button>
+              {showCategoryDropdown && (
+                <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {categories.map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => {
+                        setSelectedCategory(cat);
+                        setShowCategoryDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      {cat === 'all' ? 'All Categories' : cat}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
             <Building2 className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-            <select
-              value={selectedFirm}
-              onChange={(e) => setSelectedFirm(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-            >
-              <option value="all">All Firms</option>
-              {firms.map((firm) => (
-                <option key={firm.id} value={firm.id}>
-                  {firm.firm_name}
-                </option>
-              ))}
-            </select>
+            <div className="relative firm-filter-dropdown-container">
+              <button
+                type="button"
+                onClick={() => setShowFirmDropdown(!showFirmDropdown)}
+                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-left text-gray-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white flex items-center justify-between min-w-[150px]"
+              >
+                <span>{selectedFirm === 'all' ? 'All Firms' : firms.find(f => f.id === selectedFirm)?.firm_name || 'All Firms'}</span>
+                <ChevronDown className="h-4 w-4 text-gray-400 ml-2" />
+              </button>
+              {showFirmDropdown && (
+                <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedFirm('all');
+                      setShowFirmDropdown(false);
+                    }}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
+                    All Firms
+                  </button>
+                  {firms.map((firm) => (
+                    <button
+                      key={firm.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedFirm(firm.id);
+                        setShowFirmDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      {firm.firm_name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex rounded-lg border border-gray-300 dark:border-gray-600 overflow-hidden">

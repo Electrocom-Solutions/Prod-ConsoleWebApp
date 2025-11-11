@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { X, ChevronDown, Search } from 'lucide-react';
 import { AMC, Client } from '@/types';
 import { DatePicker } from '@/components/ui/date-picker';
 
@@ -27,10 +27,49 @@ export function AMCFormModal({ isOpen, onClose, onSubmit, amc, clients }: AMCFor
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [clientSearch, setClientSearch] = useState('');
+  const [showClientDropdown, setShowClientDropdown] = useState(false);
+  const [showBillingCycleDropdown, setShowBillingCycleDropdown] = useState(false);
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.client-dropdown-container')) {
+        setShowClientDropdown(false);
+      }
+      if (!target.closest('.billing-cycle-dropdown-container')) {
+        setShowBillingCycleDropdown(false);
+      }
+      if (!target.closest('.status-dropdown-container')) {
+        setShowStatusDropdown(false);
+      }
+    };
+
+    if (showClientDropdown || showBillingCycleDropdown || showStatusDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showClientDropdown, showBillingCycleDropdown, showStatusDropdown]);
+
+  // Filter clients based on search
+  const filteredClients = clients.filter((client) => {
+    const searchTerm = clientSearch.toLowerCase();
+    return (
+      client.name?.toLowerCase().includes(searchTerm) ||
+      client.primary_contact_name?.toLowerCase().includes(searchTerm) ||
+      client.primary_contact_email?.toLowerCase().includes(searchTerm) ||
+      client.primary_contact_phone?.toLowerCase().includes(searchTerm)
+    );
+  });
 
   useEffect(() => {
     if (amc) {
       setFormData(amc);
+      // Set client search to client name when editing
+      const selectedClient = clients.find(c => c.id === amc.client_id);
+      setClientSearch(selectedClient?.name || '');
     } else {
       setFormData({
         client_id: 0,
@@ -39,13 +78,18 @@ export function AMCFormModal({ isOpen, onClose, onSubmit, amc, clients }: AMCFor
         end_date: '',
         billing_cycle: 'Quarterly',
         amount: 0,
-        status: 'Pending',
+        status: 'Active', // Changed from 'Pending' to 'Active' as 'Pending' was removed
         description: '',
         notes: '',
       });
+      setClientSearch('');
     }
     setErrors({});
-  }, [amc, isOpen]);
+    // Close dropdowns when modal opens/closes
+    setShowClientDropdown(false);
+    setShowBillingCycleDropdown(false);
+    setShowStatusDropdown(false);
+  }, [amc, isOpen, clients]);
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
@@ -118,20 +162,76 @@ export function AMCFormModal({ isOpen, onClose, onSubmit, amc, clients }: AMCFor
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Client <span className="text-red-500">*</span>
                       </label>
-                      <select
-                        value={formData.client_id || ''}
-                        onChange={(e) => setFormData({ ...formData, client_id: parseInt(e.target.value) })}
-                        className={`w-full rounded-lg border ${
-                          errors.client_id ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
-                        } bg-white px-3 py-2 text-sm text-gray-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:bg-gray-700 dark:text-white`}
-                      >
-                        <option value="">Select a client</option>
-                        {clients.map((client) => (
-                          <option key={client.id} value={client.id}>
-                            {client.name}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="relative client-dropdown-container">
+                        <div className="relative">
+                          <div className="flex items-center gap-2">
+                            <Search className="absolute left-3 h-4 w-4 text-gray-400 z-10" />
+                            <input
+                              type="text"
+                              value={clientSearch || (formData.client_id ? clients.find(c => c.id === formData.client_id)?.name || '' : '')}
+                              onChange={(e) => {
+                                setClientSearch(e.target.value);
+                                setShowClientDropdown(true);
+                                if (!e.target.value) {
+                                  setFormData({ ...formData, client_id: 0 });
+                                }
+                              }}
+                              onFocus={() => {
+                                if (clients.length > 0) {
+                                  setShowClientDropdown(true);
+                                }
+                              }}
+                              placeholder="Search client by name, contact, email, or phone"
+                              className={`flex-1 rounded-lg border ${
+                                errors.client_id ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+                              } bg-white dark:bg-gray-700 px-10 py-2 text-sm text-gray-900 dark:text-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500`}
+                            />
+                            {formData.client_id && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setFormData({ ...formData, client_id: 0 });
+                                  setClientSearch('');
+                                  setShowClientDropdown(false);
+                                }}
+                                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                                title="Clear selection"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                          {showClientDropdown && filteredClients.length > 0 && (
+                            <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                              {filteredClients.map((client) => (
+                                <button
+                                  key={client.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setFormData({ ...formData, client_id: client.id });
+                                    setClientSearch(client.name || '');
+                                    setShowClientDropdown(false);
+                                  }}
+                                  className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                                >
+                                  <div className="font-medium">{client.name}</div>
+                                  {client.primary_contact_name && (
+                                    <div className="text-xs text-gray-500 dark:text-gray-400">{client.primary_contact_name}</div>
+                                  )}
+                                  {client.primary_contact_email && (
+                                    <div className="text-xs text-gray-500 dark:text-gray-400">{client.primary_contact_email}</div>
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          {showClientDropdown && filteredClients.length === 0 && clientSearch && (
+                            <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 text-sm text-gray-500 dark:text-gray-400">
+                              No clients found
+                            </div>
+                          )}
+                        </div>
+                      </div>
                       {errors.client_id && (
                         <p className="mt-1 text-xs text-red-500">{errors.client_id}</p>
                       )}
@@ -203,16 +303,33 @@ export function AMCFormModal({ isOpen, onClose, onSubmit, amc, clients }: AMCFor
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Billing Cycle <span className="text-red-500">*</span>
                       </label>
-                      <select
-                        value={formData.billing_cycle || 'Quarterly'}
-                        onChange={(e) => setFormData({ ...formData, billing_cycle: e.target.value as AMC['billing_cycle'] })}
-                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                      >
-                        <option value="Monthly">Monthly</option>
-                        <option value="Quarterly">Quarterly</option>
-                        <option value="Half-yearly">Half-yearly</option>
-                        <option value="Yearly">Yearly</option>
-                      </select>
+                      <div className="relative billing-cycle-dropdown-container">
+                        <button
+                          type="button"
+                          onClick={() => setShowBillingCycleDropdown(!showBillingCycleDropdown)}
+                          className="w-full rounded-lg border border-gray-300 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-left text-gray-900 dark:text-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 flex items-center justify-between"
+                        >
+                          <span>{formData.billing_cycle || 'Quarterly'}</span>
+                          <ChevronDown className="h-4 w-4 text-gray-400 ml-2" />
+                        </button>
+                        {showBillingCycleDropdown && (
+                          <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                            {['Monthly', 'Quarterly', 'Half-yearly', 'Yearly'].map((cycle) => (
+                              <button
+                                key={cycle}
+                                type="button"
+                                onClick={() => {
+                                  setFormData({ ...formData, billing_cycle: cycle as AMC['billing_cycle'] });
+                                  setShowBillingCycleDropdown(false);
+                                }}
+                                className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                              >
+                                {cycle}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                       <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                         Frequency of billing generation
                       </p>
@@ -243,16 +360,33 @@ export function AMCFormModal({ isOpen, onClose, onSubmit, amc, clients }: AMCFor
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Status
                   </label>
-                  <select
-                    value={formData.status || 'Pending'}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value as AMC['status'] })}
-                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                  >
-                    <option value="Pending">Pending</option>
-                    <option value="Active">Active</option>
-                    <option value="Expired">Expired</option>
-                    <option value="Canceled">Canceled</option>
-                  </select>
+                  <div className="relative status-dropdown-container">
+                    <button
+                      type="button"
+                      onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+                      className="w-full rounded-lg border border-gray-300 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-left text-gray-900 dark:text-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 flex items-center justify-between"
+                    >
+                      <span>{formData.status || 'Active'}</span>
+                      <ChevronDown className="h-4 w-4 text-gray-400 ml-2" />
+                    </button>
+                    {showStatusDropdown && (
+                      <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                        {['Active', 'Expired', 'Canceled'].map((status) => (
+                          <button
+                            key={status}
+                            type="button"
+                            onClick={() => {
+                              setFormData({ ...formData, status: status as AMC['status'] });
+                              setShowStatusDropdown(false);
+                            }}
+                            className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                          >
+                            {status}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Notes */}

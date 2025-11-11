@@ -193,6 +193,8 @@ function TaskHubPageContent() {
   const [statusFilter, setStatusFilter] = useState<TaskStatus | "all">("all");
   const [projectFilter, setProjectFilter] = useState<string>("all");
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>("all");
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const [showProjectDropdown, setShowProjectDropdown] = useState(false);
   const [expandedTaskId, setExpandedTaskId] = useState<number | null>(null);
   const [selectedTasks, setSelectedTasks] = useState<number[]>([]);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -355,6 +357,24 @@ function TaskHubPageContent() {
       setIsLoading(false);
     }
   }, [currentPage, debouncedSearchQuery, projectFilter, statusFilter, periodFilter, projects]); // Include projects array for project filter lookup
+
+  // Close filter dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.status-filter-dropdown-container')) {
+        setShowStatusDropdown(false);
+      }
+      if (!target.closest('.project-filter-dropdown-container')) {
+        setShowProjectDropdown(false);
+      }
+    };
+
+    if (showStatusDropdown || showProjectDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showStatusDropdown, showProjectDropdown]);
 
   // Initial data fetch - run once on mount
   useEffect(() => {
@@ -844,29 +864,109 @@ function TaskHubPageContent() {
               className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-4 text-sm text-gray-900 placeholder-gray-500 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder-gray-400"
             />
           </div>
-          <select
-            value={projectFilter}
-            onChange={(e) => setProjectFilter(e.target.value)}
-            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
-          >
-            <option value="all">All Projects</option>
-            {uniqueProjects.map((project) => (
-              <option key={project} value={project}>
-                {project}
-              </option>
-            ))}
-          </select>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as TaskStatus | "all")}
-            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
-          >
-            <option value="all">All Status</option>
-            <option value="Open">Draft</option>
-            <option value="In Progress">In Progress</option>
-            <option value="Completed">Completed</option>
-            <option value="Rejected">Canceled</option>
-          </select>
+          <div className="relative project-filter-dropdown-container">
+            <button
+              type="button"
+              onClick={() => setShowProjectDropdown(!showProjectDropdown)}
+              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-left text-gray-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white flex items-center justify-between min-w-[150px]"
+            >
+              <span>{projectFilter === "all" ? "All Projects" : projectFilter}</span>
+              <ChevronDown className="h-4 w-4 text-gray-400 ml-2" />
+            </button>
+            {showProjectDropdown && (
+              <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProjectFilter("all");
+                    setShowProjectDropdown(false);
+                  }}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  All Projects
+                </button>
+                {uniqueProjects.map((project) => (
+                  <button
+                    key={project}
+                    type="button"
+                    onClick={() => {
+                      setProjectFilter(project);
+                      setShowProjectDropdown(false);
+                    }}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
+                    {project}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="relative status-filter-dropdown-container">
+            <button
+              type="button"
+              onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-left text-gray-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white flex items-center justify-between min-w-[130px]"
+            >
+              <span>
+                {statusFilter === "all" ? "All Status" : statusFilter === "Open" ? "Draft" : statusFilter === "Rejected" ? "Canceled" : statusFilter}
+              </span>
+              <ChevronDown className="h-4 w-4 text-gray-400 ml-2" />
+            </button>
+            {showStatusDropdown && (
+              <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStatusFilter("all");
+                    setShowStatusDropdown(false);
+                  }}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  All Status
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStatusFilter("Open");
+                    setShowStatusDropdown(false);
+                  }}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  Draft
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStatusFilter("In Progress");
+                    setShowStatusDropdown(false);
+                  }}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  In Progress
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStatusFilter("Completed");
+                    setShowStatusDropdown(false);
+                  }}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  Completed
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStatusFilter("Rejected");
+                    setShowStatusDropdown(false);
+                  }}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  Canceled
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Bulk Actions Bar */}
@@ -1155,6 +1255,7 @@ function CreateTaskModal({
     status: "Open" as TaskStatus, // Maps to "Draft" in backend
   });
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [employees, setEmployees] = useState<BackendEmployeeListItem[]>([]);
   const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
   const [employeeSearch, setEmployeeSearch] = useState("");
@@ -1203,13 +1304,16 @@ function CreateTaskModal({
       if (!target.closest('.employee-dropdown-container')) {
         setShowEmployeeDropdown(false);
       }
+      if (!target.closest('.status-dropdown-container')) {
+        setShowStatusDropdown(false);
+      }
     };
 
-    if (showProjectDropdown || showEmployeeDropdown) {
+    if (showProjectDropdown || showEmployeeDropdown || showStatusDropdown) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
-  }, [showProjectDropdown, showEmployeeDropdown]);
+  }, [showProjectDropdown, showEmployeeDropdown, showStatusDropdown]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1408,17 +1512,60 @@ function CreateTaskModal({
               <label className="block text-sm font-medium mb-2 text-gray-900 dark:text-white">
                 Status <span className="text-red-500">*</span>
               </label>
-              <select
-                value={formData.status}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value as TaskStatus })}
-                required
-                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2 text-sm text-gray-900 dark:text-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-              >
-                <option value="Open">Draft</option>
-                <option value="In Progress">In Progress</option>
-                <option value="Completed">Completed</option>
-                <option value="Rejected">Canceled</option>
-              </select>
+              <div className="relative status-dropdown-container">
+                <button
+                  type="button"
+                  onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2 text-sm text-left text-gray-900 dark:text-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 flex items-center justify-between"
+                >
+                  <span>{formData.status === "Open" ? "Draft" : formData.status === "Rejected" ? "Canceled" : formData.status}</span>
+                  <ChevronDown className="h-4 w-4 text-gray-400 ml-2" />
+                </button>
+                {showStatusDropdown && (
+                  <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData({ ...formData, status: "Open" });
+                        setShowStatusDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      Draft
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData({ ...formData, status: "In Progress" });
+                        setShowStatusDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      In Progress
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData({ ...formData, status: "Completed" });
+                        setShowStatusDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      Completed
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData({ ...formData, status: "Rejected" });
+                        setShowStatusDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      Canceled
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Deadline */}

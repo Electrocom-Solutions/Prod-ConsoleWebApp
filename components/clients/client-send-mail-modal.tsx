@@ -1,10 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { X, Mail, Send, Clock, Loader2 } from "lucide-react";
+import { X, Mail, Send, Clock, Loader2, ChevronDown, Search } from "lucide-react";
 import type { Client } from "@/types";
 import { apiClient, BackendEmailTemplateListItem, EmailTemplateDetail, EmailTemplateSendRequest } from "@/lib/api";
 import { showAlert } from "@/lib/sweetalert";
+import { DatePicker } from "@/components/ui/date-picker";
+import { TimePicker } from "@/components/ui/time-picker";
+import { format } from "date-fns";
 
 interface ClientSendMailModalProps {
   isOpen: boolean;
@@ -23,8 +26,11 @@ export function ClientSendMailModal({
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [sendMode, setSendMode] = useState<"now" | "schedule">("now");
-  const [scheduledDateTime, setScheduledDateTime] = useState<string>("");
+  const [scheduledDate, setScheduledDate] = useState<string>("");
+  const [scheduledTime, setScheduledTime] = useState<string>("");
   const [placeholderValues, setPlaceholderValues] = useState<Record<string, string>>({});
+  const [templateSearch, setTemplateSearch] = useState("");
+  const [showTemplateDropdown, setShowTemplateDropdown] = useState(false);
 
   // Fetch email templates
   const fetchTemplates = useCallback(async () => {
@@ -89,14 +95,37 @@ export function ClientSendMailModal({
     }
   }, [client]);
 
+  // Close template dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.template-dropdown-container')) {
+        setShowTemplateDropdown(false);
+      }
+    };
+
+    if (showTemplateDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showTemplateDropdown]);
+
+  // Filter templates based on search
+  const filteredTemplates = templates.filter((template) => {
+    const searchTerm = templateSearch.toLowerCase();
+    return template.name.toLowerCase().includes(searchTerm);
+  });
+
   useEffect(() => {
     if (isOpen) {
       fetchTemplates();
       setSelectedTemplateId(null);
       setSelectedTemplate(null);
       setSendMode("now");
-      setScheduledDateTime("");
+      setScheduledDate("");
+      setScheduledTime("");
       setPlaceholderValues({});
+      setTemplateSearch("");
     }
   }, [isOpen, fetchTemplates]);
 
@@ -117,8 +146,8 @@ export function ClientSendMailModal({
       return;
     }
 
-    if (sendMode === "schedule" && !scheduledDateTime) {
-      showAlert("Error", "Please select a date and time for scheduling.", "error");
+    if (sendMode === "schedule" && (!scheduledDate || !scheduledTime)) {
+      showAlert("Error", "Please select both date and time for scheduling.", "error");
       return;
     }
 
@@ -129,10 +158,12 @@ export function ClientSendMailModal({
         placeholder_values: placeholderValues,
       };
 
-      if (sendMode === "schedule" && scheduledDateTime) {
-        // Convert local datetime to ISO string
-        const date = new Date(scheduledDateTime);
-        requestData.scheduled_at = date.toISOString();
+      if (sendMode === "schedule" && scheduledDate && scheduledTime) {
+        // Combine date and time and convert to ISO string
+        const [hours, minutes] = scheduledTime.split(':');
+        const dateObj = new Date(scheduledDate);
+        dateObj.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+        requestData.scheduled_at = dateObj.toISOString();
       }
 
       const response = await apiClient.sendEmailUsingTemplate(selectedTemplateId, requestData);
@@ -140,7 +171,10 @@ export function ClientSendMailModal({
       if (sendMode === "now") {
         showAlert("Success", `Email sent successfully to ${client.primary_contact_email}`, "success");
       } else {
-        showAlert("Success", `Email scheduled for ${new Date(scheduledDateTime).toLocaleString()}`, "success");
+        const [hours, minutes] = scheduledTime.split(':');
+        const dateObj = new Date(scheduledDate);
+        dateObj.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+        showAlert("Success", `Email scheduled for ${dateObj.toLocaleString()}`, "success");
       }
       
       onClose();
@@ -197,7 +231,7 @@ export function ClientSendMailModal({
             {/* Content */}
             <div className="flex-1 overflow-y-auto px-6 py-6">
               <div className="space-y-6">
-                {/* Email Template Selection */}
+                {/* Email Template Selection - Searchable Dropdown */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                     Select Email Template <span className="text-red-500">*</span>
@@ -208,18 +242,70 @@ export function ClientSendMailModal({
                       <span className="ml-2 text-sm text-gray-500">Loading templates...</span>
                     </div>
                   ) : (
-                    <select
-                      value={selectedTemplateId || ""}
-                      onChange={(e) => setSelectedTemplateId(Number(e.target.value))}
-                      className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-sky-500 focus:outline-none focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                    >
-                      <option value="">-- Select Template --</option>
-                      {templates.map((template) => (
-                        <option key={template.id} value={template.id}>
-                          {template.name}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="relative template-dropdown-container mt-1">
+                      <div className="relative">
+                        <div className="flex items-center gap-2">
+                          <Search className="absolute left-3 h-4 w-4 text-gray-400" />
+                          <input
+                            type="text"
+                            value={templateSearch || (selectedTemplateId ? templates.find(t => t.id === selectedTemplateId)?.name || "" : "")}
+                            onChange={(e) => {
+                              setTemplateSearch(e.target.value);
+                              setShowTemplateDropdown(true);
+                              if (!e.target.value) {
+                                setSelectedTemplateId(null);
+                                setSelectedTemplate(null);
+                              }
+                            }}
+                            onFocus={() => {
+                              if (templates.length > 0) {
+                                setShowTemplateDropdown(true);
+                              }
+                            }}
+                            placeholder="Search template by name..."
+                            className="w-full rounded-lg border border-gray-300 bg-white px-10 py-2 text-sm text-gray-900 shadow-sm focus:border-sky-500 focus:outline-none focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                          />
+                          {selectedTemplateId && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedTemplateId(null);
+                                setSelectedTemplate(null);
+                                setTemplateSearch("");
+                                setShowTemplateDropdown(false);
+                              }}
+                              className="absolute right-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                              title="Clear selection"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                        {showTemplateDropdown && filteredTemplates.length > 0 && (
+                          <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                            {filteredTemplates.map((template) => (
+                              <button
+                                key={template.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedTemplateId(template.id);
+                                  setTemplateSearch(template.name);
+                                  setShowTemplateDropdown(false);
+                                }}
+                                className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                              >
+                                {template.name}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {showTemplateDropdown && !isLoadingTemplates && filteredTemplates.length === 0 && templateSearch && (
+                          <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 text-sm text-gray-500 dark:text-gray-400">
+                            No templates found
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   )}
                 </div>
 
@@ -308,19 +394,30 @@ export function ClientSendMailModal({
                   </div>
                 </div>
 
-                {/* Schedule DateTime Picker */}
+                {/* Schedule Date & Time Picker */}
                 {sendMode === "schedule" && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Schedule Date & Time <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="datetime-local"
-                      value={scheduledDateTime}
-                      onChange={(e) => setScheduledDateTime(e.target.value)}
-                      min={new Date().toISOString().slice(0, 16)}
-                      className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-sky-500 focus:outline-none focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                    />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Schedule Date <span className="text-red-500">*</span>
+                      </label>
+                      <DatePicker
+                        value={scheduledDate}
+                        onChange={(value) => setScheduledDate(value || "")}
+                        placeholder="Select date"
+                        minDate={format(new Date(), "yyyy-MM-dd")}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Schedule Time <span className="text-red-500">*</span>
+                      </label>
+                      <TimePicker
+                        value={scheduledTime}
+                        onChange={(value) => setScheduledTime(value || "")}
+                        placeholder="Select time"
+                      />
+                    </div>
                   </div>
                 )}
 
@@ -351,7 +448,7 @@ export function ClientSendMailModal({
                 </button>
                 <button
                   onClick={handleSendEmail}
-                  disabled={isSending || !selectedTemplateId || (sendMode === "schedule" && !scheduledDateTime)}
+                  disabled={isSending || !selectedTemplateId || (sendMode === "schedule" && (!scheduledDate || !scheduledTime))}
                   className="inline-flex items-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSending ? (

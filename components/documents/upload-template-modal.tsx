@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Upload, File } from 'lucide-react';
+import { X, Upload, File, ChevronDown } from 'lucide-react';
 import { Client } from '@/types';
 import { DocumentTemplate } from '@/lib/api';
 
@@ -30,6 +30,26 @@ export function UploadTemplateModal({ isOpen, onClose, onUpload, clients, isUplo
   const [notes, setNotes] = useState('');
   const [dragActive, setDragActive] = useState(false);
   const [error, setError] = useState('');
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [showFirmDropdown, setShowFirmDropdown] = useState(false);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.category-dropdown-container')) {
+        setShowCategoryDropdown(false);
+      }
+      if (!target.closest('.firm-dropdown-container')) {
+        setShowFirmDropdown(false);
+      }
+    };
+
+    if (showCategoryDropdown || showFirmDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showCategoryDropdown, showFirmDropdown]);
 
   // Pre-fill form when uploading a new version
   useEffect(() => {
@@ -46,6 +66,9 @@ export function UploadTemplateModal({ isOpen, onClose, onUpload, clients, isUplo
       setNotes('');
       setError('');
     }
+    // Close dropdowns when modal opens/closes
+    setShowCategoryDropdown(false);
+    setShowFirmDropdown(false);
   }, [isOpen, template]);
 
   if (!isOpen) return null;
@@ -194,19 +217,34 @@ export function UploadTemplateModal({ isOpen, onClose, onUpload, clients, isUplo
             <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
               Category {!template && <span className="text-red-500">*</span>}
             </label>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              disabled={!!template}
-              className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:bg-gray-100 dark:disabled:bg-gray-700 disabled:cursor-not-allowed"
-            >
-              <option value="">Select a category</option>
-              {categories.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
-            </select>
+            <div className="relative category-dropdown-container">
+              <button
+                type="button"
+                onClick={() => !template && setShowCategoryDropdown(!showCategoryDropdown)}
+                disabled={!!template}
+                className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:bg-gray-100 dark:disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-between"
+              >
+                <span>{category || 'Select a category'}</span>
+                <ChevronDown className="h-4 w-4 text-gray-400 ml-2" />
+              </button>
+              {showCategoryDropdown && !template && (
+                <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {categories.map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => {
+                        setCategory(cat);
+                        setShowCategoryDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             {template && (
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 Category is inherited from the template
@@ -218,19 +256,48 @@ export function UploadTemplateModal({ isOpen, onClose, onUpload, clients, isUplo
             <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
               Firm {!template && <span className="text-gray-500">(Optional)</span>}
             </label>
-            <select
-              value={firmId}
-              onChange={(e) => setFirmId(e.target.value === '' ? '' : Number(e.target.value))}
-              disabled={!!template}
-              className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:bg-gray-100 dark:disabled:bg-gray-700 disabled:cursor-not-allowed"
-            >
-              <option value="">No firm association</option>
-              {clients.map((client) => (
-                <option key={client.id} value={client.id}>
-                  {client.name}
-                </option>
-              ))}
-            </select>
+            <div className="relative firm-dropdown-container">
+              <button
+                type="button"
+                onClick={() => !template && setShowFirmDropdown(!showFirmDropdown)}
+                disabled={!!template}
+                className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:bg-gray-100 dark:disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-between"
+              >
+                <span>
+                  {firmId === '' 
+                    ? 'No firm association' 
+                    : clients.find(c => c.id === firmId)?.name || 'No firm association'}
+                </span>
+                <ChevronDown className="h-4 w-4 text-gray-400 ml-2" />
+              </button>
+              {showFirmDropdown && !template && (
+                <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFirmId('');
+                      setShowFirmDropdown(false);
+                    }}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
+                    No firm association
+                  </button>
+                  {clients.map((client) => (
+                    <button
+                      key={client.id}
+                      type="button"
+                      onClick={() => {
+                        setFirmId(client.id);
+                        setShowFirmDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      {client.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             {template && (
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 Firm is inherited from the template
