@@ -620,7 +620,8 @@ function ProjectModal({
       client.first_name?.toLowerCase().includes(searchTerm) ||
       client.last_name?.toLowerCase().includes(searchTerm) ||
       client.email?.toLowerCase().includes(searchTerm) ||
-      client.phone?.toLowerCase().includes(searchTerm)
+      client.phone_number?.toLowerCase().includes(searchTerm) ||
+      client.primary_contact_name?.toLowerCase().includes(searchTerm)
     );
   });
 
@@ -722,22 +723,82 @@ function ProjectModal({
             <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
               Client <span className="text-red-500">*</span>
             </label>
-            <select
-              value={clientId}
-              onChange={(e) => setClientId(Number(e.target.value))}
-              className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-sky-500"
-              required
-            >
-              {clients.length === 0 ? (
-                <option value={0}>Loading clients...</option>
-              ) : (
-                clients.map((client) => (
-                  <option key={client.id} value={client.id}>
-                    {client.full_name || `${client.first_name} ${client.last_name}`}
-                  </option>
-                ))
-              )}
-            </select>
+            <div className="relative client-dropdown-container">
+              <div className="relative">
+                <div className="flex items-center gap-2">
+                  <Search className="absolute left-3 h-4 w-4 text-gray-400 z-10" />
+                  <input
+                    type="text"
+                    value={clientSearch || (clientId ? clients.find(c => c.id === clientId)?.full_name || `${clients.find(c => c.id === clientId)?.first_name} ${clients.find(c => c.id === clientId)?.last_name}` || '' : '')}
+                    onChange={(e) => {
+                      setClientSearch(e.target.value);
+                      setShowClientDropdown(true);
+                      if (!e.target.value) {
+                        setClientId(0);
+                      }
+                    }}
+                    onFocus={() => {
+                      if (clients.length > 0) {
+                        setShowClientDropdown(true);
+                      }
+                    }}
+                    placeholder="Search client by name, email, or contact"
+                    className={`flex-1 rounded-md border ${
+                      errors.client ? 'border-red-500' : 'border-gray-300 dark:border-gray-700'
+                    } bg-white dark:bg-gray-800 px-10 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-sky-500`}
+                    required
+                  />
+                  {clientId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setClientId(0);
+                        setClientSearch("");
+                        setShowClientDropdown(false);
+                      }}
+                      className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                      title="Clear selection"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+                {showClientDropdown && filteredClients.length > 0 && (
+                  <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    {filteredClients.map((client) => (
+                      <button
+                        key={client.id}
+                        type="button"
+                        onClick={() => {
+                          setClientId(client.id);
+                          setClientSearch(client.full_name || `${client.first_name} ${client.last_name}`);
+                          setShowClientDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                      >
+                        <div className="font-medium">{client.full_name || `${client.first_name} ${client.last_name}`}</div>
+                        {client.email && (
+                          <div className="text-xs text-gray-500 dark:text-gray-400">{client.email}</div>
+                        )}
+                        {client.phone_number && (
+                          <div className="text-xs text-gray-500 dark:text-gray-400">{client.phone_number}</div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {showClientDropdown && filteredClients.length === 0 && clientSearch && (
+                  <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 text-sm text-gray-500 dark:text-gray-400">
+                    No clients found
+                  </div>
+                )}
+                {showClientDropdown && clients.length === 0 && (
+                  <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 text-sm text-gray-500 dark:text-gray-400">
+                    Loading clients...
+                  </div>
+                )}
+              </div>
+            </div>
             {errors.client && (
               <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.client}</p>
             )}
