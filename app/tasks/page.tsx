@@ -74,6 +74,7 @@ function mapBackendTaskListItemToFrontend(backendTask: BackendTaskListItem): Tas
     time_taken_minutes: backendTask.time_taken_minutes,
     estimated_time_minutes: backendTask.time_taken_minutes,
     status,
+    approval_status: backendTask.approval_status || 'pending',
     priority: "Medium" as TaskPriority, // Default, not in backend
     created_at: backendTask.created_at,
     updated_at: backendTask.created_at,
@@ -105,6 +106,7 @@ function mapBackendTaskDetailToFrontend(backendTask: BackendTaskDetail): Task {
     time_taken_minutes: backendTask.time_taken_minutes,
     estimated_time_minutes: backendTask.time_taken_minutes,
     status,
+    approval_status: backendTask.approval_status || 'pending',
     priority: "Medium" as TaskPriority,
     internal_notes: backendTask.internal_notes,
     created_at: backendTask.created_at,
@@ -191,10 +193,14 @@ function TaskHubPageContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery] = useDebounce(searchQuery, 500);
   const [statusFilter, setStatusFilter] = useState<TaskStatus | "all">("all");
+  const [approvalStatusFilter, setApprovalStatusFilter] = useState<'pending' | 'approved' | 'rejected' | "all">("all");
   const [projectFilter, setProjectFilter] = useState<string>("all");
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>("all");
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const [showApprovalStatusDropdown, setShowApprovalStatusDropdown] = useState(false);
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
+  const [viewTaskModal, setViewTaskModal] = useState<Task | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [expandedTaskId, setExpandedTaskId] = useState<number | null>(null);
   const [selectedTasks, setSelectedTasks] = useState<number[]>([]);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -272,6 +278,9 @@ function TaskHubPageContent() {
         else if (statusFilter === "In Progress") params.status = "In Progress";
         else if (statusFilter === "Completed") params.status = "Completed";
         else if (statusFilter === "Rejected") params.status = "Canceled";
+      }
+      if (approvalStatusFilter !== "all") {
+        params.approval_status = approvalStatusFilter;
       }
       params.date_filter = periodFilter === "all" ? "all" : periodFilter;
 
@@ -356,7 +365,7 @@ function TaskHubPageContent() {
       console.log('[Tasks Page] fetchTasks finally block - setting isLoading to false');
       setIsLoading(false);
     }
-  }, [currentPage, debouncedSearchQuery, projectFilter, statusFilter, periodFilter, projects]); // Include projects array for project filter lookup
+  }, [currentPage, debouncedSearchQuery, projectFilter, statusFilter, approvalStatusFilter, periodFilter, projects]); // Include projects array for project filter lookup
 
   // Close filter dropdowns when clicking outside
   useEffect(() => {
@@ -365,16 +374,19 @@ function TaskHubPageContent() {
       if (!target.closest('.status-filter-dropdown-container')) {
         setShowStatusDropdown(false);
       }
+      if (!target.closest('.approval-status-filter-dropdown-container')) {
+        setShowApprovalStatusDropdown(false);
+      }
       if (!target.closest('.project-filter-dropdown-container')) {
         setShowProjectDropdown(false);
       }
     };
 
-    if (showStatusDropdown || showProjectDropdown) {
+    if (showStatusDropdown || showApprovalStatusDropdown || showProjectDropdown) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
-  }, [showStatusDropdown, showProjectDropdown]);
+  }, [showStatusDropdown, showApprovalStatusDropdown, showProjectDropdown]);
 
   // Initial data fetch - run once on mount
   useEffect(() => {
@@ -465,6 +477,7 @@ function TaskHubPageContent() {
   const closeTaskDetail = () => {
     setIsSlideOverOpen(false);
     setSelectedTask(null);
+    setIsEditMode(false);
   };
 
   const handleSaveTask = async (updatedTask: Task, resources: TaskResource[]) => {
@@ -565,9 +578,6 @@ function TaskHubPageContent() {
     try {
       const result = await apiClient.bulkApproveTasks(selectedTasks);
       let message = `Successfully approved ${result.approved_count} task(s).`;
-      if (result.skipped_count > 0) {
-        message += ` ${result.skipped_count} task(s) were skipped (not in Draft status).`;
-      }
       if (result.errors && result.errors.length > 0) {
         message += ` Errors: ${result.errors.join(", ")}`;
       }
@@ -1001,6 +1011,62 @@ function TaskHubPageContent() {
               </div>
             )}
           </div>
+          <div className="relative approval-status-filter-dropdown-container">
+            <button
+              type="button"
+              onClick={() => setShowApprovalStatusDropdown(!showApprovalStatusDropdown)}
+              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-left text-gray-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white flex items-center justify-between min-w-[150px]"
+            >
+              <span>
+                {approvalStatusFilter === "all" ? "All Approval Status" : approvalStatusFilter === "pending" ? "Pending" : approvalStatusFilter === "approved" ? "Approved" : "Rejected"}
+              </span>
+              <ChevronDown className="h-4 w-4 text-gray-400 ml-2" />
+            </button>
+            {showApprovalStatusDropdown && (
+              <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setApprovalStatusFilter("all");
+                    setShowApprovalStatusDropdown(false);
+                  }}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  All Approval Status
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setApprovalStatusFilter("pending");
+                    setShowApprovalStatusDropdown(false);
+                  }}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  Pending
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setApprovalStatusFilter("approved");
+                    setShowApprovalStatusDropdown(false);
+                  }}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  Approved
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setApprovalStatusFilter("rejected");
+                    setShowApprovalStatusDropdown(false);
+                  }}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  Rejected
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Bulk Actions Bar */}
@@ -1058,7 +1124,20 @@ function TaskHubPageContent() {
               <table className="w-full">
                 <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900">
                   <tr>
-                    <th className="w-12 px-4 py-3"></th>
+                    <th className="w-12 px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedTasks.length > 0 && selectedTasks.length === tasks.length}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedTasks(tasks.map(t => t.id));
+                          } else {
+                            setSelectedTasks([]);
+                          }
+                        }}
+                        className="h-4 w-4 rounded border-gray-300 text-sky-500 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700"
+                      />
+                    </th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-600 dark:text-gray-400">
                       Date
                     </th>
@@ -1075,7 +1154,10 @@ function TaskHubPageContent() {
                     Time
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-600 dark:text-gray-400">
-                    Status
+                    Task Status
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-600 dark:text-gray-400">
+                    Approval Status
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-600 dark:text-gray-400">
                     Resource Cost
@@ -1141,6 +1223,17 @@ function TaskHubPageContent() {
                           {task.status}
                         </span>
                       </td>
+                      <td className="px-4 py-4">
+                        <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
+                          task.approval_status === 'approved' 
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                            : task.approval_status === 'rejected'
+                            ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                            : 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+                        }`}>
+                          {task.approval_status === 'approved' ? 'Approved' : task.approval_status === 'rejected' ? 'Rejected' : 'Pending'}
+                        </span>
+                      </td>
                       <td className="px-4 py-4 text-sm">
                         {resourceCost > 0 ? (
                           <div>
@@ -1161,14 +1254,29 @@ function TaskHubPageContent() {
                       <td className="px-4 py-4">
                         <div className="flex items-center gap-2">
                           <button
-                            onClick={() => openTaskDetail(task)}
+                            onClick={async () => {
+                              setIsLoading(true);
+                              try {
+                                const taskDetail = await apiClient.getTask(task.id);
+                                const mappedTask = mapBackendTaskDetailToFrontend(taskDetail);
+                                setViewTaskModal(mappedTask);
+                              } catch (err: any) {
+                                console.error("Failed to fetch task details:", err);
+                                showAlert("Error", err.message || "Failed to load task details.", "error");
+                              } finally {
+                                setIsLoading(false);
+                              }
+                            }}
                             className="rounded p-1 text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-600 dark:hover:text-white"
                             title="View Details"
                           >
                             <Eye className="h-4 w-4" />
                           </button>
                           <button
-                            onClick={() => openTaskDetail(task)}
+                            onClick={() => {
+                              setIsEditMode(true);
+                              openTaskDetail(task);
+                            }}
                             className="rounded p-1 text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-600 dark:hover:text-white"
                             title="Edit Task"
                           >
@@ -1194,6 +1302,18 @@ function TaskHubPageContent() {
           </div>
         )}
       </div>
+
+      {/* Task View Modal */}
+      {viewTaskModal && (
+        <TaskViewModal
+          task={viewTaskModal}
+          onClose={() => {
+            setViewTaskModal(null);
+            fetchTasks();
+            fetchStatistics();
+          }}
+        />
+      )}
 
       {/* Task Detail Slide-Over */}
       {selectedTask !== null && (
@@ -1266,6 +1386,262 @@ export default function TaskHubPage() {
         <TaskHubPageContent />
       </Suspense>
     </ProtectedRoute>
+  );
+}
+
+// Task View Modal Component
+function TaskViewModal({
+  task,
+  onClose,
+}: {
+  task: Task;
+  onClose: () => void;
+}) {
+  const [taskDetail, setTaskDetail] = useState<BackendTaskDetail | null>(null);
+  const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
+  const [resources, setResources] = useState<TaskResource[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showApprovalDropdown, setShowApprovalDropdown] = useState(false);
+  const [currentApprovalStatus, setCurrentApprovalStatus] = useState<'pending' | 'approved' | 'rejected'>(task.approval_status || 'pending');
+
+  useEffect(() => {
+    const fetchDetail = async () => {
+      setIsLoading(true);
+      try {
+        const detail = await apiClient.getTask(task.id);
+        setTaskDetail(detail);
+        setCurrentApprovalStatus(detail.approval_status || 'pending');
+        
+        const mappedAttachments: TaskAttachment[] = detail.attachments.map((att) => {
+          const fileName = att.file_name.toLowerCase();
+          let fileType: "image" | "pdf" | "doc" | "other" = "other";
+          if (fileName.endsWith(".pdf")) fileType = "pdf";
+          else if (fileName.match(/\.(jpg|jpeg|png|gif|webp)$/)) fileType = "image";
+          else if (fileName.match(/\.(doc|docx)$/)) fileType = "doc";
+
+          let previewUrl = att.file_url;
+          if (fileType === "pdf" || fileType === "doc") {
+            previewUrl = apiClient.getTaskDocumentPreviewUrl(task.id, att.id);
+          } else if (att.file_url && !att.file_url.startsWith('http://') && !att.file_url.startsWith('https://')) {
+            previewUrl = apiClient.getTaskDocumentUrl(task.id, att.file_url);
+          }
+
+          return {
+            id: att.id,
+            task_id: task.id,
+            file_name: att.file_name,
+            file_url: previewUrl,
+            file_type: fileType,
+            file_size: 0,
+            uploaded_by: att.created_by_username || "Unknown",
+            uploaded_at: att.created_at,
+            notes: att.notes,
+          };
+        });
+        setAttachments(mappedAttachments);
+
+        const mappedResources = detail.resources.map((r) =>
+          mapBackendTaskResourceToFrontend(r, task.id)
+        );
+        setResources(mappedResources);
+      } catch (err: any) {
+        console.error("Failed to fetch task details:", err);
+        showAlert("Error", err.message || "Failed to load task details.", "error");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (task.id) {
+      fetchDetail();
+    }
+  }, [task.id]);
+
+  const handleApprovalStatusChange = async (newStatus: 'pending' | 'approved' | 'rejected') => {
+    setIsSaving(true);
+    try {
+      await apiClient.updateTask(task.id, { approval_status: newStatus });
+      setCurrentApprovalStatus(newStatus);
+      setShowApprovalDropdown(false);
+      showSuccess("Approval status updated successfully!");
+      onClose();
+    } catch (err: any) {
+      console.error("Failed to update approval status:", err);
+      showAlert("Error", err.message || "Failed to update approval status.", "error");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.approval-status-dropdown-container')) {
+        setShowApprovalDropdown(false);
+      }
+    };
+
+    if (showApprovalDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showApprovalDropdown]);
+
+  if (!taskDetail) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div className="rounded-lg bg-white dark:bg-gray-800 p-8">
+          <Loader2 className="h-8 w-8 animate-spin text-sky-500" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+      <div className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-white dark:bg-gray-800 rounded-lg shadow-xl">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-6 py-4">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Task Details</h2>
+          <button
+            onClick={onClose}
+            className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-6">
+          {/* Basic Information */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Task Name</label>
+              <p className="mt-1 text-sm text-gray-900 dark:text-white">{taskDetail.task_name}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Date</label>
+              <p className="mt-1 text-sm text-gray-900 dark:text-white">{format(new Date(taskDetail.task_date), "MMM dd, yyyy")}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Employee</label>
+              <p className="mt-1 text-sm text-gray-900 dark:text-white">{taskDetail.employee_name || "Unassigned"}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Project</label>
+              <p className="mt-1 text-sm text-gray-900 dark:text-white">{taskDetail.project_name}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Location</label>
+              <p className="mt-1 text-sm text-gray-900 dark:text-white">{taskDetail.location || "—"}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Time Taken</label>
+              <p className="mt-1 text-sm text-gray-900 dark:text-white">{taskDetail.time_taken_minutes} minutes</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Task Status</label>
+              <p className="mt-1 text-sm text-gray-900 dark:text-white">{taskDetail.status}</p>
+            </div>
+            <div className="relative approval-status-dropdown-container">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Approval Status</label>
+              <button
+                type="button"
+                onClick={() => setShowApprovalDropdown(!showApprovalDropdown)}
+                disabled={isSaving}
+                className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-left text-gray-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white flex items-center justify-between"
+              >
+                <span className="capitalize">{currentApprovalStatus}</span>
+                <ChevronDown className="h-4 w-4 text-gray-400 ml-2" />
+              </button>
+              {showApprovalDropdown && (
+                <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg">
+                  <button
+                    type="button"
+                    onClick={() => handleApprovalStatusChange('pending')}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
+                    Pending
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleApprovalStatusChange('approved')}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
+                    Approved
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleApprovalStatusChange('rejected')}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
+                    Rejected
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Description */}
+          {taskDetail.task_description && (
+            <div>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Description</label>
+              <p className="mt-1 text-sm text-gray-900 dark:text-white whitespace-pre-wrap">{taskDetail.task_description}</p>
+            </div>
+          )}
+
+          {/* Attachments */}
+          {attachments.length > 0 && (
+            <div>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Attachments</label>
+              <div className="mt-2 space-y-2">
+                {attachments.map((attachment) => (
+                  <div key={attachment.id} className="flex items-center gap-2 p-2 border border-gray-200 dark:border-gray-700 rounded">
+                    <FileText className="h-5 w-5 text-sky-600 dark:text-sky-400" />
+                    <span className="flex-1 text-sm text-gray-900 dark:text-white">{attachment.file_name}</span>
+                    <button
+                      onClick={() => window.open(attachment.file_url, '_blank')}
+                      className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                      title="Preview"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Resources */}
+          {resources.length > 0 && (
+            <div>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Resources</label>
+              <div className="mt-2 overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 dark:bg-gray-900">
+                    <tr>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300">Resource</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300">Quantity</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300">Unit Cost</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300">Total Cost</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                    {resources.map((resource) => (
+                      <tr key={resource.id}>
+                        <td className="px-4 py-2 text-gray-900 dark:text-white">{resource.resource_name}</td>
+                        <td className="px-4 py-2 text-gray-900 dark:text-white">{resource.quantity}</td>
+                        <td className="px-4 py-2 text-gray-900 dark:text-white">₹{resource.unit_cost?.toLocaleString("en-IN") || "—"}</td>
+                        <td className="px-4 py-2 text-gray-900 dark:text-white">₹{resource.total_cost?.toLocaleString("en-IN") || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 

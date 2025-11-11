@@ -372,6 +372,7 @@ export interface BackendTaskListItem {
   time_taken_minutes: number;
   time_taken_hours: number;
   status: 'Draft' | 'In Progress' | 'Completed' | 'Canceled';
+  approval_status: 'pending' | 'approved' | 'rejected';
   employee: number | null;
   employee_name: string | null;
   project: number;
@@ -427,6 +428,7 @@ export interface BackendTaskDetail {
   time_taken_minutes: number;
   time_taken_hours: number;
   status: 'Draft' | 'In Progress' | 'Completed' | 'Canceled';
+  approval_status: 'pending' | 'approved' | 'rejected';
   internal_notes?: string;
   employee: number | null;
   employee_name: string | null;
@@ -3105,6 +3107,7 @@ Please verify:
     search?: string;
     project?: number;
     status?: 'Draft' | 'In Progress' | 'Completed' | 'Canceled';
+    approval_status?: 'pending' | 'approved' | 'rejected';
     date_filter?: 'today' | 'this_week' | 'this_month' | 'all';
     page?: number;
   }): Promise<BackendTaskListResponse> {
@@ -3112,6 +3115,7 @@ Please verify:
     if (params?.search) queryParams.append('search', params.search);
     if (params?.project) queryParams.append('project', params.project.toString());
     if (params?.status) queryParams.append('status', params.status);
+    if (params?.approval_status) queryParams.append('approval_status', params.approval_status);
     if (params?.date_filter) queryParams.append('date_filter', params.date_filter);
     if (params?.page) queryParams.append('page', params.page.toString());
 
@@ -3180,6 +3184,7 @@ Please verify:
     deadline: string;
     employee: number;
     status: 'Draft' | 'In Progress' | 'Completed' | 'Canceled';
+    approval_status?: 'pending' | 'approved' | 'rejected';
     estimated_time: number;
     location: string;
     task_description: string;
@@ -3190,6 +3195,7 @@ Please verify:
     // Only append fields that are provided (for PATCH, only update provided fields)
     if (data.project !== undefined) formData.append('project', data.project.toString());
     if (data.task_name !== undefined) formData.append('task_name', data.task_name);
+    if (data.approval_status !== undefined) formData.append('approval_status', data.approval_status);
     if (data.deadline !== undefined) formData.append('deadline', data.deadline);
     if (data.employee !== undefined) formData.append('employee', data.employee.toString());
     if (data.status !== undefined) formData.append('status', data.status);

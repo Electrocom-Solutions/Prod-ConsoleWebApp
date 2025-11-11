@@ -49,8 +49,8 @@ function mapBackendAttendanceListItemToFrontend(backendAttendance: BackendAttend
     date: backendAttendance.attendance_date,
     status: backendAttendance.attendance_status === 'Half-Day' ? 'Half Day' : backendAttendance.attendance_status as "Present" | "Absent" | "Leave" | "Half Day",
     approval_status: backendAttendance.approval_status as ApprovalStatus,
-    check_in: backendAttendance.check_in_time ? format(parseISO(backendAttendance.check_in_time), 'HH:mm') : undefined,
-    check_out: backendAttendance.check_out_time ? format(parseISO(backendAttendance.check_out_time), 'HH:mm') : undefined,
+    check_in: backendAttendance.check_in_time ? format(parseISO(backendAttendance.check_in_time), 'h:mm a') : undefined,
+    check_out: backendAttendance.check_out_time ? format(parseISO(backendAttendance.check_out_time), 'h:mm a') : undefined,
     notes: backendAttendance.notes || undefined,
   };
 }

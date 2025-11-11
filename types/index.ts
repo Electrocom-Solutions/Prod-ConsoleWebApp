@@ -187,6 +187,7 @@ export type Task = {
   time_taken_minutes: number;
   estimated_time_minutes?: number;
   status: TaskStatus;
+  approval_status?: 'pending' | 'approved' | 'rejected';
   priority: TaskPriority;
   assigned_by?: string; // Owner who assigned
   approved_by?: string; // Owner who approved

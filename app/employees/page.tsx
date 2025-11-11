@@ -1078,13 +1078,14 @@ function EmployeeModal({ employee, onClose, onSave, isSaving }: {
               </div>
               <div>
                 <label className="block text-sm font-medium mb-2 text-gray-900 dark:text-white">
-                  Phone Number
+                  Phone Number <span className="text-red-500">*</span>
                 </label>
                 <Input
                   type="tel"
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   placeholder="+91 98765 43210"
+                  required
                 />
               </div>
               <div className="col-span-2">
