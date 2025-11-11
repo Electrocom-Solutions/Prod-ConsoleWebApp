@@ -12,6 +12,7 @@ import { showConfirm, showSuccess, showDeleteConfirm, showAlert } from "@/lib/sw
 import { apiClient, AttendanceStatisticsResponse, BackendAttendanceListItem, AttendanceDetail, AttendanceCreateData, BackendEmployeeListItem, EmployeeListResponse } from "@/lib/api";
 import { useDebounce } from "use-debounce";
 import { ProtectedRoute } from "@/components/auth/protected-route";
+import { DatePicker } from "@/components/ui/date-picker";
 
 type ApprovalStatus = "Pending" | "Approved" | "Rejected";
 
@@ -225,6 +226,34 @@ function AttendancePageContent() {
         return "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400";
       default:
         return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400";
+    }
+  };
+
+  const handleBulkApprove = async () => {
+    if (selectedAttendanceRecords.length === 0) {
+      showAlert("No Selection", "Please select at least one attendance record to approve.", "info");
+      return;
+    }
+
+    const confirmed = await showConfirm(
+      "Bulk Approve Attendance",
+      `Are you sure you want to approve ${selectedAttendanceRecords.length} attendance record(s)?`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await apiClient.bulkApproveAttendance({
+        attendance_ids: selectedAttendanceRecords,
+        approval_status: "Approved",
+      });
+      await showSuccess(`Successfully approved ${selectedAttendanceRecords.length} attendance record(s)`);
+      setSelectedAttendanceRecords([]);
+      setSelectedEmployees([]);
+      fetchAttendance();
+      fetchStatistics();
+    } catch (err: any) {
+      await showAlert("Error", err.message || "Failed to bulk approve attendance");
     }
   };
 
@@ -452,19 +481,17 @@ function AttendancePageContent() {
           <div className="flex items-center gap-4 flex-wrap">
             <div className="flex items-center gap-2">
               <label className="text-sm font-medium dark:text-gray-300">Date:</label>
-              <Input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="w-40"
+              <DatePicker
+                value={selectedDate ? new Date(selectedDate) : undefined}
+                onChange={(date) => {
+                  if (date) {
+                    setSelectedDate(format(date, "yyyy-MM-dd"));
+                  } else {
+                    setSelectedDate("");
+                  }
+                }}
+                placeholder="Select date"
               />
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSelectedDate(format(new Date(), "yyyy-MM-dd"))}
-              >
-                Today
-              </Button>
               {selectedDate && (
                 <Button
                   variant="ghost"
@@ -552,10 +579,10 @@ function AttendancePageContent() {
               </Button>
               <Button
                 size="sm"
-                onClick={() => setShowBulkPresentModal(true)}
+                onClick={handleBulkApprove}
               >
                 <Check className="h-4 w-4 mr-2" />
-                Mark as Present
+                Bulk Approve
               </Button>
             </div>
           </div>

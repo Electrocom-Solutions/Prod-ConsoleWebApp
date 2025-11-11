@@ -1,6 +1,6 @@
 "use client";
 
-import { X, Download } from "lucide-react";
+import { X } from "lucide-react";
 import { PayrollRecord } from "@/types";
 import { format } from "date-fns";
 
@@ -12,10 +12,6 @@ interface PayslipModalProps {
 
 export function PayslipModal({ payroll, isOpen, onClose }: PayslipModalProps) {
   if (!isOpen) return null;
-
-  const handleDownloadPDF = () => {
-    console.log("Download payslip PDF for:", payroll.id);
-  };
 
   const computation = payroll.computation_details;
 
@@ -42,21 +38,12 @@ export function PayslipModal({ payroll, isOpen, onClose }: PayslipModalProps) {
                 {format(new Date(payroll.period_start), "MMMM yyyy")}
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleDownloadPDF}
-                className="inline-flex items-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600"
-              >
-                <Download className="h-4 w-4" />
-                Download PDF
-              </button>
-              <button
-                onClick={onClose}
-                className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-500 dark:hover:bg-gray-700"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+            <button
+              onClick={onClose}
+              className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-500 dark:hover:bg-gray-700"
+            >
+              <X className="h-5 w-5" />
+            </button>
           </div>
 
           {/* Content */}

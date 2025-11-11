@@ -774,26 +774,26 @@ function ClientsPageContent() {
               </div>
               )}
 
-              <div className="flex rounded-lg border border-gray-300 dark:border-gray-600">
-                <button
-                  onClick={() => setViewMode("grid")}
-                  className={`p-2 ${
-                    viewMode === "grid"
-                      ? "bg-sky-500 text-white"
-                      : "bg-white text-gray-600 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
-                  }`}
-                >
-                  <Grid3x3 className="h-4 w-4" />
-                </button>
+              <div className="flex rounded-lg border border-gray-300 dark:border-gray-600 overflow-hidden">
                 <button
                   onClick={() => setViewMode("table")}
-                  className={`p-2 ${
+                  className={`p-2 rounded-l-lg ${
                     viewMode === "table"
                       ? "bg-sky-500 text-white"
                       : "bg-white text-gray-600 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
                   }`}
                 >
                   <List className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => setViewMode("grid")}
+                  className={`p-2 rounded-r-lg border-l border-gray-300 dark:border-gray-600 ${
+                    viewMode === "grid"
+                      ? "bg-sky-500 text-white"
+                      : "bg-white text-gray-600 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+                  }`}
+                >
+                  <Grid3x3 className="h-4 w-4" />
                 </button>
               </div>
             </div>

@@ -28,7 +28,6 @@ import { Task, TaskResource, TaskAttachment, TaskActivity } from "@/types";
 import { format } from "date-fns";
 import { apiClient, BackendTaskDetail, BackendTaskAttachment, BackendTaskActivity } from "@/lib/api";
 import { showAlert, showDeleteConfirm, showSuccess, showConfirm } from "@/lib/sweetalert";
-import Swal from "sweetalert2";
 
 interface TaskDetailSlideOverProps {
   task: Task;
@@ -58,6 +57,9 @@ export function TaskDetailSlideOver({
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [taskDetail, setTaskDetail] = useState<BackendTaskDetail | null>(null);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejectError, setRejectError] = useState("");
 
   const fetchTaskDetail = useCallback(async () => {
     if (!task.id) return;
@@ -290,25 +292,30 @@ export function TaskDetailSlideOver({
     }
   };
 
-  const handleReject = async () => {
-    const { value: reason } = await Swal.fire({
-      title: "Reject Task",
-      text: "Enter rejection reason:",
-      input: "text",
-      inputPlaceholder: "Enter reason for rejection",
-      showCancelButton: true,
-      confirmButtonText: "Reject",
-      cancelButtonText: "Cancel",
-      inputValidator: (value) => {
-        if (!value) {
-          return "You need to provide a reason!";
-        }
-      },
-    });
-    
-    if (reason && onReject) {
-      await onReject(task, reason);
+  const handleReject = () => {
+    setShowRejectModal(true);
+    setRejectReason("");
+    setRejectError("");
+  };
+
+  const handleRejectSubmit = async () => {
+    if (!rejectReason.trim()) {
+      setRejectError("Please provide a reason for rejection");
+      return;
     }
+
+    setRejectError("");
+    if (onReject) {
+      await onReject(task, rejectReason.trim());
+      setShowRejectModal(false);
+      setRejectReason("");
+    }
+  };
+
+  const handleRejectCancel = () => {
+    setShowRejectModal(false);
+    setRejectReason("");
+    setRejectError("");
   };
 
   const handleUploadAttachment = async (file: File, notes?: string) => {
@@ -937,6 +944,65 @@ export function TaskDetailSlideOver({
                   Download
                 </a>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject Task Modal */}
+      {showRejectModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full border border-gray-200 dark:border-gray-700">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Reject Task
+              </h3>
+              <button
+                onClick={handleRejectCancel}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Reason for Rejection <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={rejectReason}
+                onChange={(e) => {
+                  setRejectReason(e.target.value);
+                  setRejectError("");
+                }}
+                placeholder="Enter reason for rejection..."
+                rows={4}
+                className={`w-full rounded-lg border ${
+                  rejectError ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+                } bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500`}
+              />
+              {rejectError && (
+                <p className="mt-1 text-sm text-red-500">{rejectError}</p>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 dark:border-gray-700">
+              <button
+                onClick={handleRejectCancel}
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRejectSubmit}
+                disabled={!rejectReason.trim()}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Reject Task
+              </button>
             </div>
           </div>
         </div>

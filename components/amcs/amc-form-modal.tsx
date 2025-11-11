@@ -168,7 +168,7 @@ export function AMCFormModal({ isOpen, onClose, onSubmit, amc, clients }: AMCFor
                             <Search className="absolute left-3 h-4 w-4 text-gray-400 z-10" />
                             <input
                               type="text"
-                              value={clientSearch || (formData.client_id ? clients.find(c => c.id === formData.client_id)?.name || '' : '')}
+                              value={clientSearch || (formData.client_id && formData.client_id !== 0 ? clients.find(c => c.id === formData.client_id)?.name || '' : '')}
                               onChange={(e) => {
                                 setClientSearch(e.target.value);
                                 setShowClientDropdown(true);
@@ -186,7 +186,7 @@ export function AMCFormModal({ isOpen, onClose, onSubmit, amc, clients }: AMCFor
                                 errors.client_id ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
                               } bg-white dark:bg-gray-700 px-10 py-2 text-sm text-gray-900 dark:text-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500`}
                             />
-                            {formData.client_id && (
+                            {formData.client_id && formData.client_id !== 0 && (
                               <button
                                 type="button"
                                 onClick={() => {

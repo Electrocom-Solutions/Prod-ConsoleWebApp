@@ -3090,7 +3090,7 @@ Please verify:
     if (params?.filter) queryParams.append('filter', params.filter);
 
     const queryString = queryParams.toString();
-    const endpoint = `/api/tasks/statistics${queryString ? `?${queryString}` : ''}`;
+    const endpoint = `/api/tasks/statistics/${queryString ? `?${queryString}` : ''}`;
 
     return this.request<TaskStatisticsResponse>(endpoint, {
       method: 'GET',
@@ -3228,6 +3228,19 @@ Please verify:
     return this.request<BackendTaskDetail>(`/api/tasks/${id}/reject/`, {
       method: 'POST',
       body: JSON.stringify({ reason: reason || 'Task rejected' }),
+    });
+  }
+
+  /**
+   * Bulk approve tasks
+   */
+  async bulkApproveTasks(taskIds: number[]): Promise<{ approved_count: number; skipped_count: number; errors?: string[] }> {
+    return this.request<{ approved_count: number; skipped_count: number; errors?: string[] }>('/api/tasks/bulk-approve/', {
+      method: 'POST',
+      body: JSON.stringify({ task_ids: taskIds }),
+      headers: {
+        'Content-Type': 'application/json',
+      },
     });
   }
 

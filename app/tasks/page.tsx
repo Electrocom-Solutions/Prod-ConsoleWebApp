@@ -30,7 +30,7 @@ import { Task, TaskStatus, TaskResource, TaskPriority, TaskAttachment, TaskActiv
 import { format } from "date-fns";
 import { TaskDetailSlideOver } from "@/components/tasks/task-detail-slide-over";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
-import { showSuccess, showError, showDeleteConfirm, showAlert } from "@/lib/sweetalert";
+import { showSuccess, showError, showDeleteConfirm, showAlert, showConfirm } from "@/lib/sweetalert";
 import {
   apiClient,
   TaskStatisticsResponse,
@@ -549,6 +549,49 @@ function TaskHubPageContent() {
     }
   };
 
+  const handleBulkApprove = async () => {
+    if (selectedTasks.length === 0) {
+      showAlert("No Selection", "Please select at least one task to approve.", "info");
+      return;
+    }
+
+    const confirmed = await showConfirm(
+      "Bulk Approve Tasks",
+      `Are you sure you want to approve ${selectedTasks.length} task(s)?`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const result = await apiClient.bulkApproveTasks(selectedTasks);
+      let message = `Successfully approved ${result.approved_count} task(s).`;
+      if (result.skipped_count > 0) {
+        message += ` ${result.skipped_count} task(s) were skipped (not in Draft status).`;
+      }
+      if (result.errors && result.errors.length > 0) {
+        message += ` Errors: ${result.errors.join(", ")}`;
+      }
+      showSuccess(message);
+      setSelectedTasks([]);
+      await fetchTasks();
+      await fetchStatistics();
+    } catch (err: any) {
+      console.error("Failed to bulk approve tasks:", err);
+      showAlert("Bulk Approval Failed", err.message || "An error occurred during bulk approval.", "error");
+    }
+  };
+
+  const handleBulkAssign = async () => {
+    if (selectedTasks.length === 0) {
+      showAlert("No Selection", "Please select at least one task to assign.", "info");
+      return;
+    }
+
+    // For now, show a message that bulk assign is not yet implemented
+    // TODO: Implement bulk assign modal with employee selection
+    showAlert("Coming Soon", "Bulk assign functionality will be available soon.", "info");
+  };
+
   const handleDeleteTask = async (taskId: number) => {
     const confirmed = await showDeleteConfirm("this task");
     if (confirmed) {
@@ -976,11 +1019,17 @@ function TaskHubPageContent() {
               {selectedTasks.length} task{selectedTasks.length > 1 ? "s" : ""} selected
             </p>
             <div className="flex gap-2">
-              <button className="inline-flex items-center gap-2 rounded-lg border border-sky-300 bg-white px-3 py-1.5 text-sm font-medium text-sky-700 hover:bg-sky-50 dark:border-sky-600 dark:bg-gray-800 dark:text-sky-400 dark:hover:bg-gray-700">
+              <button
+                onClick={handleBulkAssign}
+                className="inline-flex items-center gap-2 rounded-lg border border-sky-300 bg-white px-3 py-1.5 text-sm font-medium text-sky-700 hover:bg-sky-50 dark:border-sky-600 dark:bg-gray-800 dark:text-sky-400 dark:hover:bg-gray-700"
+              >
                 <UserPlus className="h-4 w-4" />
                 Assign
               </button>
-              <button className="inline-flex items-center gap-2 rounded-lg bg-sky-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-600">
+              <button
+                onClick={handleBulkApprove}
+                className="inline-flex items-center gap-2 rounded-lg bg-sky-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-600"
+              >
                 <Check className="h-4 w-4" />
                 Mark Approved
               </button>
@@ -1126,6 +1175,13 @@ function TaskHubPageContent() {
                             title="View Details"
                           >
                             <Eye className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => openTaskDetail(task)}
+                            className="rounded p-1 text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-600 dark:hover:text-white"
+                            title="Edit Task"
+                          >
+                            <Edit className="h-4 w-4" />
                           </button>
                           {(task.status === "Open" || task.status === "Rejected") && (
                             <button
