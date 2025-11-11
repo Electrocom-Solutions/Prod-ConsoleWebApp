@@ -358,9 +358,9 @@ export interface BackendProjectDetail {
 
 export interface TaskStatisticsResponse {
   total_tasks: number;
+  in_progress: number;
   pending_approval: number;
   approved_tasks: number;
-  total_timings: number; // in hours
   total_resource_cost: number;
 }
 

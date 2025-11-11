@@ -617,17 +617,17 @@ function TaskHubPageContent() {
     if (!statistics) {
       return {
         total: 0,
+        inProgress: 0,
         pending: 0,
-        completed: 0,
-        totalTime: 0,
+        approved: 0,
         totalResourceCost: 0,
       };
     }
     return {
       total: statistics.total_tasks,
+      inProgress: statistics.in_progress,
       pending: statistics.pending_approval,
-      completed: statistics.approved_tasks,
-      totalTime: statistics.total_timings, // Already in hours
+      approved: statistics.approved_tasks,
       totalResourceCost: statistics.total_resource_cost,
     };
   }, [statistics]);
@@ -842,6 +842,16 @@ function TaskHubPageContent() {
 
           <div className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
             <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">In Progress</p>
+              <Clock className="h-5 w-5 text-blue-500" />
+            </div>
+            <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
+              {statistics?.in_progress ?? "..."}
+            </p>
+          </div>
+
+          <div className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+            <div className="flex items-center justify-between">
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pending Approval</p>
               <AlertCircle className="h-5 w-5 text-orange-500" />
             </div>
@@ -862,25 +872,6 @@ function TaskHubPageContent() {
             </div>
             <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
               {statistics?.approved_tasks ?? "..."}
-            </p>
-          </div>
-
-          <div className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Time</p>
-              <Clock className="h-5 w-5 text-blue-500" />
-            </div>
-            <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-              {(() => {
-                if (!statistics || statistics.total_timings === null || statistics.total_timings === undefined) {
-                  return "...";
-                }
-                const timings = typeof statistics.total_timings === 'string' 
-                  ? parseFloat(statistics.total_timings) 
-                  : statistics.total_timings;
-                return isNaN(timings) ? "0.0" : timings.toFixed(1);
-              })()}
-              <span className="ml-1 text-base font-normal text-gray-600 dark:text-gray-400">hrs</span>
             </p>
           </div>
 
