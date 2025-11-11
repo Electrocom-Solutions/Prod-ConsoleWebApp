@@ -4630,6 +4630,16 @@ Please verify:
     });
   }
 
+  async bulkDeleteNotifications(notificationIds: number[]): Promise<{ deleted_count: number; skipped_count: number; errors?: string[] }> {
+    return this.request<{ deleted_count: number; skipped_count: number; errors?: string[] }>('/api/notifications/bulk-delete/', {
+      method: 'POST',
+      body: JSON.stringify({ notification_ids: notificationIds }),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+  }
+
   /**
    * Email Templates API Methods
    */

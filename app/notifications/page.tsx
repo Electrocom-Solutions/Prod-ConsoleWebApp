@@ -20,6 +20,7 @@ import {
   CheckCircle,
   Clock,
   Calendar,
+  Trash2,
 } from "lucide-react";
 import { NotificationRecord, NotificationType } from "@/types";
 import { formatDistanceToNow, format } from "date-fns";
@@ -91,6 +92,7 @@ function NotificationsPageContent() {
   const [isSaving, setIsSaving] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [selectedNotifications, setSelectedNotifications] = useState<number[]>([]);
 
   /**
    * Fetch statistics from backend
@@ -170,7 +172,9 @@ function NotificationsPageContent() {
 
   useEffect(() => {
     fetchNotifications();
-  }, [fetchNotifications]);
+    // Clear selection when view mode changes
+    setSelectedNotifications([]);
+  }, [fetchNotifications, viewMode]);
 
   // Refetch statistics after marking as read or deleting
   const refetchData = useCallback(() => {
@@ -220,6 +224,45 @@ function NotificationsPageContent() {
       } catch (err: any) {
         showError("Error", err.message || "Failed to cancel scheduled notification");
       }
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedNotifications.length === 0) {
+      showError("Error", "Please select at least one notification to delete");
+      return;
+    }
+
+    const confirmed = await showDeleteConfirm(`${selectedNotifications.length} notification${selectedNotifications.length > 1 ? 's' : ''}`);
+    if (confirmed) {
+      try {
+        const result = await apiClient.bulkDeleteNotifications(selectedNotifications);
+        setSelectedNotifications([]);
+        refetchData();
+        if (result.errors && result.errors.length > 0) {
+          showAlert("Partially Successful", `${result.deleted_count} notification(s) deleted. ${result.errors.join(', ')}`, "warning");
+        } else {
+          showSuccess("Success", `Successfully deleted ${result.deleted_count} notification(s)`);
+        }
+      } catch (err: any) {
+        showError("Error", err.message || "Failed to delete notifications");
+      }
+    }
+  };
+
+  const handleToggleSelect = (id: number) => {
+    setSelectedNotifications(prev => 
+      prev.includes(id) 
+        ? prev.filter(nId => nId !== id)
+        : [...prev, id]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedNotifications.length === notifications.length) {
+      setSelectedNotifications([]);
+    } else {
+      setSelectedNotifications(notifications.map(n => n.id));
     }
   };
 
@@ -317,7 +360,7 @@ function NotificationsPageContent() {
           </div>
 
           <div className="flex items-center gap-2">
-            {statistics && statistics.unread_count > 0 && (
+            {statistics && statistics.unread_count > 0 && viewMode === "received" && (
               <Button
                 variant="outline"
                 size="sm"
@@ -326,6 +369,18 @@ function NotificationsPageContent() {
               >
                 <CheckCheck className="h-4 w-4 mr-2" />
                 Mark All Read ({statistics.unread_count})
+              </Button>
+            )}
+            {isOwner && viewMode === "sent" && selectedNotifications.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleBulkDelete}
+                disabled={isLoading}
+                className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete Selected ({selectedNotifications.length})
               </Button>
             )}
             <Button
@@ -502,6 +557,32 @@ function NotificationsPageContent() {
           </div>
         ) : (
           <>
+            {isOwner && viewMode === "sent" && selectedNotifications.length > 0 && (
+              <div className="flex items-center justify-between rounded-lg bg-sky-50 p-4 dark:bg-sky-900/20">
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  {selectedNotifications.length} notification{selectedNotifications.length > 1 ? 's' : ''} selected
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleBulkDelete}
+                    disabled={isLoading}
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete Selected
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedNotifications([])}
+                  >
+                    Clear Selection
+                  </Button>
+                </div>
+              </div>
+            )}
             <div className="space-y-3">
               {notifications.map((notification) => (
                 <div
@@ -511,10 +592,22 @@ function NotificationsPageContent() {
                     viewMode === "scheduled"
                       ? "border-l-4 border-l-yellow-500 bg-yellow-50/30 dark:bg-yellow-950/20"
                       : !notification.is_read &&
-                        "border-l-4 border-l-sky-500 bg-sky-50/30 dark:bg-sky-950/20"
+                        "border-l-4 border-l-sky-500 bg-sky-50/30 dark:bg-sky-950/20",
+                    isOwner && viewMode === "sent" && selectedNotifications.includes(notification.id) &&
+                      "ring-2 ring-sky-500"
                   )}
                 >
                   <div className="flex items-start gap-4">
+                    {isOwner && viewMode === "sent" && (
+                      <div className="flex-shrink-0 mt-1">
+                        <input
+                          type="checkbox"
+                          checked={selectedNotifications.includes(notification.id)}
+                          onChange={() => handleToggleSelect(notification.id)}
+                          className="h-4 w-4 rounded border-gray-300 text-sky-600 focus:ring-sky-500"
+                        />
+                      </div>
+                    )}
                     <div className="flex-shrink-0 mt-1">
                       {getNotificationIcon(notification.type)}
                     </div>
