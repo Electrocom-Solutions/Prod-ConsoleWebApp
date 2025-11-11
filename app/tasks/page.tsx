@@ -256,6 +256,7 @@ function TaskHubPageContent() {
         search?: string;
         project?: number;
         status?: "Draft" | "In Progress" | "Completed" | "Canceled";
+        approval_status?: "pending" | "approved" | "rejected";
         date_filter?: "today" | "this_week" | "this_month" | "all";
         page?: number;
       } = { page: currentPage };
