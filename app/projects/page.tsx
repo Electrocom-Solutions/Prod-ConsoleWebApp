@@ -30,7 +30,7 @@ import {
   ProjectStatisticsResponse,
   BackendProjectListItem,
   BackendProjectDetail,
-  BackendClientListItem,
+  BackendTenderListItem,
 } from "@/lib/api";
 import { showDeleteConfirm, showAlert } from "@/lib/sweetalert";
 import { useDebounce } from "use-debounce";
@@ -38,7 +38,7 @@ import { ProtectedRoute } from "@/components/auth/protected-route";
 import { format } from "date-fns";
 import { DatePicker } from "@/components/ui/date-picker";
 
-type ProjectWithNames = Project & { client_name?: string; tender_name?: string | null };
+type ProjectWithNames = Project & { tender_name?: string };
 
 /**
  * Map backend project list item to frontend Project type
@@ -46,7 +46,7 @@ type ProjectWithNames = Project & { client_name?: string; tender_name?: string |
 function mapBackendProjectListItemToFrontend(backendProject: BackendProjectListItem): ProjectWithNames {
   return {
     id: backendProject.id,
-    client_id: backendProject.client,
+    tender_id: backendProject.tender,
     name: backendProject.name,
     description: "", // Not in list item
     start_date: backendProject.start_date,
@@ -54,7 +54,6 @@ function mapBackendProjectListItemToFrontend(backendProject: BackendProjectListI
     status: backendProject.status,
     created_at: backendProject.created_at,
     updated_at: backendProject.created_at, // Fallback
-    client_name: backendProject.client_name,
     tender_name: backendProject.tender_name,
   };
 }
@@ -65,7 +64,7 @@ function mapBackendProjectListItemToFrontend(backendProject: BackendProjectListI
 function mapBackendProjectDetailToFrontend(backendProject: BackendProjectDetail): Project {
   return {
     id: backendProject.id,
-    client_id: backendProject.client,
+    tender_id: backendProject.tender,
     name: backendProject.name,
     description: backendProject.description || "",
     start_date: backendProject.start_date,
@@ -80,7 +79,7 @@ function ProjectsPageContent() {
   const router = useRouter();
   const [projects, setProjects] = useState<ProjectWithNames[]>([]);
   const [statistics, setStatistics] = useState<ProjectStatisticsResponse | null>(null);
-  const [clients, setClients] = useState<BackendClientListItem[]>([]);
+  const [tenders, setTenders] = useState<BackendTenderListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -93,6 +92,17 @@ function ProjectsPageContent() {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  
+  // Autocomplete states
+  const [allProjectsForAutocomplete, setAllProjectsForAutocomplete] = useState<ProjectWithNames[]>([]);
+  const [showAutocomplete, setShowAutocomplete] = useState(false);
+  const [autocompleteSuggestions, setAutocompleteSuggestions] = useState<Array<{
+    type: 'project' | 'tender';
+    name: string;
+    tenderName?: string;
+    projectId?: number;
+  }>>([]);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
 
   // Fetch statistics
   const fetchStatistics = useCallback(async () => {
@@ -105,14 +115,32 @@ function ProjectsPageContent() {
     }
   }, []);
 
-  // Fetch clients for dropdown
-  const fetchClients = useCallback(async () => {
+  // Fetch tenders for dropdown
+  const fetchTenders = useCallback(async () => {
     try {
-      const response = await apiClient.getClients();
-      setClients(response.results);
+      const response = await apiClient.getTenders();
+      setTenders(response.results);
     } catch (err: any) {
-      console.error("Failed to fetch clients:", err);
+      console.error("Failed to fetch tenders:", err);
       // Don't set error here, just log it
+    }
+  }, []);
+
+  // Fetch all projects for autocomplete (fetch multiple pages)
+  const fetchAllProjectsForAutocomplete = useCallback(async () => {
+    try {
+      // Fetch first 5 pages (100 projects) for autocomplete suggestions
+      const allProjects: ProjectWithNames[] = [];
+      for (let page = 1; page <= 5; page++) {
+        const response = await apiClient.getProjects({ page });
+        const pageProjects = response.results.map(mapBackendProjectListItemToFrontend);
+        allProjects.push(...pageProjects);
+        // If we got fewer than 20 results, we've reached the last page
+        if (response.results.length < 20) break;
+      }
+      setAllProjectsForAutocomplete(allProjects);
+    } catch (err: any) {
+      console.error("Failed to fetch projects for autocomplete:", err);
     }
   }, []);
 
@@ -143,28 +171,80 @@ function ProjectsPageContent() {
     }
   }, [currentPage, debouncedSearchQuery, statusFilter]);
 
-  // Close filter dropdowns when clicking outside
+  // Generate autocomplete suggestions
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setAutocompleteSuggestions([]);
+      setShowAutocomplete(false);
+      return;
+    }
+
+    const query = searchQuery.toLowerCase().trim();
+    const suggestions: Array<{
+      type: 'project' | 'tender';
+      name: string;
+      tenderName?: string;
+      projectId?: number;
+    }> = [];
+
+    // Add project name suggestions
+    allProjectsForAutocomplete.forEach((project) => {
+      if (project.name.toLowerCase().includes(query)) {
+        suggestions.push({
+          type: 'project',
+          name: project.name,
+          tenderName: project.tender_name,
+          projectId: project.id,
+        });
+      }
+    });
+
+    // Add tender name suggestions (unique tenders)
+    const uniqueTenders = new Set<string>();
+    allProjectsForAutocomplete.forEach((project) => {
+      if (project.tender_name && project.tender_name.toLowerCase().includes(query)) {
+        if (!uniqueTenders.has(project.tender_name)) {
+          uniqueTenders.add(project.tender_name);
+          suggestions.push({
+            type: 'tender',
+            name: project.tender_name,
+          });
+        }
+      }
+    });
+
+    // Limit to 10 suggestions
+    setAutocompleteSuggestions(suggestions.slice(0, 10));
+    setShowAutocomplete(suggestions.length > 0);
+    setSelectedSuggestionIndex(-1); // Reset selection when suggestions change
+  }, [searchQuery, allProjectsForAutocomplete]);
+
+  // Close filter dropdowns and autocomplete when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
       if (!target.closest('.status-filter-dropdown-container')) {
         setShowStatusDropdown(false);
       }
+      if (!target.closest('.autocomplete-search-container')) {
+        setShowAutocomplete(false);
+      }
     };
 
-    if (showStatusDropdown) {
+    if (showStatusDropdown || showAutocomplete) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
-  }, [showStatusDropdown]);
+  }, [showStatusDropdown, showAutocomplete]);
 
   const statusFilterOptions = ['All', 'Planned', 'In Progress', 'On Hold', 'Completed', 'Canceled'];
 
   useEffect(() => {
     fetchStatistics();
-    fetchClients();
+    fetchTenders();
+    fetchAllProjectsForAutocomplete();
     fetchProjects();
-  }, [fetchStatistics, fetchClients, fetchProjects]);
+  }, [fetchStatistics, fetchTenders, fetchAllProjectsForAutocomplete, fetchProjects]);
 
   const handleEditProject = async (project: Project) => {
     setIsLoading(true);
@@ -184,7 +264,7 @@ function ProjectsPageContent() {
     try {
       const submitData: any = {
         name: projectData.name!,
-        client: projectData.client_id!,
+        tender: projectData.tender_id!,
         description: projectData.description,
         start_date: projectData.start_date,
         end_date: projectData.end_date,
@@ -202,6 +282,7 @@ function ProjectsPageContent() {
       setSelectedProject(null);
       fetchProjects(); // Refresh list
       fetchStatistics(); // Refresh stats
+      fetchAllProjectsForAutocomplete(); // Refresh autocomplete data
     } catch (err: any) {
       console.error("Save failed:", err);
       showAlert("Save Failed", err.message || "An error occurred during save.", "error");
@@ -218,6 +299,7 @@ function ProjectsPageContent() {
         showAlert("Deleted!", "Project has been deleted.", "success");
         fetchProjects(); // Refresh list
         fetchStatistics(); // Refresh stats
+        fetchAllProjectsForAutocomplete(); // Refresh autocomplete data
       } catch (err: any) {
         console.error("Delete failed:", err);
         showAlert("Delete Failed", err.message || "An error occurred during deletion.", "error");
@@ -398,15 +480,92 @@ function ProjectsPageContent() {
 
         {/* Search and Filters */}
         <div className="flex items-center gap-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+          <div className="relative flex-1 max-w-md autocomplete-search-container">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500 z-10" />
             <Input
               type="search"
-              placeholder="Search projects..."
+              placeholder="Search by project name or tender name..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setShowAutocomplete(true);
+                setSelectedSuggestionIndex(-1);
+              }}
+              onFocus={() => {
+                if (searchQuery && autocompleteSuggestions.length > 0) {
+                  setShowAutocomplete(true);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (!showAutocomplete || autocompleteSuggestions.length === 0) return;
+                
+                if (e.key === 'ArrowDown') {
+                  e.preventDefault();
+                  setSelectedSuggestionIndex((prev) => 
+                    prev < autocompleteSuggestions.length - 1 ? prev + 1 : prev
+                  );
+                } else if (e.key === 'ArrowUp') {
+                  e.preventDefault();
+                  setSelectedSuggestionIndex((prev) => (prev > 0 ? prev - 1 : -1));
+                } else if (e.key === 'Enter' && selectedSuggestionIndex >= 0) {
+                  e.preventDefault();
+                  const suggestion = autocompleteSuggestions[selectedSuggestionIndex];
+                  setSearchQuery(suggestion.name);
+                  setShowAutocomplete(false);
+                } else if (e.key === 'Escape') {
+                  setShowAutocomplete(false);
+                  setSelectedSuggestionIndex(-1);
+                }
+              }}
               className="pl-9"
             />
+            {showAutocomplete && autocompleteSuggestions.length > 0 && (
+              <div className="absolute z-20 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                {autocompleteSuggestions.map((suggestion, index) => (
+                  <button
+                    key={`${suggestion.type}-${suggestion.name}-${index}`}
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery(suggestion.name);
+                      setShowAutocomplete(false);
+                      setSelectedSuggestionIndex(-1);
+                    }}
+                    onMouseEnter={() => setSelectedSuggestionIndex(index)}
+                    className={`w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 last:border-b-0 ${
+                      selectedSuggestionIndex === index
+                        ? 'bg-sky-100 dark:bg-sky-900/30'
+                        : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      {suggestion.type === 'project' ? (
+                        <>
+                          <FileText className="h-4 w-4 text-sky-500 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium truncate">{suggestion.name}</div>
+                            {suggestion.tenderName && (
+                              <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                Tender: {suggestion.tenderName}
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <Inbox className="h-4 w-4 text-purple-500 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium truncate">{suggestion.name}</div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                              Tender - Click to see all projects
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <div className="relative status-filter-dropdown-container">
             <button
@@ -482,11 +641,6 @@ function ProjectsPageContent() {
                           {project.status}
                         </span>
                       </div>
-                      {project.client_name && (
-                        <p className="text-sm text-sky-600 dark:text-sky-400 mt-1">
-                          Client: {project.client_name}
-                        </p>
-                      )}
                       {project.tender_name && (
                         <p className="text-sm text-purple-600 dark:text-purple-400 mt-1">
                           Tender: {project.tender_name}
@@ -550,7 +704,7 @@ function ProjectsPageContent() {
       {showModal && (
         <ProjectModal
           project={selectedProject}
-          clients={clients}
+          tenders={tenders}
           onClose={() => {
             setShowModal(false);
             setSelectedProject(null);
@@ -565,19 +719,19 @@ function ProjectsPageContent() {
 
 function ProjectModal({
   project,
-  clients,
+  tenders,
   onClose,
   onSave,
   isSaving = false,
 }: {
   project: Project | null;
-  clients: BackendClientListItem[];
+  tenders: BackendTenderListItem[];
   onClose: () => void;
   onSave: (project: Partial<Project>) => Promise<void>;
   isSaving?: boolean;
 }) {
   const [name, setName] = useState(project?.name || "");
-  const [clientId, setClientId] = useState<number>(project?.client_id || clients[0]?.id || 0);
+  const [tenderId, setTenderId] = useState<number>(project?.tender_id || tenders[0]?.id || 0);
   const [description, setDescription] = useState(project?.description || "");
   const [startDate, setStartDate] = useState<string | undefined>(
     project?.start_date ? format(new Date(project.start_date), "yyyy-MM-dd") : undefined
@@ -589,67 +743,63 @@ function ProjectModal({
     "Planned" | "In Progress" | "On Hold" | "Completed" | "Canceled"
   >(project?.status || "Planned");
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [clientSearch, setClientSearch] = useState("");
-  const [showClientDropdown, setShowClientDropdown] = useState(false);
+  const [tenderSearch, setTenderSearch] = useState("");
+  const [showTenderDropdown, setShowTenderDropdown] = useState(false);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
-      if (!target.closest('.client-dropdown-container')) {
-        setShowClientDropdown(false);
+      if (!target.closest('.tender-dropdown-container')) {
+        setShowTenderDropdown(false);
       }
       if (!target.closest('.status-dropdown-container')) {
         setShowStatusDropdown(false);
       }
     };
 
-    if (showClientDropdown || showStatusDropdown) {
+    if (showTenderDropdown || showStatusDropdown) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
-  }, [showClientDropdown, showStatusDropdown]);
+  }, [showTenderDropdown, showStatusDropdown]);
 
-  // Filter clients based on search
-  const filteredClients = clients.filter((client) => {
-    const searchTerm = clientSearch.toLowerCase();
-    const fullName = client.full_name || `${client.first_name} ${client.last_name}`;
+  // Filter tenders based on search
+  const filteredTenders = tenders.filter((tender) => {
+    const searchTerm = tenderSearch.toLowerCase();
     return (
-      fullName.toLowerCase().includes(searchTerm) ||
-      client.first_name?.toLowerCase().includes(searchTerm) ||
-      client.last_name?.toLowerCase().includes(searchTerm) ||
-      client.email?.toLowerCase().includes(searchTerm) ||
-      client.phone_number?.toLowerCase().includes(searchTerm) ||
-      client.primary_contact_name?.toLowerCase().includes(searchTerm)
+      tender.name.toLowerCase().includes(searchTerm) ||
+      tender.reference_number?.toLowerCase().includes(searchTerm) ||
+      ''
     );
   });
 
   useEffect(() => {
     if (project) {
       setName(project.name || "");
-      setClientId(project.client_id || clients[0]?.id || 0);
+      setTenderId(project.tender_id || tenders[0]?.id || 0);
       setDescription(project.description || "");
       setStartDate(project.start_date ? format(new Date(project.start_date), "yyyy-MM-dd") : undefined);
       setEndDate(project.end_date ? format(new Date(project.end_date), "yyyy-MM-dd") : undefined);
       setStatus(project.status || "Planned");
-      // Set client search to client name when editing
-      const selectedClient = clients.find(c => c.id === project.client_id);
-      setClientSearch(selectedClient ? (selectedClient.full_name || `${selectedClient.first_name} ${selectedClient.last_name}`) : "");
+      // Set tender search to tender name when editing
+      const selectedTender = tenders.find(t => t.id === project.tender_id);
+      setTenderSearch(selectedTender ? selectedTender.name : "");
     } else {
       setName("");
-      setClientId(clients[0]?.id || 0);
+      setTenderId(tenders[0]?.id || 0);
       setDescription("");
       setStartDate(undefined);
       setEndDate(undefined);
       setStatus("Planned");
-      setClientSearch("");
+      setTenderSearch("");
     }
     setErrors({});
     // Close dropdowns when modal opens/closes
-    setShowClientDropdown(false);
+    setShowTenderDropdown(false);
     setShowStatusDropdown(false);
-  }, [project, clients]);
+  }, [project, tenders]);
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
@@ -658,8 +808,8 @@ function ProjectModal({
       newErrors.name = "Project name is required";
     }
 
-    if (!clientId) {
-      newErrors.client = "Client is required";
+    if (!tenderId) {
+      newErrors.tender = "Tender is required";
     }
 
     if (!startDate) {
@@ -687,7 +837,7 @@ function ProjectModal({
 
     const projectData: Partial<Project> = {
       name,
-      client_id: clientId,
+      tender_id: tenderId,
       description,
       start_date: startDate || "",
       end_date: endDate || "",
@@ -721,40 +871,40 @@ function ProjectModal({
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
             <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
-              Client <span className="text-red-500">*</span>
+              Tender <span className="text-red-500">*</span>
             </label>
-            <div className="relative client-dropdown-container">
+            <div className="relative tender-dropdown-container">
               <div className="relative">
                 <div className="flex items-center gap-2">
                   <Search className="absolute left-3 h-4 w-4 text-gray-400 z-10" />
                   <input
                     type="text"
-                    value={clientSearch || (clientId ? clients.find(c => c.id === clientId)?.full_name || `${clients.find(c => c.id === clientId)?.first_name} ${clients.find(c => c.id === clientId)?.last_name}` || '' : '')}
+                    value={tenderSearch || (tenderId ? tenders.find(t => t.id === tenderId)?.name || '' : '')}
                     onChange={(e) => {
-                      setClientSearch(e.target.value);
-                      setShowClientDropdown(true);
+                      setTenderSearch(e.target.value);
+                      setShowTenderDropdown(true);
                       if (!e.target.value) {
-                        setClientId(0);
+                        setTenderId(0);
                       }
                     }}
                     onFocus={() => {
-                      if (clients.length > 0) {
-                        setShowClientDropdown(true);
+                      if (tenders.length > 0) {
+                        setShowTenderDropdown(true);
                       }
                     }}
-                    placeholder="Search client by name, email, or contact"
+                    placeholder="Search tender by name or reference number"
                     className={`flex-1 rounded-md border ${
-                      errors.client ? 'border-red-500' : 'border-gray-300 dark:border-gray-700'
+                      errors.tender ? 'border-red-500' : 'border-gray-300 dark:border-gray-700'
                     } bg-white dark:bg-gray-800 px-10 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-sky-500`}
                     required
                   />
-                  {clientId && (
+                  {tenderId && (
                     <button
                       type="button"
                       onClick={() => {
-                        setClientId(0);
-                        setClientSearch("");
-                        setShowClientDropdown(false);
+                        setTenderId(0);
+                        setTenderSearch("");
+                        setShowTenderDropdown(false);
                       }}
                       className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
                       title="Clear selection"
@@ -763,44 +913,41 @@ function ProjectModal({
                     </button>
                   )}
                 </div>
-                {showClientDropdown && filteredClients.length > 0 && (
+                {showTenderDropdown && filteredTenders.length > 0 && (
                   <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                    {filteredClients.map((client) => (
+                    {filteredTenders.map((tender) => (
                       <button
-                        key={client.id}
+                        key={tender.id}
                         type="button"
                         onClick={() => {
-                          setClientId(client.id);
-                          setClientSearch(client.full_name || `${client.first_name} ${client.last_name}`);
-                          setShowClientDropdown(false);
+                          setTenderId(tender.id);
+                          setTenderSearch(tender.name);
+                          setShowTenderDropdown(false);
                         }}
                         className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
                       >
-                        <div className="font-medium">{client.full_name || `${client.first_name} ${client.last_name}`}</div>
-                        {client.email && (
-                          <div className="text-xs text-gray-500 dark:text-gray-400">{client.email}</div>
-                        )}
-                        {client.phone_number && (
-                          <div className="text-xs text-gray-500 dark:text-gray-400">{client.phone_number}</div>
+                        <div className="font-medium">{tender.name}</div>
+                        {tender.reference_number && (
+                          <div className="text-xs text-gray-500 dark:text-gray-400">Ref: {tender.reference_number}</div>
                         )}
                       </button>
                     ))}
                   </div>
                 )}
-                {showClientDropdown && filteredClients.length === 0 && clientSearch && (
+                {showTenderDropdown && filteredTenders.length === 0 && tenderSearch && (
                   <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 text-sm text-gray-500 dark:text-gray-400">
-                    No clients found
+                    No tenders found
                   </div>
                 )}
-                {showClientDropdown && clients.length === 0 && (
+                {showTenderDropdown && tenders.length === 0 && (
                   <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 text-sm text-gray-500 dark:text-gray-400">
-                    Loading clients...
+                    Loading tenders...
                   </div>
                 )}
               </div>
             </div>
-            {errors.client && (
-              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.client}</p>
+            {errors.tender && (
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.tender}</p>
             )}
           </div>
 

@@ -318,10 +318,8 @@ export interface ProjectStatisticsResponse {
 export interface BackendProjectListItem {
   id: number;
   name: string;
-  client: number;
-  client_name: string;
-  tender: number | null;
-  tender_name: string | null;
+  tender: number;
+  tender_name: string;
   start_date: string;
   end_date: string;
   status: 'Planned' | 'In Progress' | 'On Hold' | 'Completed' | 'Canceled';
@@ -339,10 +337,8 @@ export interface BackendProjectDetail {
   id: number;
   name: string;
   description?: string;
-  client: number;
-  client_name: string;
-  tender: number | null;
-  tender_name: string | null;
+  tender: number;
+  tender_name: string;
   start_date: string;
   end_date: string;
   status: 'Planned' | 'In Progress' | 'On Hold' | 'Completed' | 'Canceled';
@@ -377,7 +373,7 @@ export interface BackendTaskListItem {
   employee_name: string | null;
   project: number;
   project_name: string;
-  client_name: string;
+  tender_name: string;
   created_at: string;
 }
 
@@ -434,7 +430,7 @@ export interface BackendTaskDetail {
   employee_name: string | null;
   project: number;
   project_name: string;
-  client_name: string;
+  tender_name: string;
   attachments: BackendTaskAttachment[];
   resources: BackendTaskResource[];
   activity_feed: BackendTaskActivity[];
@@ -1149,7 +1145,7 @@ export interface BackendTaskResourceListItem {
   employee_name: string | null;
   project: number;
   project_name: string;
-  client_name: string | null;
+  tender_name: string | null;
   task_date: string;
   resources_count: number;
   grand_total: number;
@@ -1170,7 +1166,7 @@ export interface TaskResourceDetail {
   employee_name: string | null;
   project: number;
   project_name: string;
-  client_name: string | null;
+  tender_name: string | null;
   task_date: string;
   resources_count: number;
   grand_total: number;

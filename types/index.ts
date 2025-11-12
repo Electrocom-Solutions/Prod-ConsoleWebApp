@@ -160,7 +160,7 @@ export type ContractWorker = {
 
 export type Project = {
   id: number;
-  client_id: number;
+  tender_id: number;
   name: string;
   description: string;
   start_date: string;

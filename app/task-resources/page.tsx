@@ -15,7 +15,7 @@ type TaskResourceSummary = {
   task_id: number;
   task_date: string;
   employee_name: string;
-  client_name: string;
+  tender_name: string;
   project_name: string;
   total_resources: number;
   total_cost: number;
@@ -35,7 +35,7 @@ function mapBackendTaskResourceToFrontend(backendTask: BackendTaskResourceListIt
     task_id: backendTask.id,
     task_date: backendTask.task_date,
     employee_name: backendTask.employee_name || 'N/A',
-    client_name: backendTask.client_name || 'N/A',
+    tender_name: backendTask.tender_name || 'N/A',
     project_name: backendTask.project_name || 'N/A',
     total_resources: backendTask.resources_count,
     total_cost: backendTask.grand_total,
@@ -144,12 +144,12 @@ function TaskResourcesPageContent() {
     }
 
     const csvContent = [
-      ["Task ID", "Date", "Employee", "Client", "Project", "Resources Used", "Total Cost"].join(","),
+      ["Task ID", "Date", "Employee", "Tender", "Project", "Resources Used", "Total Cost"].join(","),
       ...taskResources.map(task => [
         task.task_id,
         task.task_date,
         task.employee_name,
-        task.client_name,
+        task.tender_name,
         task.project_name,
         task.total_resources,
         task.total_cost
@@ -268,7 +268,7 @@ function TaskResourcesPageContent() {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
             <Input
               type="search"
-              placeholder="Search by employee, client, project, or task name..."
+              placeholder="Search by employee, tender, project, or task name..."
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
@@ -317,7 +317,7 @@ function TaskResourcesPageContent() {
                           </div>
                           <div className="mt-1 font-semibold">{task.employee_name}</div>
                           <div className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                            {task.client_name} • {task.project_name}
+                            {task.tender_name} • {task.project_name}
                           </div>
                         </div>
                         <div className="flex items-center gap-6">

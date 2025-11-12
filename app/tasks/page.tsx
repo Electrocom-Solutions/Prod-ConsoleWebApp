@@ -65,7 +65,7 @@ function mapBackendTaskListItemToFrontend(backendTask: BackendTaskListItem): Tas
     employee_id: backendTask.employee || 0,
     employee_name: backendTask.employee_name || undefined,
     client_id: undefined, // Not in list item
-    client_name: backendTask.client_name || undefined,
+    client_name: undefined, // Not used anymore
     project_id: backendTask.project,
     project_name: backendTask.project_name || undefined,
     description: backendTask.task_name, // task_name is the description/title
@@ -97,7 +97,7 @@ function mapBackendTaskDetailToFrontend(backendTask: BackendTaskDetail): Task {
     employee_id: backendTask.employee || 0,
     employee_name: backendTask.employee_name || undefined,
     client_id: undefined,
-    client_name: backendTask.client_name || undefined,
+    client_name: undefined, // Not used anymore
     project_id: backendTask.project,
     project_name: backendTask.project_name || undefined,
     description: backendTask.task_name, // task_name is the description/title
@@ -903,7 +903,7 @@ function TaskHubPageContent() {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
-              placeholder="Search by employee, client, project, location..."
+              placeholder="Search by employee, tender, project, location..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-4 text-sm text-gray-900 placeholder-gray-500 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder-gray-400"
