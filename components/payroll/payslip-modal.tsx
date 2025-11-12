@@ -38,12 +38,12 @@ export function PayslipModal({ payroll, isOpen, onClose }: PayslipModalProps) {
                 {format(new Date(payroll.period_start), "MMMM yyyy")}
               </p>
             </div>
-            <button
-              onClick={onClose}
-              className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-500 dark:hover:bg-gray-700"
-            >
-              <X className="h-5 w-5" />
-            </button>
+              <button
+                onClick={onClose}
+                className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-500 dark:hover:bg-gray-700"
+              >
+                <X className="h-5 w-5" />
+              </button>
           </div>
 
           {/* Content */}

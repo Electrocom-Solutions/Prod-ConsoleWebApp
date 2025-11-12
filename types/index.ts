@@ -445,3 +445,15 @@ export type SystemSettings = {
   email_notifications_enabled: boolean;
   sms_notifications_enabled: boolean;
 };
+
+export type TrainingVideo = {
+  id: number;
+  title: string;
+  youtube_url: string;
+  youtube_video_id: string;
+  rank: number;
+  created_at: string;
+  updated_at: string;
+  created_by?: number;
+  updated_by?: number;
+};

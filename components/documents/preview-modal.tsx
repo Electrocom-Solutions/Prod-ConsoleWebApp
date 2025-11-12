@@ -126,17 +126,17 @@ export function PreviewModal({
                 </button>
               </div>
             ) : (
-              <iframe
-                src={fileUrl}
+            <iframe
+              src={fileUrl}
                 className="h-[800px] w-full border-0"
-                title={fileName}
+              title={fileName}
                 allow="fullscreen"
                 onError={() => setLoadError(true)}
                 onLoad={() => {
                   // Reset error state on successful load
                   setLoadError(false);
                 }}
-              />
+            />
             )
           ) : (
             <div className="flex h-[800px] items-center justify-center">

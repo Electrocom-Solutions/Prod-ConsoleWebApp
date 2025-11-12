@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, Moon, Sun, User, Settings, LogOut } from "lucide-react";
+import { Bell, Moon, Sun, User, Settings, LogOut, GraduationCap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
@@ -158,6 +158,16 @@ export function Header({ title, breadcrumbs }: { title: string; breadcrumbs?: st
                   >
                     <Settings className="h-4 w-4" />
                     Settings
+                  </button>
+                  <button
+                    onClick={() => {
+                      router.push("/learning");
+                      setShowUserMenu(false);
+                    }}
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-800"
+                  >
+                    <GraduationCap className="h-4 w-4" />
+                    Learning
                   </button>
                   <button
                     onClick={async () => {

@@ -1402,6 +1402,43 @@ export interface HolidayCalendarCreateData {
   type: 'National' | 'Festival' | 'Company';
 }
 
+/**
+ * Learning / Training Videos Interfaces
+ */
+
+export interface BackendTrainingVideoListItem {
+  id: number;
+  title: string;
+  youtube_video_id: string;
+  rank: number;
+  created_at: string;
+}
+
+export interface BackendTrainingVideoListResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: BackendTrainingVideoListItem[];
+}
+
+export interface BackendTrainingVideoDetail {
+  id: number;
+  title: string;
+  youtube_url: string;
+  youtube_video_id: string;
+  rank: number;
+  created_at: string;
+  updated_at: string;
+  created_by?: number;
+  updated_by?: number;
+}
+
+export interface TrainingVideoCreateData {
+  title: string;
+  youtube_url: string;
+  rank?: number;
+}
+
 class ApiClient {
   private baseURL: string;
 
@@ -4852,6 +4889,68 @@ Please verify:
    */
   async deleteHoliday(id: number): Promise<void> {
     await this.request(`/api/holidays/${id}/`, {
+      method: 'DELETE',
+    });
+  }
+
+  /**
+   * Learning / Training Videos API Methods
+   */
+
+  /**
+   * Get training videos list
+   */
+  async getTrainingVideos(params?: {
+    search?: string;
+    page?: number;
+  }): Promise<BackendTrainingVideoListResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.page) queryParams.append('page', params.page.toString());
+
+    const queryString = queryParams.toString();
+    const endpoint = `/api/training-videos/${queryString ? `?${queryString}` : ''}`;
+    return this.request<BackendTrainingVideoListResponse>(endpoint);
+  }
+
+  /**
+   * Get training video details
+   */
+  async getTrainingVideo(id: number): Promise<BackendTrainingVideoDetail> {
+    return this.request<BackendTrainingVideoDetail>(`/api/training-videos/${id}/`);
+  }
+
+  /**
+   * Create training video
+   */
+  async createTrainingVideo(data: TrainingVideoCreateData): Promise<BackendTrainingVideoDetail> {
+    return this.request<BackendTrainingVideoDetail>('/api/training-videos/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+  }
+
+  /**
+   * Update training video
+   */
+  async updateTrainingVideo(id: number, data: Partial<TrainingVideoCreateData>): Promise<BackendTrainingVideoDetail> {
+    return this.request<BackendTrainingVideoDetail>(`/api/training-videos/${id}/`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+  }
+
+  /**
+   * Delete training video
+   */
+  async deleteTrainingVideo(id: number): Promise<void> {
+    await this.request(`/api/training-videos/${id}/`, {
       method: 'DELETE',
     });
   }
