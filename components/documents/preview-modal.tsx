@@ -1,6 +1,6 @@
 'use client';
 
-import { X, Download, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
+import { X, Download, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, AlertCircle, Printer } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 type PreviewModalProps = {
@@ -88,6 +88,14 @@ export function PreviewModal({
               <ChevronRight className="h-4 w-4" />
             </button>
           </div>
+
+          <button
+            onClick={() => window.print()}
+            className="flex items-center gap-2 rounded-lg bg-gray-700 px-4 py-2 text-sm font-medium text-white hover:bg-gray-600"
+          >
+            <Printer className="h-4 w-4" />
+            Print
+          </button>
 
           <button
             onClick={onDownload}

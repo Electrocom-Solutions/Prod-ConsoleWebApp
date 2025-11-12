@@ -12,6 +12,8 @@ import * as XLSX from "xlsx";
 import { apiClient, PaymentTrackerStatisticsResponse, BackendPaymentTrackerListItem, PaymentTrackerListResponse, PaymentTrackerUploadResponse } from "@/lib/api";
 import { useDebounce } from "use-debounce";
 import { ProtectedRoute } from "@/components/auth/protected-route";
+import { DatePicker } from "@/components/ui/date-picker";
+import { CustomDropdown } from "@/components/ui/custom-dropdown";
 
 interface ContractWorkerPayment {
   id: number;
@@ -1045,14 +1047,15 @@ function MarkAsPaidModal({
               Payment Date <span className="text-red-500">*</span>
             </label>
             <div className="flex gap-2">
-              <Input
-                type="date"
-                value={paymentDate}
-                onChange={(e) => setPaymentDate(e.target.value)}
-                required
-                disabled={isSaving}
-                className="flex-1"
-              />
+              <div className="flex-1">
+                <DatePicker
+                  value={paymentDate}
+                  onChange={(value) => setPaymentDate(value)}
+                  placeholder="Select payment date"
+                  required
+                  disabled={isSaving}
+                />
+              </div>
               <Button type="button" variant="outline" onClick={handleTodayDate} disabled={isSaving}>
                 <Calendar className="h-4 w-4 mr-2" />
                 Today
@@ -1064,18 +1067,19 @@ function MarkAsPaidModal({
             <label className="block text-sm font-medium mb-2">
               Payment Mode <span className="text-red-500">*</span>
             </label>
-            <select
+            <CustomDropdown
               value={paymentMode}
-              onChange={(e) => setPaymentMode(e.target.value)}
-              disabled={isSaving}
-              className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              onChange={(value) => setPaymentMode(value)}
+              options={[
+                { value: "Cash", label: "Cash" },
+                { value: "Cheque", label: "Cheque" },
+                { value: "Bank Transfer", label: "Bank Transfer" },
+                { value: "UPI", label: "UPI" },
+              ]}
+              placeholder="Select payment mode"
               required
-            >
-              <option value="Cash">Cash</option>
-              <option value="Cheque">Cheque</option>
-              <option value="Bank Transfer">Bank Transfer</option>
-              <option value="UPI">UPI</option>
-            </select>
+              disabled={isSaving}
+            />
           </div>
 
           <div className="flex justify-end gap-3 pt-4">

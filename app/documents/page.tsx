@@ -322,17 +322,21 @@ export default function DocumentsPage() {
     }
   };
 
-  const handleBulkPrint = async () => {
+  const handleBulkPrint = () => {
     const selectedIds = Array.from(selectedTemplates);
     const selectedTemplatesToPrint = templates.filter((t) => selectedIds.includes(t.id));
     
-    await showAlert(
-      "Preparing to Print",
-      `Preparing to print ${selectedTemplatesToPrint.length} template(s):\n${selectedTemplatesToPrint.map((t) => `- ${t.title}`).join('\n')}`,
-      "info"
-    );
+    if (selectedTemplatesToPrint.length === 0) return;
     
-    window.print();
+    // Open preview modal for the first selected template
+    const firstTemplate = selectedTemplatesToPrint[0];
+    handlePreview(firstTemplate.id);
+    
+    // After modal opens, trigger print dialog
+    // Use a longer delay to ensure the iframe is loaded
+    setTimeout(() => {
+      window.print();
+    }, 1000);
   };
 
   const handleBulkDownload = async () => {
@@ -464,13 +468,6 @@ export default function DocumentsPage() {
               >
                 <Download className="h-4 w-4" />
                 Download Selected
-              </button>
-              <button
-                onClick={handleBulkTag}
-                className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-              >
-                <Tag className="h-4 w-4" />
-                Tag Selected
               </button>
             </div>
           </div>

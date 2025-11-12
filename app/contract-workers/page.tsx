@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { DatePicker } from "@/components/ui/date-picker";
+import { CustomDropdown } from "@/components/ui/custom-dropdown";
 import { Plus, Search, Upload, Edit, Trash2, X, User, Phone, MapPin, Mail, Loader2, Inbox, FileText, Download, ChevronDown } from "lucide-react";
 import { showDeleteConfirm, showAlert, showSuccess } from "@/lib/sweetalert";
 import { apiClient, ContractWorkerStatisticsResponse, BackendContractWorkerListItem, ContractWorkerDetail, ContractWorkerCreateData, BulkUploadContractWorkerResponse, BackendProjectListItem } from "@/lib/api";
@@ -1049,16 +1050,18 @@ function WorkerModal({ worker, projects, onClose, onSave, isSaving }: {
                 <label className="block text-sm font-medium mb-2 text-gray-900 dark:text-white">
                   Worker Type <span className="text-red-500">*</span>
                 </label>
-                <select
+                <CustomDropdown
                   value={formData.worker_type}
-                  onChange={(e) => setFormData({ ...formData, worker_type: e.target.value as "Unskilled" | "Semi-Skilled" | "Skilled" })}
+                  onChange={(value) => setFormData({ ...formData, worker_type: value as "Unskilled" | "Semi-Skilled" | "Skilled" })}
+                  options={[
+                    { value: "Unskilled", label: "Unskilled" },
+                    { value: "Semi-Skilled", label: "Semi-Skilled" },
+                    { value: "Skilled", label: "Skilled" },
+                  ]}
+                  placeholder="Select worker type"
                   required
-                  className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-                >
-                  <option value="Unskilled">Unskilled</option>
-                  <option value="Semi-Skilled">Semi-Skilled</option>
-                  <option value="Skilled">Skilled</option>
-                </select>
+                  disabled={isSaving}
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-2 text-gray-900 dark:text-white">

@@ -4,6 +4,8 @@ import { useState } from "react";
 import { X, Check, Calendar, Loader2 } from "lucide-react";
 import { PayrollRecord, PaymentMode } from "@/types";
 import { format } from "date-fns";
+import { DatePicker } from "@/components/ui/date-picker";
+import { CustomDropdown } from "@/components/ui/custom-dropdown";
 
 interface MarkPaidModalProps {
   payroll: PayrollRecord;
@@ -68,15 +70,15 @@ export function MarkPaidModal({ payroll, isSaving = false, isOpen, onClose, onSu
                   Payment Date <span className="text-red-500">*</span>
                 </label>
                 <div className="flex gap-2 mt-1">
-                  <input
-                    id="payment-date"
-                    type="date"
-                    value={paymentDate}
-                    onChange={(e) => setPaymentDate(e.target.value)}
-                    required
-                    disabled={isSaving}
-                    className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                  />
+                  <div className="flex-1">
+                    <DatePicker
+                      value={paymentDate}
+                      onChange={(value) => setPaymentDate(value)}
+                      placeholder="Select payment date"
+                      required
+                      disabled={isSaving}
+                    />
+                  </div>
                   <button
                     type="button"
                     onClick={handleTodayDate}
@@ -93,19 +95,19 @@ export function MarkPaidModal({ payroll, isSaving = false, isOpen, onClose, onSu
                 <label htmlFor="payment-mode" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Payment Mode <span className="text-red-500">*</span>
                 </label>
-                <select
-                  id="payment-mode"
+                <CustomDropdown
                   value={paymentMode}
-                  onChange={(e) => setPaymentMode(e.target.value as PaymentMode)}
+                  onChange={(value) => setPaymentMode(value as PaymentMode)}
+                  options={[
+                    { value: "Cash", label: "Cash" },
+                    { value: "Cheque", label: "Cheque" },
+                    { value: "Bank Transfer", label: "Bank Transfer" },
+                    { value: "UPI", label: "UPI" },
+                  ]}
+                  placeholder="Select payment mode"
                   required
                   disabled={isSaving}
-                  className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                >
-                  <option value="Cash">Cash</option>
-                  <option value="Cheque">Cheque</option>
-                  <option value="Bank Transfer">Bank Transfer</option>
-                  <option value="UPI">UPI</option>
-                </select>
+                />
               </div>
 
               <div>

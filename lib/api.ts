@@ -2785,6 +2785,24 @@ Please verify:
   }
 
   /**
+   * Update AMC billing payment status
+   */
+  async updateAMCBilling(billingId: number, data: {
+    paid: boolean;
+    payment_date?: string;
+    payment_mode?: 'Cash' | 'Bank Transfer' | 'Cheque' | 'UPI';
+    notes?: string;
+  }): Promise<BackendAMCBilling> {
+    return this.request<BackendAMCBilling>(`/api/amcs/billing/${billingId}/update/`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+  }
+
+  /**
    * Tender Management APIs
    */
 

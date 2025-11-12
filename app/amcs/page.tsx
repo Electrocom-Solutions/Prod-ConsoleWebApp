@@ -20,9 +20,11 @@ import {
   Inbox,
   X,
   ChevronDown,
+  Trash2,
 } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { AMCFormModal } from '@/components/amcs/amc-form-modal';
+import { CustomDropdown } from '@/components/ui/custom-dropdown';
 import {
   apiClient,
   AMCStatisticsResponse,
@@ -812,6 +814,13 @@ function AMCsPageContent() {
                           >
                             <Mail className="h-4 w-4" />
                           </button>
+                          <button
+                            onClick={() => handleDeleteAMC(amc.id)}
+                            className="rounded p-1 text-red-600 hover:bg-red-100 hover:text-red-900 dark:text-red-400 dark:hover:bg-red-900/30 dark:hover:text-red-300"
+                            title="Delete AMC"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -846,9 +855,22 @@ function AMCsPageContent() {
               setBillingAMCDetail(null);
             }}
             onUpdateBilling={async (billingId: number, updates: Partial<AMCBilling>) => {
-              // This would need a backend API endpoint to update billing
-              // For now, we'll just show an alert
-              showAlert('Info', 'Billing update functionality will be implemented in the backend API.', 'info');
+              try {
+                await apiClient.updateAMCBilling(billingId, {
+                  paid: updates.paid ?? false,
+                  payment_date: updates.payment_date,
+                  payment_mode: updates.payment_mode,
+                  notes: updates.notes,
+                });
+                // Refresh billing details
+                if (billingAMC) {
+                  const backendAMC = await apiClient.getAMC(billingAMC.id);
+                  setBillingAMCDetail(backendAMC);
+                }
+              } catch (err: any) {
+                console.error('Failed to update billing:', err);
+                showAlert('Error', err.message || 'Failed to update billing status.', 'error');
+              }
             }}
           />
         )}
@@ -914,7 +936,7 @@ function AMCBillingModal({
       payment_date: newPaidStatus ? new Date().toISOString().split('T')[0] : undefined,
       payment_mode: newPaidStatus ? 'Bank Transfer' : undefined,
     };
-    onUpdateBilling(billing.id, updates);
+    await onUpdateBilling(billing.id, updates);
   };
 
   return (
@@ -1119,18 +1141,16 @@ function EmailTemplateModal({
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Email Template
             </label>
-            <select
+            <CustomDropdown
               value={selectedTemplate}
-              onChange={(e) => handleTemplateChange(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-            >
-              <option value="">Select a template</option>
-              {emailTemplates.map((template) => (
-                <option key={template.id} value={template.id}>
-                  {template.name}
-                </option>
-              ))}
-            </select>
+              onChange={(value) => handleTemplateChange(value)}
+              options={[
+                { value: 'renewal_reminder', label: 'AMC Renewal Reminder' },
+                { value: 'payment_reminder', label: 'Payment Reminder' },
+                { value: 'service_notification', label: 'Service Notification' },
+              ]}
+              placeholder="Select a template"
+            />
           </div>
 
           {selectedTemplate && (

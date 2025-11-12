@@ -82,13 +82,13 @@ export function VideoModal({ video, isOpen, isSaving, onClose, onSave }: VideoMo
               type="url"
               value={youtubeUrl}
               onChange={(e) => setYoutubeUrl(e.target.value)}
-              placeholder="https://www.youtube.com/watch?v=..."
+              placeholder="https://www.youtube.com/watch?v=... or https://youtube.com/shorts/..."
               required
               disabled={isSaving}
               className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-500"
             />
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Supports: youtube.com/watch?v=, youtu.be/, youtube.com/embed/
+              Supports: youtube.com/watch?v=, youtu.be/, youtube.com/embed/, youtube.com/shorts/
             </p>
           </div>
 

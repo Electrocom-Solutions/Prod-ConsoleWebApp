@@ -13,6 +13,7 @@ import { apiClient, AttendanceStatisticsResponse, BackendAttendanceListItem, Att
 import { useDebounce } from "use-debounce";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { DatePicker } from "@/components/ui/date-picker";
+import { CustomDropdown } from "@/components/ui/custom-dropdown";
 
 type ApprovalStatus = "Pending" | "Approved" | "Rejected";
 
@@ -1065,11 +1066,12 @@ function MarkAttendanceModal({
             <label className="block text-sm font-medium mb-2 dark:text-gray-200">
               Attendance Date <span className="text-red-500">*</span>
             </label>
-            <Input
-              type="date"
+            <DatePicker
               value={formData.date}
-              onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+              onChange={(value) => setFormData({ ...formData, date: value })}
+              placeholder="Select attendance date"
               required
+              disabled={isSaving}
             />
           </div>
 
@@ -1078,17 +1080,19 @@ function MarkAttendanceModal({
             <label className="block text-sm font-medium mb-2 dark:text-gray-200">
               Attendance Status <span className="text-red-500">*</span>
             </label>
-            <select
+            <CustomDropdown
               value={formData.status}
-              onChange={(e) => setFormData({ ...formData, status: e.target.value as "Present" | "Absent" | "Half-Day" | "Leave" })}
+              onChange={(value) => setFormData({ ...formData, status: value as "Present" | "Absent" | "Half-Day" | "Leave" })}
+              options={[
+                { value: "Present", label: "Present" },
+                { value: "Absent", label: "Absent" },
+                { value: "Half-Day", label: "Half-Day" },
+                { value: "Leave", label: "Leave" },
+              ]}
+              placeholder="Select attendance status"
               required
-              className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm dark:text-gray-200 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-            >
-              <option value="Present">Present</option>
-              <option value="Absent">Absent</option>
-              <option value="Half-Day">Half-Day</option>
-              <option value="Leave">Leave</option>
-            </select>
+              disabled={isSaving}
+            />
           </div>
 
           {/* Check In and Check Out Times */}

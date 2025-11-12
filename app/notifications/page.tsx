@@ -27,11 +27,12 @@ import { formatDistanceToNow, format } from "date-fns";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { showDeleteConfirm, showSuccess, showError, showAlert } from "@/lib/sweetalert";
-import { apiClient, BackendNotificationListItem, NotificationStatisticsResponse } from "@/lib/api";
+import { apiClient, BackendNotificationListItem, NotificationStatisticsResponse, BackendEmployeeListItem } from "@/lib/api";
+import { DatePicker } from "@/components/ui/date-picker";
+import { CustomDropdown } from "@/components/ui/custom-dropdown";
+import { TimePicker } from "@/components/ui/time-picker";
 import { useDebounce } from "use-debounce";
 import { ProtectedRoute } from "@/components/auth/protected-route";
-import { DatePicker } from "@/components/ui/date-picker";
-import { TimePicker } from "@/components/ui/time-picker";
 import { useAuth } from "@/components/providers/auth-provider";
 
 /**
@@ -867,37 +868,39 @@ function CreateNotificationModal({
             <label className="block text-sm font-medium mb-2">
               Type <span className="text-red-500">*</span>
             </label>
-            <select
+            <CustomDropdown
               value={type}
-              onChange={(e) => setType(e.target.value as NotificationType)}
-              className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+              onChange={(value) => setType(value as NotificationType)}
+              options={[
+                { value: "Task", label: "Task" },
+                { value: "AMC", label: "AMC" },
+                { value: "Tender", label: "Tender" },
+                { value: "Payroll", label: "Payroll" },
+                { value: "System", label: "System" },
+                { value: "Other", label: "Other" },
+              ]}
+              placeholder="Select notification type"
               required
               disabled={isSaving}
-            >
-              <option value="Task">Task</option>
-              <option value="AMC">AMC</option>
-              <option value="Tender">Tender</option>
-              <option value="Payroll">Payroll</option>
-              <option value="System">System</option>
-              <option value="Other">Other</option>
-            </select>
+            />
           </div>
 
           <div>
             <label className="block text-sm font-medium mb-2">
               Channel <span className="text-red-500">*</span>
             </label>
-            <select
+            <CustomDropdown
               value={channel}
-              onChange={(e) => setChannel(e.target.value)}
-              className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+              onChange={(value) => setChannel(value)}
+              options={[
+                { value: "In-App", label: "In-App" },
+                { value: "Email", label: "Email" },
+                { value: "Push", label: "Push" },
+              ]}
+              placeholder="Select channel"
               required
               disabled={isSaving}
-            >
-              <option value="In-App">In-App</option>
-              <option value="Email">Email</option>
-              <option value="Push">Push</option>
-            </select>
+            />
           </div>
 
           <div>
