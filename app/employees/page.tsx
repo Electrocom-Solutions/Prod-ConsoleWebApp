@@ -233,7 +233,70 @@ function EmployeesPageContent() {
       await fetchStatistics();
     } catch (err: any) {
       console.error("Failed to create employee:", err);
-      showAlert("Create Failed", err.message || "An error occurred during employee creation.", "error");
+      
+      // Extract error message from error object
+      let errorMessage = "An error occurred during employee creation.";
+      
+      if (err.message) {
+        errorMessage = err.message;
+      } else if (err.response) {
+        // Handle Django validation errors
+        const response = err.response;
+        if (response.detail) {
+          errorMessage = response.detail;
+        } else if (response.error) {
+          errorMessage = response.error;
+        } else if (response.message) {
+          errorMessage = response.message;
+        } else {
+          // Extract field-specific errors
+          const fieldErrors: string[] = [];
+          for (const [field, messages] of Object.entries(response)) {
+            if (Array.isArray(messages)) {
+              // Format field name (e.g., "phone_number" -> "Phone Number")
+              const formattedField = field
+                .split('_')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ');
+              fieldErrors.push(`${formattedField}: ${messages.join(', ')}`);
+            } else if (typeof messages === 'string') {
+              const formattedField = field
+                .split('_')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ');
+              fieldErrors.push(`${formattedField}: ${messages}`);
+            }
+          }
+          
+          if (fieldErrors.length > 0) {
+            errorMessage = fieldErrors.join('\n');
+          }
+        }
+      } else if (err.fieldErrors) {
+        // Handle field errors from API client
+        const fieldErrors: string[] = [];
+        for (const [field, messages] of Object.entries(err.fieldErrors)) {
+          if (Array.isArray(messages)) {
+            const formattedField = field
+              .split('_')
+              .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+              .join(' ');
+            fieldErrors.push(`${formattedField}: ${messages.join(', ')}`);
+          } else if (typeof messages === 'string') {
+            const formattedField = field
+              .split('_')
+              .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+              .join(' ');
+            fieldErrors.push(`${formattedField}: ${messages}`);
+          }
+        }
+        
+        if (fieldErrors.length > 0) {
+          errorMessage = fieldErrors.join('\n');
+        }
+      }
+      
+      showAlert("Create Failed", errorMessage, "error");
     } finally {
       setIsSaving(false);
     }

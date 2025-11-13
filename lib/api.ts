@@ -3779,7 +3779,45 @@ Please verify:
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Create failed' }));
+      const errorData = await response.json().catch(() => ({ error: 'Create failed' }));
+      
+      // Parse Django validation errors
+      // Django returns errors in formats like:
+      // - {field_name: ["error message"]} for field-specific errors
+      // - {error: "error message"} for general errors
+      // - {detail: "error message"} for detail errors
+      let errorMessage = 'Failed to create employee';
+      
+      if (errorData.detail) {
+        errorMessage = errorData.detail;
+      } else if (errorData.error) {
+        errorMessage = errorData.error;
+      } else if (errorData.message) {
+        errorMessage = errorData.message;
+      } else {
+        // Extract field-specific errors
+        const fieldErrors: string[] = [];
+        for (const [field, messages] of Object.entries(errorData)) {
+          if (Array.isArray(messages)) {
+            fieldErrors.push(`${field}: ${messages.join(', ')}`);
+          } else if (typeof messages === 'string') {
+            fieldErrors.push(`${field}: ${messages}`);
+          } else if (typeof messages === 'object' && messages !== null) {
+            // Handle nested error objects
+            const nestedMessages = Object.values(messages).flat();
+            fieldErrors.push(`${field}: ${nestedMessages.join(', ')}`);
+          }
+        }
+        
+        if (fieldErrors.length > 0) {
+          errorMessage = fieldErrors.join('; ');
+        }
+      }
+      
+      // Create error object with parsed message
+      const error = new Error(errorMessage);
+      (error as any).response = errorData;
+      (error as any).fieldErrors = errorData;
       throw error;
     }
 
