@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { DatePicker } from "@/components/ui/date-picker";
+import { CustomDropdown } from "@/components/ui/custom-dropdown";
 import { Plus, Search, Mail, Phone, MapPin, Edit, Trash2, X, User, Briefcase, Loader2, Inbox, Eye, Calendar, CreditCard, FileText, Building2, MapPin as MapPinIcon, Globe, Award, DollarSign, IdCard, ChevronDown } from "lucide-react";
 import { showDeleteConfirm, showAlert, showSuccess } from "@/lib/sweetalert";
 import { apiClient, EmployeeStatisticsResponse, BackendEmployeeListItem, EmployeeDetail, EmployeeCreateData } from "@/lib/api";
@@ -1028,14 +1029,15 @@ function EmployeeModal({ employee, onClose, onSave, isSaving }: {
                 <label className="block text-sm font-medium mb-2 text-gray-900 dark:text-white">
                   Gender
                 </label>
-                <select
+                <CustomDropdown
                   value={formData.gender}
-                  onChange={(e) => setFormData({ ...formData, gender: e.target.value as "Male" | "Female" })}
-                  className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-                >
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                </select>
+                  onChange={(value) => setFormData({ ...formData, gender: value as "Male" | "Female" })}
+                  options={[
+                    { value: "Male", label: "Male" },
+                    { value: "Female", label: "Female" },
+                  ]}
+                  placeholder="Select gender"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-2 text-gray-900 dark:text-white">

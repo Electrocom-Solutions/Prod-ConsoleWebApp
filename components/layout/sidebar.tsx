@@ -151,8 +151,18 @@ export function Sidebar() {
 
         <div className="border-t p-4">
           {!collapsed ? (
-            <div className="text-xs text-gray-500 dark:text-gray-400">
+            <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
               <p>© 2025 Electrocom</p>
+              <p>
+                <a 
+                  href="https://www.electrocomsolutions.in/privacy-policy" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="hover:text-sky-500 dark:hover:text-sky-400 transition-colors underline"
+                >
+                  Privacy Policy
+                </a>
+              </p>
             </div>
           ) : (
             <div className="flex justify-center">

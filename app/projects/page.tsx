@@ -608,26 +608,26 @@ function ProjectsPageContent() {
             </p>
             <Button
               onClick={() => {
-                setSelectedProject(null);
-                setShowModal(true);
+            setSelectedProject(null);
+            setShowModal(true);
               }}
               className="mt-4"
             >
-              <Plus className="h-4 w-4 mr-2" />
-              Create Project
-            </Button>
-          </div>
+            <Plus className="h-4 w-4 mr-2" />
+            Create Project
+          </Button>
+        </div>
         ) : (
-          <div className="grid gap-4">
+        <div className="grid gap-4">
             {projects.map((project) => {
               return (
-                <div
-                  key={project.id}
-                  className="bg-white dark:bg-gray-900 rounded-lg border p-4 hover:shadow-md transition-shadow"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3">
+            <div
+              key={project.id}
+              className="bg-white dark:bg-gray-900 rounded-lg border p-4 hover:shadow-md transition-shadow"
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3">
                         <h3 className="font-semibold text-lg text-gray-900 dark:text-white">
                           {project.name}
                         </h3>
@@ -638,66 +638,66 @@ function ProjectsPageContent() {
                           )}
                         >
                           {getStatusIcon(project.status)}
-                          {project.status}
-                        </span>
-                      </div>
+                      {project.status}
+                    </span>
+                  </div>
                       {project.tender_name && (
                         <p className="text-sm text-purple-600 dark:text-purple-400 mt-1">
                           Tender: {project.tender_name}
-                        </p>
-                      )}
+                    </p>
+                  )}
                       {project.description && (
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                          {project.description}
-                        </p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    {project.description}
+                  </p>
                       )}
                       <div className="flex items-center gap-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
                         <span className="flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
                           Start: {format(new Date(project.start_date), "dd MMM yyyy")}
                         </span>
-                        <span>•</span>
+                    <span>•</span>
                         <span className="flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
                           End: {format(new Date(project.end_date), "dd MMM yyyy")}
                         </span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          // Navigate to Tasks page with project filter
-                          router.push(`/tasks?project=${encodeURIComponent(project.name)}`);
-                        }}
-                        title="View Tasks"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEditProject(project)}
-                        title="Edit"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDelete(project.id)}
-                        title="Delete"
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
                   </div>
                 </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      // Navigate to Tasks page with project filter
+                      router.push(`/tasks?project=${encodeURIComponent(project.name)}`);
+                    }}
+                    title="View Tasks"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                        onClick={() => handleEditProject(project)}
+                    title="Edit"
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDelete(project.id)}
+                    title="Delete"
+                        className="text-red-600 hover:text-red-700"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
               );
             })}
-          </div>
+        </div>
         )}
       </div>
 
@@ -896,7 +896,7 @@ function ProjectModal({
                     className={`flex-1 rounded-md border ${
                       errors.tender ? 'border-red-500' : 'border-gray-300 dark:border-gray-700'
                     } bg-white dark:bg-gray-800 px-10 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-sky-500`}
-                    required
+              required
                   />
                   {tenderId && (
                     <button
@@ -1054,7 +1054,7 @@ function ProjectModal({
                 </>
               ) : (
                 <>
-                  {project ? "Update" : "Create"} Project
+              {project ? "Update" : "Create"} Project
                 </>
               )}
             </Button>
