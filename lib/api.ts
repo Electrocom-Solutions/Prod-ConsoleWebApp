@@ -2859,6 +2859,7 @@ Please verify:
     name: string;
     reference_number?: string;
     description?: string;
+    firm?: number;
     filed_date?: string;
     start_date?: string;
     end_date?: string;
@@ -2881,6 +2882,10 @@ Please verify:
     formData.append('name', data.name);
     if (data.reference_number !== undefined && data.reference_number !== '') formData.append('reference_number', data.reference_number);
     if (data.description !== undefined && data.description !== '') formData.append('description', data.description);
+    // Handle firm field: send it if it has a value
+    if (data.firm !== undefined && data.firm !== null) {
+      formData.append('firm', data.firm.toString());
+    }
     if (data.filed_date !== undefined && data.filed_date !== '') formData.append('filed_date', data.filed_date);
     if (data.start_date !== undefined && data.start_date !== '') formData.append('start_date', data.start_date);
     if (data.end_date !== undefined && data.end_date !== '') formData.append('end_date', data.end_date);
@@ -2914,6 +2919,7 @@ Please verify:
     name: string;
     reference_number: string;
     description: string;
+    firm?: number | null;
     filed_date: string;
     start_date: string;
     end_date: string;
@@ -2936,6 +2942,16 @@ Please verify:
     if (data.name !== undefined && data.name !== '') formData.append('name', data.name);
     if (data.reference_number !== undefined && data.reference_number !== '') formData.append('reference_number', data.reference_number);
     if (data.description !== undefined && data.description !== '') formData.append('description', data.description);
+    // Handle firm field: include it if it's explicitly set
+    // For clearing (null), we send empty string which DRF will interpret as null for nullable fields
+    if (data.firm !== undefined) {
+      if (data.firm !== null) {
+        formData.append('firm', data.firm.toString());
+      } else {
+        // Send empty string to clear the firm field (DRF will set it to null)
+        formData.append('firm', '');
+      }
+    }
     if (data.filed_date !== undefined && data.filed_date !== '') formData.append('filed_date', data.filed_date);
     if (data.start_date !== undefined && data.start_date !== '') formData.append('start_date', data.start_date);
     if (data.end_date !== undefined && data.end_date !== '') formData.append('end_date', data.end_date);

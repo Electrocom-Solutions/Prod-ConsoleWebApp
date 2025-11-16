@@ -158,7 +158,8 @@ export default function TenderFormModal({
       name: formData.name,
       reference_number: formData.reference_number,
       description: formData.description,
-      firm: formData.firm ? parseInt(formData.firm, 10) : undefined,
+      // Parse firm ID: if formData.firm is a non-empty string, parse it to number; otherwise set to null
+      firm: formData.firm && formData.firm.trim() !== '' ? parseInt(formData.firm, 10) : null,
       filed_date: formData.filed_date || undefined,
       start_date: formData.start_date,
       end_date: formData.end_date,
