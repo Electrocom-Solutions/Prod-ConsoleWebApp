@@ -255,6 +255,7 @@ export interface BackendTenderListItem {
   name: string;
   reference_number: string;
   firm?: number | null;
+  firm_name?: string | null;
   filed_date?: string;
   start_date: string;
   end_date: string;
