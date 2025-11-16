@@ -254,6 +254,7 @@ export interface BackendTenderListItem {
   id: number;
   name: string;
   reference_number: string;
+  firm?: number | null;
   filed_date?: string;
   start_date: string;
   end_date: string;
@@ -281,6 +282,7 @@ export interface BackendTenderDetail {
   name: string;
   reference_number: string;
   description?: string;
+  firm?: number | null;
   filed_date?: string;
   start_date: string;
   end_date: string;
@@ -2822,12 +2824,14 @@ Please verify:
     search?: string;
     status?: 'Draft' | 'Filed' | 'Awarded' | 'Lost' | 'Closed';
     pending_emds?: boolean;
+    firm?: number;
     page?: number;
   }): Promise<BackendTenderListResponse> {
     const queryParams = new URLSearchParams();
     if (params?.search) queryParams.append('search', params.search);
     if (params?.status) queryParams.append('status', params.status);
     if (params?.pending_emds !== undefined) queryParams.append('pending_emds', params.pending_emds.toString());
+    if (params?.firm) queryParams.append('firm', params.firm.toString());
     if (params?.page) queryParams.append('page', params.page.toString());
 
     const queryString = queryParams.toString();

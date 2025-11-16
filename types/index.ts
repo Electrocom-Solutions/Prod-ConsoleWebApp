@@ -74,6 +74,7 @@ export type Tender = {
   name: string;
   reference_number: string;
   description: string;
+  firm?: number | null;
   filed_date?: string;
   start_date: string;
   end_date: string;

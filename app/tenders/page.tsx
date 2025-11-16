@@ -27,6 +27,7 @@ import {
   TenderStatisticsResponse,
   BackendTenderListItem,
   BackendTenderDetail,
+  BackendFirmListItem,
 } from "@/lib/api";
 import { showDeleteConfirm, showConfirm, showAlert } from "@/lib/sweetalert";
 import { useDebounce } from "use-debounce";
@@ -42,6 +43,7 @@ function mapBackendTenderListItemToFrontend(backendTender: BackendTenderListItem
     name: backendTender.name,
     reference_number: backendTender.reference_number,
     description: "", // Not in list item
+    firm: backendTender.firm,
     filed_date: backendTender.filed_date,
     start_date: backendTender.start_date,
     end_date: backendTender.end_date,
@@ -62,6 +64,7 @@ function mapBackendTenderDetailToFrontend(backendTender: BackendTenderDetail): T
     name: backendTender.name,
     reference_number: backendTender.reference_number,
     description: backendTender.description || "",
+    firm: backendTender.firm,
     filed_date: backendTender.filed_date,
     start_date: backendTender.start_date,
     end_date: backendTender.end_date,
@@ -115,13 +118,16 @@ function TendersPageContent() {
   const [debouncedSearchQuery] = useDebounce(searchQuery, 500);
   const [statusFilter, setStatusFilter] = useState<string>("All");
   const [emdFilter, setEmdFilter] = useState<boolean>(false);
+  const [firmFilter, setFirmFilter] = useState<string>("");
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const [showFirmDropdown, setShowFirmDropdown] = useState(false);
   const [isTenderModalOpen, setIsTenderModalOpen] = useState(false);
   const [selectedTender, setSelectedTender] = useState<Tender | null>(null);
   const [selectedTenderFinancials, setSelectedTenderFinancials] = useState<TenderFinancials | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [firms, setFirms] = useState<BackendFirmListItem[]>([]);
 
   // Fetch statistics
   const fetchStatistics = useCallback(async () => {
@@ -130,6 +136,17 @@ function TendersPageContent() {
       setStatistics(stats);
     } catch (err: any) {
       console.error("Failed to fetch tender statistics:", err);
+      // Don't set error here, just log it
+    }
+  }, []);
+
+  // Fetch firms
+  const fetchFirms = useCallback(async () => {
+    try {
+      const response = await apiClient.getFirms();
+      setFirms(response.results);
+    } catch (err: any) {
+      console.error("Failed to fetch firms:", err);
       // Don't set error here, just log it
     }
   }, []);
@@ -143,6 +160,7 @@ function TendersPageContent() {
         search?: string;
         status?: "Draft" | "Filed" | "Awarded" | "Lost" | "Closed";
         pending_emds?: boolean;
+        firm?: number;
         page?: number;
       } = { page: currentPage };
 
@@ -151,6 +169,7 @@ function TendersPageContent() {
         params.status = statusFilter as "Draft" | "Filed" | "Awarded" | "Lost" | "Closed";
       }
       if (emdFilter) params.pending_emds = true;
+      if (firmFilter) params.firm = parseInt(firmFilter, 10);
 
       const response = await apiClient.getTenders(params);
       setBackendTenders(response.results); // Store backend data with emd_collected status
@@ -162,12 +181,13 @@ function TendersPageContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [currentPage, debouncedSearchQuery, statusFilter, emdFilter]);
+  }, [currentPage, debouncedSearchQuery, statusFilter, emdFilter, firmFilter]);
 
   useEffect(() => {
     fetchStatistics();
     fetchTenders();
-  }, [fetchStatistics, fetchTenders]);
+    fetchFirms();
+  }, [fetchStatistics, fetchTenders, fetchFirms]);
 
   // Close filter dropdowns when clicking outside
   useEffect(() => {
@@ -176,13 +196,16 @@ function TendersPageContent() {
       if (!target.closest('.status-filter-dropdown-container')) {
         setShowStatusDropdown(false);
       }
+      if (!target.closest('.firm-filter-dropdown-container')) {
+        setShowFirmDropdown(false);
+      }
     };
 
-    if (showStatusDropdown) {
+    if (showStatusDropdown || showFirmDropdown) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
-  }, [showStatusDropdown]);
+  }, [showStatusDropdown, showFirmDropdown]);
 
   const statusFilterOptions = ['All', 'Draft', 'Filed', 'Awarded', 'Lost', 'Closed'];
 
@@ -249,6 +272,7 @@ function TendersPageContent() {
         name: tenderData.name,
         reference_number: tenderData.reference_number,
         description: tenderData.description,
+        firm: tenderData.firm,
         filed_date: tenderData.filed_date,
         start_date: tenderData.start_date,
         end_date: tenderData.end_date,
@@ -572,11 +596,66 @@ function TendersPageContent() {
               />
             </div>
 
+            {/* Firm Filter */}
+            <div className="relative firm-filter-dropdown-container">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowFirmDropdown(!showFirmDropdown);
+                  setShowStatusDropdown(false);
+                }}
+                className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-left text-gray-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white flex items-center justify-between min-w-[150px]"
+              >
+                <span>
+                  {firmFilter
+                    ? firms.find((f) => f.id.toString() === firmFilter)?.firm_name || "Select Firm"
+                    : "All Firms"}
+                </span>
+                <ChevronDown className="h-4 w-4 text-gray-400 ml-2" />
+              </button>
+              {showFirmDropdown && (
+                <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFirmFilter("");
+                      setShowFirmDropdown(false);
+                    }}
+                    className={`w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                      !firmFilter ? "bg-sky-50 dark:bg-sky-900/20 text-sky-600 dark:text-sky-400" : ""
+                    }`}
+                  >
+                    All Firms
+                  </button>
+                  {firms.map((firm) => (
+                    <button
+                      key={firm.id}
+                      type="button"
+                      onClick={() => {
+                        setFirmFilter(firm.id.toString());
+                        setShowFirmDropdown(false);
+                      }}
+                      className={`w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                        firmFilter === firm.id.toString()
+                          ? "bg-sky-50 dark:bg-sky-900/20 text-sky-600 dark:text-sky-400"
+                          : ""
+                      }`}
+                    >
+                      {firm.firm_name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* Status Filter */}
             <div className="relative status-filter-dropdown-container">
               <button
                 type="button"
-                onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+                onClick={() => {
+                  setShowStatusDropdown(!showStatusDropdown);
+                  setShowFirmDropdown(false);
+                }}
                 className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-left text-gray-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white flex items-center justify-between min-w-[130px]"
               >
                 <span>{statusFilter === "All" ? "All Status" : statusFilter}</span>
@@ -931,6 +1010,7 @@ function TendersPageContent() {
           tender={selectedTender}
           existingFinancials={selectedTenderFinancials}
           isSaving={isSaving}
+          firms={firms}
         />
       </div>
     </DashboardLayout>

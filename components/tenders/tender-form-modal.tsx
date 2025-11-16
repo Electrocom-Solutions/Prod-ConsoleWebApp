@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { X, Loader2, ChevronDown } from "lucide-react";
 import { Tender, TenderFinancials } from "@/types";
 import { DatePicker } from "@/components/ui/date-picker";
+import { CustomDropdown } from "@/components/ui/custom-dropdown";
+import { BackendFirmListItem } from "@/lib/api";
 
 interface TenderFormModalProps {
   isOpen: boolean;
@@ -15,6 +17,7 @@ interface TenderFormModalProps {
   tender?: Tender | null;
   existingFinancials?: TenderFinancials | null;
   isSaving?: boolean;
+  firms?: BackendFirmListItem[];
 }
 
 export default function TenderFormModal({
@@ -24,11 +27,13 @@ export default function TenderFormModal({
   existingFinancials,
   onSubmit,
   isSaving = false,
+  firms = [],
 }: TenderFormModalProps) {
   const [formData, setFormData] = useState({
     name: "",
     reference_number: "",
     description: "",
+    firm: "",
     filed_date: "",
     start_date: "",
     end_date: "",
@@ -70,6 +75,7 @@ export default function TenderFormModal({
         name: tender.name,
         reference_number: tender.reference_number,
         description: tender.description,
+        firm: tender.firm?.toString() || "",
         filed_date: tender.filed_date || "",
         start_date: tender.start_date,
         end_date: tender.end_date,
@@ -88,6 +94,7 @@ export default function TenderFormModal({
         name: "",
         reference_number: "",
         description: "",
+        firm: "",
         filed_date: "",
         start_date: "",
         end_date: "",
@@ -151,6 +158,7 @@ export default function TenderFormModal({
       name: formData.name,
       reference_number: formData.reference_number,
       description: formData.description,
+      firm: formData.firm ? parseInt(formData.firm, 10) : undefined,
       filed_date: formData.filed_date || undefined,
       start_date: formData.start_date,
       end_date: formData.end_date,
@@ -246,6 +254,23 @@ export default function TenderFormModal({
                 {/* Form Content */}
                 <div className="relative mt-6 flex-1 px-4 sm:px-6">
                   <div className="space-y-6">
+                    {/* Firm Selection */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Firm
+                      </label>
+                      <CustomDropdown
+                        value={formData.firm}
+                        onChange={(value) => setFormData({ ...formData, firm: value })}
+                        options={firms.map((firm) => ({
+                          value: firm.id.toString(),
+                          label: firm.firm_name,
+                        }))}
+                        placeholder="Select a firm"
+                        disabled={isSaving}
+                      />
+                    </div>
+
                     {/* Basic Information */}
                     <div className="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
                       <h3 className="mb-4 text-sm font-medium text-gray-900 dark:text-white">
