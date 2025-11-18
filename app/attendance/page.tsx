@@ -964,6 +964,7 @@ function AttendanceDetailModal({
   onClose: () => void;
 }) {
   const [employeePhoto, setEmployeePhoto] = useState<string | null>(null);
+  const [fullSizeImage, setFullSizeImage] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchEmployeePhoto = async () => {
@@ -1138,7 +1139,7 @@ function AttendanceDetailModal({
                             src={detail.check_in_selfie_url}
                             alt="Check in selfie"
                             className="h-48 w-48 object-cover rounded-lg border border-gray-300 dark:border-gray-600 cursor-pointer hover:opacity-80 transition-opacity"
-                            onClick={() => window.open(detail.check_in_selfie_url || '', '_blank')}
+                            onClick={() => setFullSizeImage(detail.check_in_selfie_url || null)}
                           />
                           <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-10 rounded-lg transition-opacity flex items-center justify-center">
                             <span className="text-white text-sm opacity-0 hover:opacity-100">Click to view full size</span>
@@ -1190,7 +1191,7 @@ function AttendanceDetailModal({
                             src={detail.check_out_selfie_url}
                             alt="Check out selfie"
                             className="h-48 w-48 object-cover rounded-lg border border-gray-300 dark:border-gray-600 cursor-pointer hover:opacity-80 transition-opacity"
-                            onClick={() => window.open(detail.check_out_selfie_url || '', '_blank')}
+                            onClick={() => setFullSizeImage(detail.check_out_selfie_url || null)}
                           />
                           <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-10 rounded-lg transition-opacity flex items-center justify-center">
                             <span className="text-white text-sm opacity-0 hover:opacity-100">Click to view full size</span>
@@ -1257,6 +1258,30 @@ function AttendanceDetailModal({
           </Button>
         </div>
       </div>
+
+      {/* Full Size Image Modal */}
+      {fullSizeImage && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4"
+          onClick={() => setFullSizeImage(null)}
+        >
+          <div className="relative max-w-7xl max-h-full">
+            <button
+              onClick={() => setFullSizeImage(null)}
+              className="absolute -top-10 right-0 text-white hover:text-gray-300 transition-colors"
+              title="Close"
+            >
+              <XIcon className="h-8 w-8" />
+            </button>
+            <img
+              src={fullSizeImage}
+              alt="Full size selfie"
+              className="max-w-full max-h-[90vh] object-contain rounded-lg"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
