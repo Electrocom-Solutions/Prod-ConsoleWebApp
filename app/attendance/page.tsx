@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar, Search, Check, X as XIcon, ChevronLeft, ChevronRight, Download, CheckCircle, XCircle, Clock, Edit2, Loader2, Inbox, Trash2, ChevronDown, Eye, MapPin } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, parseISO } from "date-fns";
 import { showConfirm, showSuccess, showDeleteConfirm, showAlert } from "@/lib/sweetalert";
-import { apiClient, AttendanceStatisticsResponse, BackendAttendanceListItem, AttendanceDetail, AttendanceCreateData, BackendEmployeeListItem, EmployeeListResponse } from "@/lib/api";
+import { apiClient, AttendanceStatisticsResponse, BackendAttendanceListItem, AttendanceDetail, AttendanceCreateData, BackendEmployeeListItem, EmployeeListResponse, EmployeeDetail } from "@/lib/api";
 import { useDebounce } from "use-debounce";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -621,6 +621,9 @@ function AttendancePageContent() {
                       />
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                      Selfie
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                       Date
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
@@ -631,9 +634,6 @@ function AttendancePageContent() {
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                       Check In
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                      Punch In Image
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                       Check Out
@@ -704,6 +704,17 @@ function AttendancePageContent() {
                               />
                             )}
                           </td>
+                          <td className="px-6 py-4">
+                            {record.check_in_selfie_url ? (
+                              <img
+                                src={record.check_in_selfie_url}
+                                alt="Punch in selfie"
+                                className="h-12 w-12 object-cover rounded border border-gray-300 dark:border-gray-600"
+                              />
+                            ) : (
+                              <span className="text-gray-400 dark:text-gray-500">-</span>
+                            )}
+                          </td>
                           <td className="px-6 py-4 text-sm font-medium dark:text-gray-200">
                             {format(new Date(record.date), "MMM dd, yyyy")}
                           </td>
@@ -715,26 +726,6 @@ function AttendancePageContent() {
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
                           {record.check_in || "-"}
-                        </td>
-                        <td className="px-6 py-4">
-                          {record.check_in_selfie_url ? (
-                            <div className="relative group">
-                              <img
-                                src={record.check_in_selfie_url}
-                                alt="Punch in selfie"
-                                className="h-12 w-12 object-cover rounded border border-gray-300 dark:border-gray-600 cursor-pointer hover:opacity-80 transition-opacity"
-                                onClick={() => {
-                                  // Open image in a modal or new tab
-                                  window.open(record.check_in_selfie_url || '', '_blank');
-                                }}
-                              />
-                              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 rounded transition-opacity flex items-center justify-center">
-                                <span className="text-white text-xs opacity-0 group-hover:opacity-100">View</span>
-                              </div>
-                            </div>
-                          ) : (
-                            <span className="text-gray-400 dark:text-gray-500">-</span>
-                          )}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
                           {record.check_out || "-"}
@@ -948,7 +939,325 @@ function AttendancePageContent() {
           </div>
         </div>
       )}
+
+      {showDetailModal && (
+        <AttendanceDetailModal
+          detail={attendanceDetail}
+          isLoading={isLoadingDetail}
+          onClose={() => {
+            setShowDetailModal(false);
+            setAttendanceDetail(null);
+          }}
+        />
+      )}
     </DashboardLayout>
+  );
+}
+
+function AttendanceDetailModal({
+  detail,
+  isLoading,
+  onClose,
+}: {
+  detail: AttendanceDetail | null;
+  isLoading: boolean;
+  onClose: () => void;
+}) {
+  const [employeePhoto, setEmployeePhoto] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchEmployeePhoto = async () => {
+      if (detail?.employee) {
+        try {
+          const employee = await apiClient.getEmployee(detail.employee);
+          setEmployeePhoto(employee.photo_url || null);
+        } catch (err) {
+          console.error('Failed to fetch employee photo:', err);
+        }
+      }
+    };
+
+    if (detail) {
+      fetchEmployeePhoto();
+    }
+  }, [detail]);
+
+  const formatDateTime = (dateTimeString: string | null) => {
+    if (!dateTimeString) return "-";
+    try {
+      const date = parseISO(dateTimeString);
+      return format(date, "dd MMM yyyy, h:mm a");
+    } catch {
+      return dateTimeString;
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    try {
+      const date = parseISO(dateString);
+      return format(date, "dd MMM yyyy");
+    } catch {
+      return dateString;
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "Present":
+        return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400";
+      case "Absent":
+        return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400";
+      case "Leave":
+        return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
+      case "Half-Day":
+        return "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400";
+      default:
+        return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400";
+    }
+  };
+
+  const getApprovalStatusColor = (status: string) => {
+    switch (status) {
+      case "Approved":
+        return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400";
+      case "Pending":
+        return "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400";
+      case "Rejected":
+        return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400";
+      default:
+        return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400";
+    }
+  };
+
+  const openGoogleMaps = (lat: string | null, lng: string | null, location: string | null) => {
+    if (lat && lng) {
+      window.open(`https://www.google.com/maps?q=${lat},${lng}`, '_blank');
+    } else if (location) {
+      window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`, '_blank');
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between p-6 border-b dark:border-gray-700">
+          <h2 className="text-xl font-semibold dark:text-white">Attendance Details</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+          >
+            <XIcon className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="overflow-y-auto flex-1 p-6">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-sky-600" />
+              <span className="ml-2 text-gray-500 dark:text-gray-400">Loading details...</span>
+            </div>
+          ) : detail ? (
+            <div className="space-y-6">
+              {/* Employee Info Section */}
+              <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">Employee Information</h3>
+                <div className="flex items-start gap-4">
+                  {employeePhoto ? (
+                    <img
+                      src={employeePhoto}
+                      alt={detail.employee_name}
+                      className="h-20 w-20 rounded-full object-cover border-2 border-gray-300 dark:border-gray-600"
+                    />
+                  ) : (
+                    <div className="h-20 w-20 rounded-full bg-gray-300 dark:bg-gray-700 flex items-center justify-center">
+                      <span className="text-2xl font-semibold text-gray-600 dark:text-gray-400">
+                        {detail.employee_name?.charAt(0).toUpperCase() || 'E'}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    <h4 className="text-lg font-semibold dark:text-white">{detail.employee_name}</h4>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Employee Code: {detail.employee_code}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Attendance Date and Status */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Attendance Date</label>
+                  <p className="mt-1 text-sm dark:text-gray-200">{formatDate(detail.attendance_date)}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
+                  <div className="mt-1">
+                    <Badge className={getStatusColor(detail.attendance_status)}>
+                      {detail.attendance_status}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+
+              {/* Check In Section */}
+              {detail.check_in_time && (
+                <div className="border-t dark:border-gray-700 pt-4">
+                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">Check In Details</h3>
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Check In Time</label>
+                        <p className="mt-1 text-sm dark:text-gray-200">{formatDateTime(detail.check_in_time)}</p>
+                      </div>
+                      {detail.check_in_location && (
+                        <div>
+                          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Location</label>
+                          <div className="mt-1 flex items-center gap-2">
+                            <p className="text-sm dark:text-gray-200">{detail.check_in_location}</p>
+                            {(detail.check_in_location_latitude || detail.check_in_location_longitude) && (
+                              <button
+                                onClick={() => openGoogleMaps(
+                                  detail.check_in_location_latitude,
+                                  detail.check_in_location_longitude,
+                                  detail.check_in_location
+                                )}
+                                className="text-sky-600 hover:text-sky-700 dark:text-sky-400"
+                                title="View on Google Maps"
+                              >
+                                <MapPin className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    {detail.check_in_selfie_url && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">Check In Selfie</label>
+                        <div className="relative inline-block">
+                          <img
+                            src={detail.check_in_selfie_url}
+                            alt="Check in selfie"
+                            className="h-48 w-48 object-cover rounded-lg border border-gray-300 dark:border-gray-600 cursor-pointer hover:opacity-80 transition-opacity"
+                            onClick={() => window.open(detail.check_in_selfie_url || '', '_blank')}
+                          />
+                          <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-10 rounded-lg transition-opacity flex items-center justify-center">
+                            <span className="text-white text-sm opacity-0 hover:opacity-100">Click to view full size</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Check Out Section */}
+              {detail.check_out_time && (
+                <div className="border-t dark:border-gray-700 pt-4">
+                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">Check Out Details</h3>
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Check Out Time</label>
+                        <p className="mt-1 text-sm dark:text-gray-200">{formatDateTime(detail.check_out_time)}</p>
+                      </div>
+                      {detail.check_out_location && (
+                        <div>
+                          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Location</label>
+                          <div className="mt-1 flex items-center gap-2">
+                            <p className="text-sm dark:text-gray-200">{detail.check_out_location}</p>
+                            {(detail.check_out_location_latitude || detail.check_out_location_longitude) && (
+                              <button
+                                onClick={() => openGoogleMaps(
+                                  detail.check_out_location_latitude,
+                                  detail.check_out_location_longitude,
+                                  detail.check_out_location
+                                )}
+                                className="text-sky-600 hover:text-sky-700 dark:text-sky-400"
+                                title="View on Google Maps"
+                              >
+                                <MapPin className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    {detail.check_out_selfie_url && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">Check Out Selfie</label>
+                        <div className="relative inline-block">
+                          <img
+                            src={detail.check_out_selfie_url}
+                            alt="Check out selfie"
+                            className="h-48 w-48 object-cover rounded-lg border border-gray-300 dark:border-gray-600 cursor-pointer hover:opacity-80 transition-opacity"
+                            onClick={() => window.open(detail.check_out_selfie_url || '', '_blank')}
+                          />
+                          <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-10 rounded-lg transition-opacity flex items-center justify-center">
+                            <span className="text-white text-sm opacity-0 hover:opacity-100">Click to view full size</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Approval Status */}
+              <div className="border-t dark:border-gray-700 pt-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Approval Status</label>
+                    <div className="mt-1">
+                      <Badge className={getApprovalStatusColor(detail.approval_status)}>
+                        {detail.approval_status}
+                      </Badge>
+                    </div>
+                  </div>
+                  {detail.rejection_reason && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Rejection Reason</label>
+                      <p className="mt-1 text-sm text-red-600 dark:text-red-400">{detail.rejection_reason}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Notes */}
+              {detail.notes && (
+                <div className="border-t dark:border-gray-700 pt-4">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Notes</label>
+                  <p className="mt-1 text-sm dark:text-gray-200 whitespace-pre-wrap">{detail.notes}</p>
+                </div>
+              )}
+
+              {/* Timestamps */}
+              <div className="border-t dark:border-gray-700 pt-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-gray-500 dark:text-gray-400">
+                  <div>
+                    <span className="font-medium">Created:</span> {formatDateTime(detail.created_at)}
+                  </div>
+                  {detail.updated_at && (
+                    <div>
+                      <span className="font-medium">Last Updated:</span> {formatDateTime(detail.updated_at)}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <p className="text-gray-500 dark:text-gray-400">No details available</p>
+            </div>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-3 p-6 border-t dark:border-gray-700">
+          <Button variant="secondary" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }
 
