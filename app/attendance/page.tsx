@@ -1241,15 +1241,17 @@ function AttendanceDetailModal({
                     {detail.check_in_selfie_url && (
                       <div>
                         <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">Check In Selfie</label>
-                        <div className="relative inline-block">
+                        <div 
+                          className="relative inline-block cursor-pointer group"
+                          onClick={() => setFullSizeImage(detail.check_in_selfie_url || null)}
+                        >
                           <img
                             src={detail.check_in_selfie_url}
                             alt="Check in selfie"
-                            className="h-48 w-48 object-cover rounded-lg border border-gray-300 dark:border-gray-600 cursor-pointer hover:opacity-80 transition-opacity"
-                            onClick={() => setFullSizeImage(detail.check_in_selfie_url || null)}
+                            className="h-48 w-48 object-cover rounded-lg border border-gray-300 dark:border-gray-600 hover:opacity-80 transition-opacity"
                           />
-                          <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-10 rounded-lg transition-opacity flex items-center justify-center">
-                            <span className="text-white text-sm opacity-0 hover:opacity-100">Click to view full size</span>
+                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 rounded-lg transition-opacity flex items-center justify-center pointer-events-none">
+                            <span className="text-white text-sm opacity-0 group-hover:opacity-100">Click to view full size</span>
                           </div>
                         </div>
                       </div>
@@ -1304,15 +1306,17 @@ function AttendanceDetailModal({
                     {detail.check_out_selfie_url && (
                       <div>
                         <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">Check Out Selfie</label>
-                        <div className="relative inline-block">
+                        <div 
+                          className="relative inline-block cursor-pointer group"
+                          onClick={() => setFullSizeImage(detail.check_out_selfie_url || null)}
+                        >
                           <img
                             src={detail.check_out_selfie_url}
                             alt="Check out selfie"
-                            className="h-48 w-48 object-cover rounded-lg border border-gray-300 dark:border-gray-600 cursor-pointer hover:opacity-80 transition-opacity"
-                            onClick={() => setFullSizeImage(detail.check_out_selfie_url || null)}
+                            className="h-48 w-48 object-cover rounded-lg border border-gray-300 dark:border-gray-600 hover:opacity-80 transition-opacity"
                           />
-                          <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-10 rounded-lg transition-opacity flex items-center justify-center">
-                            <span className="text-white text-sm opacity-0 hover:opacity-100">Click to view full size</span>
+                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 rounded-lg transition-opacity flex items-center justify-center pointer-events-none">
+                            <span className="text-white text-sm opacity-0 group-hover:opacity-100">Click to view full size</span>
                           </div>
                         </div>
                       </div>
