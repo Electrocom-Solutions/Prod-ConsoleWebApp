@@ -965,6 +965,9 @@ function AttendanceDetailModal({
 }) {
   const [employeePhoto, setEmployeePhoto] = useState<string | null>(null);
   const [fullSizeImage, setFullSizeImage] = useState<string | null>(null);
+  const [checkInAddress, setCheckInAddress] = useState<string | null>(null);
+  const [checkOutAddress, setCheckOutAddress] = useState<string | null>(null);
+  const [isLoadingAddress, setIsLoadingAddress] = useState(false);
 
   useEffect(() => {
     const fetchEmployeePhoto = async () => {
@@ -980,6 +983,99 @@ function AttendanceDetailModal({
 
     if (detail) {
       fetchEmployeePhoto();
+    }
+  }, [detail]);
+
+  // Reverse geocoding to convert coordinates to human-readable address
+  useEffect(() => {
+    const reverseGeocode = async (lat: string | null, lng: string | null): Promise<string | null> => {
+      if (!lat || !lng) return null;
+
+      try {
+        // Using OpenStreetMap Nominatim (free, no API key required)
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+          {
+            headers: {
+              'User-Agent': 'Electrocom-ERP/1.0' // Required by Nominatim
+            }
+          }
+        );
+
+        if (!response.ok) return null;
+
+        const data = await response.json();
+        if (data && data.address) {
+          const address = data.address;
+          const parts: string[] = [];
+
+          // Build address in a readable format
+          if (address.road || address.street) {
+            parts.push(address.road || address.street);
+          }
+          if (address.house_number) {
+            parts.push(address.house_number);
+          }
+          if (address.suburb || address.neighbourhood) {
+            parts.push(address.suburb || address.neighbourhood);
+          }
+          if (address.city || address.town || address.village) {
+            parts.push(address.city || address.town || address.village);
+          }
+          if (address.state) {
+            parts.push(address.state);
+          }
+          if (address.postcode) {
+            parts.push(address.postcode);
+          }
+          if (address.country) {
+            parts.push(address.country);
+          }
+
+          return parts.length > 0 ? parts.join(', ') : data.display_name || null;
+        }
+
+        return data.display_name || null;
+      } catch (err) {
+        console.error('Reverse geocoding error:', err);
+        return null;
+      }
+    };
+
+    const fetchAddresses = async () => {
+      if (!detail) return;
+
+      setIsLoadingAddress(true);
+      try {
+        // Fetch check-in address
+        if (detail.check_in_location_latitude && detail.check_in_location_longitude) {
+          const address = await reverseGeocode(
+            detail.check_in_location_latitude,
+            detail.check_in_location_longitude
+          );
+          setCheckInAddress(address);
+        }
+
+        // Fetch check-out address
+        if (detail.check_out_location_latitude && detail.check_out_location_longitude) {
+          const address = await reverseGeocode(
+            detail.check_out_location_latitude,
+            detail.check_out_location_longitude
+          );
+          setCheckOutAddress(address);
+        }
+      } catch (err) {
+        console.error('Error fetching addresses:', err);
+      } finally {
+        setIsLoadingAddress(false);
+      }
+    };
+
+    if (detail) {
+      fetchAddresses();
+    } else {
+      setCheckInAddress(null);
+      setCheckOutAddress(null);
     }
   }, [detail]);
 
@@ -1113,19 +1209,30 @@ function AttendanceDetailModal({
                         <div>
                           <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Location</label>
                           <div className="mt-1 flex items-center gap-2">
-                            <p className="text-sm dark:text-gray-200">{detail.check_in_location}</p>
-                            {(detail.check_in_location_latitude || detail.check_in_location_longitude) && (
-                              <button
-                                onClick={() => openGoogleMaps(
-                                  detail.check_in_location_latitude,
-                                  detail.check_in_location_longitude,
-                                  detail.check_in_location
+                            {isLoadingAddress ? (
+                              <div className="flex items-center gap-2">
+                                <Loader2 className="h-3 w-3 animate-spin text-gray-400" />
+                                <p className="text-sm text-gray-400 dark:text-gray-500">Loading address...</p>
+                              </div>
+                            ) : (
+                              <>
+                                <p className="text-sm dark:text-gray-200">
+                                  {checkInAddress || detail.check_in_location}
+                                </p>
+                                {(detail.check_in_location_latitude || detail.check_in_location_longitude) && (
+                                  <button
+                                    onClick={() => openGoogleMaps(
+                                      detail.check_in_location_latitude,
+                                      detail.check_in_location_longitude,
+                                      detail.check_in_location
+                                    )}
+                                    className="text-sky-600 hover:text-sky-700 dark:text-sky-400"
+                                    title="View on Google Maps"
+                                  >
+                                    <MapPin className="h-4 w-4" />
+                                  </button>
                                 )}
-                                className="text-sky-600 hover:text-sky-700 dark:text-sky-400"
-                                title="View on Google Maps"
-                              >
-                                <MapPin className="h-4 w-4" />
-                              </button>
+                              </>
                             )}
                           </div>
                         </div>
@@ -1165,19 +1272,30 @@ function AttendanceDetailModal({
                         <div>
                           <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Location</label>
                           <div className="mt-1 flex items-center gap-2">
-                            <p className="text-sm dark:text-gray-200">{detail.check_out_location}</p>
-                            {(detail.check_out_location_latitude || detail.check_out_location_longitude) && (
-                              <button
-                                onClick={() => openGoogleMaps(
-                                  detail.check_out_location_latitude,
-                                  detail.check_out_location_longitude,
-                                  detail.check_out_location
+                            {isLoadingAddress ? (
+                              <div className="flex items-center gap-2">
+                                <Loader2 className="h-3 w-3 animate-spin text-gray-400" />
+                                <p className="text-sm text-gray-400 dark:text-gray-500">Loading address...</p>
+                              </div>
+                            ) : (
+                              <>
+                                <p className="text-sm dark:text-gray-200">
+                                  {checkOutAddress || detail.check_out_location}
+                                </p>
+                                {(detail.check_out_location_latitude || detail.check_out_location_longitude) && (
+                                  <button
+                                    onClick={() => openGoogleMaps(
+                                      detail.check_out_location_latitude,
+                                      detail.check_out_location_longitude,
+                                      detail.check_out_location
+                                    )}
+                                    className="text-sky-600 hover:text-sky-700 dark:text-sky-400"
+                                    title="View on Google Maps"
+                                  >
+                                    <MapPin className="h-4 w-4" />
+                                  </button>
                                 )}
-                                className="text-sky-600 hover:text-sky-700 dark:text-sky-400"
-                                title="View on Google Maps"
-                              >
-                                <MapPin className="h-4 w-4" />
-                              </button>
+                              </>
                             )}
                           </div>
                         </div>
