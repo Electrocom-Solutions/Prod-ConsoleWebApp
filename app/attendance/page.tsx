@@ -6,7 +6,7 @@ import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Search, Check, X as XIcon, ChevronLeft, ChevronRight, Download, CheckCircle, XCircle, Clock, Edit2, Loader2, Inbox, Trash2, ChevronDown } from "lucide-react";
+import { Calendar, Search, Check, X as XIcon, ChevronLeft, ChevronRight, Download, CheckCircle, XCircle, Clock, Edit2, Loader2, Inbox, Trash2, ChevronDown, Eye, MapPin } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, parseISO } from "date-fns";
 import { showConfirm, showSuccess, showDeleteConfirm, showAlert } from "@/lib/sweetalert";
 import { apiClient, AttendanceStatisticsResponse, BackendAttendanceListItem, AttendanceDetail, AttendanceCreateData, BackendEmployeeListItem, EmployeeListResponse } from "@/lib/api";
@@ -27,6 +27,7 @@ type AttendanceRecord = {
   approval_status: ApprovalStatus;
   check_in?: string;
   check_out?: string;
+  check_in_selfie_url?: string | null;
   notes?: string;
   rejection_reason?: string;
 };
@@ -52,6 +53,7 @@ function mapBackendAttendanceListItemToFrontend(backendAttendance: BackendAttend
     approval_status: backendAttendance.approval_status as ApprovalStatus,
     check_in: backendAttendance.check_in_time ? format(parseISO(backendAttendance.check_in_time), 'h:mm a') : undefined,
     check_out: backendAttendance.check_out_time ? format(parseISO(backendAttendance.check_out_time), 'h:mm a') : undefined,
+    check_in_selfie_url: backendAttendance.check_in_selfie_url || null,
     notes: backendAttendance.notes || undefined,
   };
 }
@@ -62,7 +64,7 @@ function AttendancePageContent() {
   const [statistics, setStatistics] = useState<AttendanceStatisticsResponse | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState<string>("");
+  const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), "yyyy-MM-dd"));
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch] = useDebounce(searchQuery, 500);
   const [viewMode, setViewMode] = useState<"calendar" | "list">("list");
@@ -71,6 +73,9 @@ function AttendancePageContent() {
   const [showMarkModal, setShowMarkModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [showBulkPresentModal, setShowBulkPresentModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [attendanceDetail, setAttendanceDetail] = useState<AttendanceDetail | null>(null);
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [editingRecord, setEditingRecord] = useState<AttendanceRecord | null>(null);
   const [selectedEmployees, setSelectedEmployees] = useState<number[]>([]);
   const [selectedAttendanceRecords, setSelectedAttendanceRecords] = useState<number[]>([]);
@@ -372,6 +377,20 @@ function AttendancePageContent() {
     }
   };
 
+  const handleViewDetails = async (attendanceId: number) => {
+    setIsLoadingDetail(true);
+    setShowDetailModal(true);
+    try {
+      const detail = await apiClient.getAttendanceRecord(attendanceId);
+      setAttendanceDetail(detail);
+    } catch (err: any) {
+      await showAlert("Error", err.message || "Failed to fetch attendance details");
+      setShowDetailModal(false);
+    } finally {
+      setIsLoadingDetail(false);
+    }
+  };
+
   const handleSaveAttendance = async (record: AttendanceRecord) => {
     setIsSaving(true);
     try {
@@ -489,15 +508,6 @@ function AttendancePageContent() {
                 }}
                 placeholder="Select date"
               />
-              {selectedDate && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setSelectedDate("")}
-                >
-                  Clear
-                </Button>
-              )}
             </div>
 
             <div className="relative">
@@ -623,6 +633,9 @@ function AttendancePageContent() {
                       Check In
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                      Punch In Image
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                       Check Out
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
@@ -639,7 +652,7 @@ function AttendancePageContent() {
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                   {isLoading ? (
                     <tr>
-                      <td colSpan={9} className="px-6 py-8 text-center">
+                      <td colSpan={10} className="px-6 py-8 text-center">
                         <div className="flex items-center justify-center">
                           <Loader2 className="h-6 w-6 animate-spin text-sky-600" />
                           <span className="ml-2 text-gray-500 dark:text-gray-400">Loading attendance records...</span>
@@ -648,7 +661,7 @@ function AttendancePageContent() {
                     </tr>
                   ) : attendance.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="px-6 py-8 text-center">
+                      <td colSpan={10} className="px-6 py-8 text-center">
                         <div className="flex flex-col items-center justify-center">
                           <Inbox className="h-12 w-12 text-gray-400 mb-4" />
                           <p className="text-gray-500 dark:text-gray-400">No attendance records found</p>
@@ -703,6 +716,26 @@ function AttendancePageContent() {
                         <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
                           {record.check_in || "-"}
                         </td>
+                        <td className="px-6 py-4">
+                          {record.check_in_selfie_url ? (
+                            <div className="relative group">
+                              <img
+                                src={record.check_in_selfie_url}
+                                alt="Punch in selfie"
+                                className="h-12 w-12 object-cover rounded border border-gray-300 dark:border-gray-600 cursor-pointer hover:opacity-80 transition-opacity"
+                                onClick={() => {
+                                  // Open image in a modal or new tab
+                                  window.open(record.check_in_selfie_url || '', '_blank');
+                                }}
+                              />
+                              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 rounded transition-opacity flex items-center justify-center">
+                                <span className="text-white text-xs opacity-0 group-hover:opacity-100">View</span>
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 dark:text-gray-500">-</span>
+                          )}
+                        </td>
                         <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
                           {record.check_out || "-"}
                         </td>
@@ -746,6 +779,15 @@ function AttendancePageContent() {
                                 </Button>
                               </>
                             ) : null}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleViewDetails(record.id)}
+                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                              title="View Details"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
                             <Button
                               variant="ghost"
                               size="sm"

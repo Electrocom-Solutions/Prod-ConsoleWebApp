@@ -837,6 +837,7 @@ export interface BackendAttendanceListItem {
   approval_status: 'Approved' | 'Pending' | 'Rejected';
   check_in_time: string | null;
   check_out_time: string | null;
+  check_in_selfie_url: string | null;
   notes: string | null;
   created_at: string;
 }
