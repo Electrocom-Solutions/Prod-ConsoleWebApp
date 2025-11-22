@@ -3981,13 +3981,14 @@ Please verify:
     if (data.state) formData.append('state', data.state);
     if (data.pin_code) formData.append('pin_code', data.pin_code);
     if (data.country) formData.append('country', data.country);
+    if (data.father_name) formData.append('father_name', data.father_name);
     if (data.uan_number) formData.append('uan_number', data.uan_number);
+    if (data.esi) formData.append('esi', data.esi);
     if (data.department) formData.append('department', data.department);
     if (data.project) formData.append('project', data.project.toString());
     if (data.bank_name) formData.append('bank_name', data.bank_name);
     if (data.bank_account_number) formData.append('bank_account_number', data.bank_account_number);
     if (data.ifsc_code) formData.append('ifsc_code', data.ifsc_code);
-    if (data.bank_branch) formData.append('bank_branch', data.bank_branch);
 
     // Ensure we have a CSRF token before making the request
     await this.ensureCsrfToken();
@@ -4037,13 +4038,14 @@ Please verify:
     if (data.state) formData.append('state', data.state);
     if (data.pin_code) formData.append('pin_code', data.pin_code);
     if (data.country) formData.append('country', data.country);
+    if (data.father_name !== undefined) formData.append('father_name', data.father_name || '');
     if (data.uan_number !== undefined) formData.append('uan_number', data.uan_number || '');
+    if (data.esi !== undefined) formData.append('esi', data.esi || '');
     if (data.department) formData.append('department', data.department);
     if (data.project !== undefined) formData.append('project', data.project ? data.project.toString() : '');
     if (data.bank_name !== undefined) formData.append('bank_name', data.bank_name || '');
     if (data.bank_account_number !== undefined) formData.append('bank_account_number', data.bank_account_number || '');
     if (data.ifsc_code !== undefined) formData.append('ifsc_code', data.ifsc_code || '');
-    if (data.bank_branch !== undefined) formData.append('bank_branch', data.bank_branch || '');
 
     // Ensure we have a CSRF token before making the request
     await this.ensureCsrfToken();
