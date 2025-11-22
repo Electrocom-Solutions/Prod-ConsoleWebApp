@@ -1370,6 +1370,7 @@ function BulkImportModal({ onClose, onImport, isUploading }: {
               <li>Sr. No. (optional)</li>
               <li>First Name (required)</li>
               <li>Last Name (required)</li>
+              <li>Father Name (optional)</li>
               <li>Email (required)</li>
               <li>Phone Number (optional)</li>
               <li>Date Of Birth (dd/mm/yy) (optional)</li>
@@ -1378,8 +1379,11 @@ function BulkImportModal({ onClose, onImport, isUploading }: {
               <li>Worker Type (unskilled, semiskilled, skilled) (required)</li>
               <li>Salary (required)</li>
               <li>Aadhar Number (required)</li>
-              <li>UAN Number, Department (optional)</li>
-              <li>Bank Name, Account Number, IFSC Code, Bank Branch (optional)</li>
+              <li>UAN Number (optional)</li>
+              <li>ESI (optional)</li>
+              <li>Department (optional)</li>
+              <li>Bank Name, Account Number, IFSC Code (optional)</li>
+              <li>Project (optional)</li>
             </ul>
           </div>
 
