@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { DatePicker } from "@/components/ui/date-picker";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
-import { Plus, Search, Upload, Edit, Trash2, X, User, Phone, MapPin, Mail, Loader2, Inbox, FileText, Download, ChevronDown } from "lucide-react";
+import { Plus, Search, Upload, Edit, Trash2, X, User, Phone, MapPin, Mail, Loader2, Inbox, FileText, Download, ChevronDown, Eye } from "lucide-react";
 import { showDeleteConfirm, showAlert, showSuccess } from "@/lib/sweetalert";
 import { apiClient, ContractWorkerStatisticsResponse, BackendContractWorkerListItem, ContractWorkerDetail, ContractWorkerCreateData, BulkUploadContractWorkerResponse, BackendProjectListItem } from "@/lib/api";
 import { useDebounce } from "use-debounce";
@@ -22,6 +22,7 @@ type ContractWorker = {
   phone: string;
   date_of_birth: string;
   gender: "Male" | "Female";
+  father_name: string;
   address: string;
   city: string;
   state: string;
@@ -31,11 +32,11 @@ type ContractWorker = {
   monthly_salary: number;
   aadhar_number: string;
   uan_number: string;
+  esi: string;
   department: string;
   bank_name: string;
   bank_account_number: string;
   bank_ifsc: string;
-  bank_branch: string;
   status: "Available" | "Assigned" | "Inactive";
   created_at: string;
   // Legacy fields for backward compatibility
@@ -63,6 +64,7 @@ function mapBackendContractWorkerListItemToFrontend(backendWorker: BackendContra
     phone: backendWorker.phone_number || '',
     date_of_birth: '',
     gender: "Male",
+    father_name: '',
     address: '',
     city: '',
     state: '',
@@ -72,11 +74,11 @@ function mapBackendContractWorkerListItemToFrontend(backendWorker: BackendContra
     monthly_salary: parseFloat(backendWorker.monthly_salary) || 0,
     aadhar_number: '',
     uan_number: '',
+    esi: '',
     department: backendWorker.department || '',
     bank_name: '',
     bank_account_number: '',
     bank_ifsc: '',
-    bank_branch: '',
     status: backendWorker.availability_status === 'assigned' ? 'Assigned' : 'Available',
     created_at: backendWorker.created_at,
     name: backendWorker.full_name || '',
@@ -104,6 +106,7 @@ function mapBackendContractWorkerDetailToFrontend(backendWorker: ContractWorkerD
     phone: backendWorker.phone_number || '',
     date_of_birth: backendWorker.date_of_birth || '',
     gender: (backendWorker.gender === 'male' ? 'Male' : backendWorker.gender === 'female' ? 'Female' : 'Male') as "Male" | "Female",
+    father_name: backendWorker.father_name || '',
     address: backendWorker.address || '',
     city: backendWorker.city || '',
     state: backendWorker.state || '',
@@ -113,11 +116,11 @@ function mapBackendContractWorkerDetailToFrontend(backendWorker: ContractWorkerD
     monthly_salary: parseFloat(backendWorker.monthly_salary) || 0,
     aadhar_number: backendWorker.aadhar_no || '',
     uan_number: backendWorker.uan_number || '',
+    esi: backendWorker.esi || '',
     department: backendWorker.department || '',
     bank_name: backendWorker.bank_account?.bank_name || '',
     bank_account_number: backendWorker.bank_account?.account_number || '',
     bank_ifsc: backendWorker.bank_account?.ifsc_code || '',
-    bank_branch: backendWorker.bank_account?.branch || '',
     status: backendWorker.project ? 'Assigned' : 'Available',
     created_at: backendWorker.created_at,
     name: backendWorker.full_name || '',
@@ -149,7 +152,9 @@ function ContractWorkersPageContent() {
   const [showAvailabilityDropdown, setShowAvailabilityDropdown] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [showBulkImport, setShowBulkImport] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
   const [selectedWorker, setSelectedWorker] = useState<ContractWorker | null>(null);
+  const [viewWorkerDetail, setViewWorkerDetail] = useState<ContractWorkerDetail | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
@@ -300,6 +305,21 @@ function ContractWorkersPageContent() {
       const mappedWorker = mapBackendContractWorkerDetailToFrontend(workerDetail);
       setSelectedWorker(mappedWorker);
       setShowModal(true);
+    } catch (err: any) {
+      console.error("Failed to fetch contract worker details:", err);
+      showAlert("Error", err.message || "Failed to load contract worker details.", "error");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle view contract worker details
+  const handleView = async (worker: ContractWorker) => {
+    try {
+      setIsLoading(true);
+      const workerDetail = await apiClient.getContractWorker(worker.id);
+      setViewWorkerDetail(workerDetail);
+      setShowViewModal(true);
     } catch (err: any) {
       console.error("Failed to fetch contract worker details:", err);
       showAlert("Error", err.message || "Failed to load contract worker details.", "error");
@@ -632,7 +652,16 @@ function ContractWorkersPageContent() {
                         <Button
                           variant="ghost"
                           size="sm"
+                          onClick={() => handleView(worker)}
+                          title="View Details"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => handleEdit(worker)}
+                          title="Edit"
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -641,6 +670,7 @@ function ContractWorkersPageContent() {
                           size="sm"
                           onClick={() => handleDelete(worker.id)}
                           className="text-red-600"
+                          title="Delete"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -707,7 +737,222 @@ function ContractWorkersPageContent() {
           isUploading={isSaving}
         />
       )}
+
+      {showViewModal && viewWorkerDetail && (
+        <ViewDetailsModal
+          workerDetail={viewWorkerDetail}
+          onClose={() => {
+            setShowViewModal(false);
+            setViewWorkerDetail(null);
+          }}
+          onEdit={async () => {
+            setShowViewModal(false);
+            const mappedWorker = mapBackendContractWorkerDetailToFrontend(viewWorkerDetail);
+            setSelectedWorker(mappedWorker);
+            setShowModal(true);
+          }}
+        />
+      )}
     </DashboardLayout>
+  );
+}
+
+function ViewDetailsModal({ workerDetail, onClose, onEdit }: {
+  workerDetail: ContractWorkerDetail | null;
+  onClose: () => void;
+  onEdit: () => void;
+}) {
+  if (!workerDetail) return null;
+
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return "-";
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' });
+    } catch {
+      return dateString;
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white dark:bg-gray-900 border-b dark:border-gray-800 p-6 flex items-center justify-between z-10">
+          <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
+            Contract Worker Details
+          </h2>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={onEdit}>
+              <Edit className="h-4 w-4 mr-2" />
+              Edit
+            </Button>
+            <button 
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="p-6 space-y-6">
+          {/* Personal Information */}
+          <div className="space-y-4">
+            <div className="border-b dark:border-gray-700 pb-2">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Personal Information</h3>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Full Name</label>
+                <p className="text-base text-gray-900 dark:text-white mt-1">{workerDetail.full_name || "-"}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Father Name</label>
+                <p className="text-base text-gray-900 dark:text-white mt-1">{workerDetail.father_name || "-"}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Date of Birth</label>
+                <p className="text-base text-gray-900 dark:text-white mt-1">{formatDate(workerDetail.date_of_birth)}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Gender</label>
+                <p className="text-base text-gray-900 dark:text-white mt-1 capitalize">{workerDetail.gender || "-"}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Contact Details */}
+          <div className="space-y-4">
+            <div className="border-b dark:border-gray-700 pb-2">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Contact Details</h3>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Email</label>
+                <p className="text-base text-gray-900 dark:text-white mt-1">{workerDetail.email || "-"}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Phone Number</label>
+                <p className="text-base text-gray-900 dark:text-white mt-1">{workerDetail.phone_number || "-"}</p>
+              </div>
+              <div className="col-span-2">
+                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Address</label>
+                <p className="text-base text-gray-900 dark:text-white mt-1">{workerDetail.address || "-"}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">City</label>
+                <p className="text-base text-gray-900 dark:text-white mt-1">{workerDetail.city || "-"}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">State</label>
+                <p className="text-base text-gray-900 dark:text-white mt-1">{workerDetail.state || "-"}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Pincode</label>
+                <p className="text-base text-gray-900 dark:text-white mt-1">{workerDetail.pin_code || "-"}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Country</label>
+                <p className="text-base text-gray-900 dark:text-white mt-1">{workerDetail.country || "-"}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Work Details */}
+          <div className="space-y-4">
+            <div className="border-b dark:border-gray-700 pb-2">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Work Details</h3>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Worker Type</label>
+                <p className="text-base text-gray-900 dark:text-white mt-1">{workerDetail.worker_type || "-"}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Department</label>
+                <p className="text-base text-gray-900 dark:text-white mt-1">{workerDetail.department || "-"}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Monthly Salary</label>
+                <p className="text-base text-gray-900 dark:text-white mt-1">₹{parseFloat(workerDetail.monthly_salary || "0").toLocaleString('en-IN')}/mo</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Project</label>
+                <p className="text-base text-gray-900 dark:text-white mt-1">{workerDetail.project_name || "Not Assigned"}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Identity Documents */}
+          <div className="space-y-4">
+            <div className="border-b dark:border-gray-700 pb-2">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Identity Documents</h3>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Aadhar Number</label>
+                <p className="text-base text-gray-900 dark:text-white mt-1">{workerDetail.aadhar_no || "-"}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">UAN Number</label>
+                <p className="text-base text-gray-900 dark:text-white mt-1">{workerDetail.uan_number || "-"}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">ESI Number</label>
+                <p className="text-base text-gray-900 dark:text-white mt-1">{workerDetail.esi || "-"}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Bank Details */}
+          {workerDetail.bank_account && (
+            <div className="space-y-4">
+              <div className="border-b dark:border-gray-700 pb-2">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Bank Details</h3>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Bank Name</label>
+                  <p className="text-base text-gray-900 dark:text-white mt-1">{workerDetail.bank_account.bank_name || "-"}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Account Number</label>
+                  <p className="text-base text-gray-900 dark:text-white mt-1">{workerDetail.bank_account.account_number || "-"}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500 dark:text-gray-400">IFSC Code</label>
+                  <p className="text-base text-gray-900 dark:text-white mt-1">{workerDetail.bank_account.ifsc_code || "-"}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Metadata */}
+          <div className="space-y-4 pt-4 border-t dark:border-gray-700">
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Created At</label>
+                <p className="text-base text-gray-900 dark:text-white mt-1">{formatDate(workerDetail.created_at)}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Last Updated</label>
+                <p className="text-base text-gray-900 dark:text-white mt-1">{formatDate(workerDetail.updated_at)}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3 p-6 border-t dark:border-gray-700">
+          <Button variant="outline" onClick={onClose}>
+            Close
+          </Button>
+          <Button onClick={onEdit}>
+            <Edit className="h-4 w-4 mr-2" />
+            Edit Worker
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -737,6 +982,7 @@ function WorkerModal({ worker, projects, onClose, onSave, isSaving }: {
   const [formData, setFormData] = useState({
     first_name: worker?.first_name || worker?.name?.split(' ')[0] || "",
     last_name: worker?.last_name || worker?.name?.split(' ').slice(1).join(' ') || "",
+    father_name: worker?.father_name || "",
     email: worker?.email || "",
     phone: worker?.phone || "",
     date_of_birth: worker?.date_of_birth || "",
@@ -750,13 +996,13 @@ function WorkerModal({ worker, projects, onClose, onSave, isSaving }: {
     monthly_salary: worker?.monthly_salary?.toString() || "",
     aadhar_number: worker?.aadhar_number || "",
     uan_number: worker?.uan_number || "",
+    esi: worker?.esi || "",
     department: worker?.department || "",
     project: worker?.project_id?.toString() || "",
     project_search: worker?.project_name || "",
     bank_name: worker?.bank_name || "",
     bank_account_number: worker?.bank_account_number || "",
     bank_ifsc: worker?.bank_ifsc || "",
-    bank_branch: worker?.bank_branch || "",
   });
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
 
@@ -766,6 +1012,7 @@ function WorkerModal({ worker, projects, onClose, onSave, isSaving }: {
       setFormData({
         first_name: worker.first_name || worker.name?.split(' ')[0] || "",
         last_name: worker.last_name || worker.name?.split(' ').slice(1).join(' ') || "",
+        father_name: worker.father_name || "",
         email: worker.email || "",
         phone: worker.phone || "",
         date_of_birth: worker.date_of_birth || "",
@@ -779,18 +1026,19 @@ function WorkerModal({ worker, projects, onClose, onSave, isSaving }: {
         monthly_salary: worker.monthly_salary?.toString() || "",
         aadhar_number: worker.aadhar_number || "",
         uan_number: worker.uan_number || "",
+        esi: worker.esi || "",
         department: worker.department || "",
         project: worker.project_id?.toString() || "",
         project_search: worker.project_name || "",
         bank_name: worker.bank_name || "",
         bank_account_number: worker.bank_account_number || "",
         bank_ifsc: worker.bank_ifsc || "",
-        bank_branch: worker.bank_branch || "",
       });
     } else {
       setFormData({
         first_name: "",
         last_name: "",
+        father_name: "",
         email: "",
         phone: "",
         date_of_birth: "",
@@ -804,13 +1052,13 @@ function WorkerModal({ worker, projects, onClose, onSave, isSaving }: {
         monthly_salary: "",
         aadhar_number: "",
         uan_number: "",
+        esi: "",
         department: "",
         project: "",
         project_search: "",
         bank_name: "",
         bank_account_number: "",
         bank_ifsc: "",
-        bank_branch: "",
       });
     }
   }, [worker]);
@@ -857,6 +1105,7 @@ function WorkerModal({ worker, projects, onClose, onSave, isSaving }: {
     const workerData: ContractWorkerCreateData = {
       first_name: formData.first_name,
       last_name: formData.last_name,
+      father_name: formData.father_name || undefined,
       email: formData.email,
       worker_type: formData.worker_type,
       monthly_salary: parseFloat(formData.monthly_salary) || 0,
@@ -870,12 +1119,12 @@ function WorkerModal({ worker, projects, onClose, onSave, isSaving }: {
       pin_code: formData.pincode || undefined,
       country: formData.country || undefined,
       uan_number: formData.uan_number || undefined,
+      esi: formData.esi || undefined,
       department: formData.department || undefined,
       project: formData.project ? parseInt(formData.project) : undefined,
       bank_name: formData.bank_name || (worker ? "" : undefined),
       bank_account_number: formData.bank_account_number || (worker ? "" : undefined),
       ifsc_code: formData.bank_ifsc || (worker ? "" : undefined),
-      bank_branch: formData.bank_branch || (worker ? "" : undefined),
     };
 
     await onSave(workerData);
@@ -924,6 +1173,16 @@ function WorkerModal({ worker, projects, onClose, onSave, isSaving }: {
                   onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
                   required
                   placeholder="Enter last name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-900 dark:text-white">
+                  Father Name
+                </label>
+                <Input
+                  value={formData.father_name}
+                  onChange={(e) => setFormData({ ...formData, father_name: e.target.value })}
+                  placeholder="Enter father name"
                 />
               </div>
               <div>
@@ -1181,6 +1440,17 @@ function WorkerModal({ worker, projects, onClose, onSave, isSaving }: {
                   maxLength={12}
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-900 dark:text-white">
+                  ESI Number
+                </label>
+                <Input
+                  type="text"
+                  value={formData.esi}
+                  onChange={(e) => setFormData({ ...formData, esi: e.target.value })}
+                  placeholder="Enter ESI number"
+                />
+              </div>
             </div>
           </div>
 
@@ -1222,16 +1492,6 @@ function WorkerModal({ worker, projects, onClose, onSave, isSaving }: {
                   onChange={(e) => setFormData({ ...formData, bank_ifsc: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 11) })}
                   placeholder="Enter IFSC code"
                   maxLength={11}
-                />
-              </div>
-              <div className="col-span-2">
-                <label className="block text-sm font-medium mb-2 text-gray-900 dark:text-white">
-                  Bank Branch
-                </label>
-                <Input
-                  value={formData.bank_branch}
-                  onChange={(e) => setFormData({ ...formData, bank_branch: e.target.value })}
-                  placeholder="Enter bank branch name"
                 />
               </div>
             </div>

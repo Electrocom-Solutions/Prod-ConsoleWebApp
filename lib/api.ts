@@ -760,6 +760,7 @@ export interface ContractWorkerDetail {
   phone_number: string | null;
   date_of_birth: string | null;
   gender: string | null;
+  father_name: string | null;
   address: string | null;
   city: string | null;
   state: string | null;
@@ -769,6 +770,7 @@ export interface ContractWorkerDetail {
   monthly_salary: string; // Decimal as string
   aadhar_no: string;
   uan_number: string | null;
+  esi: string | null;
   department: string | null;
   project: number | null;
   project_name: string | null;
@@ -789,6 +791,7 @@ export interface ContractWorkerDetail {
 export interface ContractWorkerCreateData {
   first_name: string;
   last_name: string;
+  father_name?: string;
   email: string;
   worker_type: 'Unskilled' | 'Semi-Skilled' | 'Skilled';
   monthly_salary: number;
@@ -802,12 +805,12 @@ export interface ContractWorkerCreateData {
   pin_code?: string;
   country?: string;
   uan_number?: string;
+  esi?: string;
   department?: string;
   project?: number;
   bank_name?: string;
   bank_account_number?: string;
   ifsc_code?: string;
-  bank_branch?: string;
 }
 
 export interface BulkUploadContractWorkerResponse {
