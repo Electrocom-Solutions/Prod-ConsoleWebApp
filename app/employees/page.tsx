@@ -979,6 +979,27 @@ function EmployeeModal({ employee, onClose, onSave, isSaving }: {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [aadharCardFile, setAadharCardFile] = useState<File | null>(null);
   const [panCardFile, setPanCardFile] = useState<File | null>(null);
+  const [phoneError, setPhoneError] = useState<string>("");
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    // Remove all non-digit characters
+    const digitsOnly = value.replace(/\D/g, '');
+    
+    // Limit to 10 digits
+    const limitedDigits = digitsOnly.slice(0, 10);
+    
+    setFormData({ ...formData, phone: limitedDigits });
+    
+    // Validate
+    if (limitedDigits.length > 0 && limitedDigits.length !== 10) {
+      setPhoneError("Mobile number must be exactly 10 digits");
+    } else if (limitedDigits.length === 0) {
+      setPhoneError("");
+    } else {
+      setPhoneError("");
+    }
+  };
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -994,6 +1015,13 @@ function EmployeeModal({ employee, onClose, onSave, isSaving }: {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate phone number before submit
+    const phoneDigits = formData.phone.replace(/\D/g, '');
+    if (phoneDigits.length !== 10) {
+      setPhoneError("Mobile number must be exactly 10 digits");
+      return;
+    }
     
     // Prepare employee data for API
     const employeeData: EmployeeCreateData = {
@@ -1148,10 +1176,14 @@ function EmployeeModal({ employee, onClose, onSave, isSaving }: {
                 <Input
                   type="tel"
                   value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  placeholder="+91 98765 43210"
+                  onChange={handlePhoneChange}
+                  placeholder="9983172626"
                   required
+                  className={phoneError ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}
                 />
+                {phoneError && (
+                  <p className="mt-1 text-sm text-red-500">{phoneError}</p>
+                )}
               </div>
               <div className="col-span-2">
                 <label className="block text-sm font-medium mb-2 text-gray-900 dark:text-white">
