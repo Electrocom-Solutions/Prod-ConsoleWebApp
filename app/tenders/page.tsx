@@ -773,9 +773,12 @@ function TendersPageContent() {
                     return (
                       <tr key={tender.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                         <td className="px-6 py-4">
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">
+                          <Link
+                            href={`/tenders/${tender.id}`}
+                            className="text-sm font-medium text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300 hover:underline transition-colors cursor-pointer"
+                          >
                             {tender.name}
-                          </div>
+                          </Link>
                           {tender.description && (
                             <div className="text-sm text-gray-500 dark:text-gray-400 line-clamp-1">
                               {tender.description}
