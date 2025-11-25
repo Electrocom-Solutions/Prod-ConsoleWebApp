@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
@@ -26,7 +27,6 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
-  Zap,
 } from "lucide-react";
 
 const navigationGroups = [
@@ -91,13 +91,40 @@ export function Sidebar() {
         <div className="flex h-16 items-center justify-between border-b px-4">
           {!collapsed && (
             <Link href="/dashboard" className="flex items-center gap-2">
-              <Zap className="h-6 w-6 text-sky-500" />
-              <span className="text-lg font-bold">Electrocom</span>
+              <div className="relative h-8 w-8">
+                <Image
+                  src="/logos/logo only.png"
+                  alt="Electrocom Logo"
+                  fill
+                  sizes="32px"
+                  className="object-contain dark:brightness-0 dark:invert"
+                  priority
+                />
+              </div>
+              <div className="relative h-12 w-[180px]">
+                <Image
+                  src="/logos/Electrocom Text.png"
+                  alt="Electrocom"
+                  fill
+                  sizes="180px"
+                  className="object-contain dark:brightness-0 dark:invert"
+                  priority
+                />
+              </div>
             </Link>
           )}
           {collapsed && (
             <Link href="/dashboard" className="flex items-center justify-center w-full">
-              <Zap className="h-6 w-6 text-sky-500" />
+              <div className="relative h-8 w-8">
+                <Image
+                  src="/logos/logo only.png"
+                  alt="Electrocom Logo"
+                  fill
+                  sizes="32px"
+                  className="object-contain dark:brightness-0 dark:invert"
+                  priority
+                />
+              </div>
             </Link>
           )}
         </div>

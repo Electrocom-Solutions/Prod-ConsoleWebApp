@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Bell, Moon, Sun, User, Settings, LogOut, GraduationCap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useRef, useEffect, useCallback } from "react";
@@ -75,18 +76,30 @@ export function Header({ title, breadcrumbs }: { title: string; breadcrumbs?: st
   return (
     <header className="sticky top-0 z-30 border-b bg-white dark:bg-gray-900">
       <div className="flex h-16 items-center justify-between px-6">
-        <div className="flex flex-col">
-          <h1 className="text-xl font-semibold">{title}</h1>
-          {breadcrumbs && breadcrumbs.length > 0 && (
-            <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-              {breadcrumbs.map((crumb, index) => (
-                <span key={index} className="flex items-center gap-2">
-                  {index > 0 && <span>/</span>}
-                  <span>{crumb}</span>
-                </span>
-              ))}
-            </div>
-          )}
+        <div className="flex items-center gap-3">
+          <div className="relative h-8 w-8 hidden sm:block">
+            <Image
+              src="/logos/logo only.png"
+              alt="Electrocom Logo"
+              fill
+              sizes="32px"
+              className="object-contain dark:brightness-0 dark:invert"
+              priority
+            />
+          </div>
+          <div className="flex flex-col">
+            <h1 className="text-xl font-semibold">{title}</h1>
+            {breadcrumbs && breadcrumbs.length > 0 && (
+              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                {breadcrumbs.map((crumb, index) => (
+                  <span key={index} className="flex items-center gap-2">
+                    {index > 0 && <span>/</span>}
+                    <span>{crumb}</span>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center gap-4">

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -101,6 +102,18 @@ Error: ${error.message}`;
         style={{ backgroundColor: "#0F1117" }}
       >
         <div className="text-center">
+          <div className="flex justify-center mb-6">
+            <div className="relative h-20 w-20">
+              <Image
+                src="/logos/logo only.png"
+                alt="Electrocom Logo"
+                fill
+                sizes="80px"
+                className="object-contain brightness-0 invert"
+                priority
+              />
+            </div>
+          </div>
           <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]" style={{ color: "#007BFF" }}></div>
           <p className="mt-4 text-gray-400">Loading...</p>
         </div>
@@ -125,13 +138,29 @@ Error: ${error.message}`;
           borderColor: "#2A2D35",
         }}
       >
-        <CardHeader className="text-center space-y-2 pb-8 pt-8 px-6">
-          <h1 
-            className="text-3xl sm:text-4xl font-bold tracking-tight"
-            style={{ color: "#FFFFFF" }}
-          >
-            Electrocom
-          </h1>
+        <CardHeader className="text-center space-y-4 pb-8 pt-8 px-6">
+          <div className="flex flex-col items-center gap-3">
+            <div className="relative h-16 w-16">
+              <Image
+                src="/logos/logo only.png"
+                alt="Electrocom Logo"
+                fill
+                sizes="64px"
+                className="object-contain brightness-0 invert"
+                priority
+              />
+            </div>
+            <div className="relative h-12 w-48">
+              <Image
+                src="/logos/Electrocom Text.png"
+                alt="Electrocom"
+                fill
+                sizes="192px"
+                className="object-contain brightness-0 invert"
+                priority
+              />
+            </div>
+          </div>
           <p 
             className="text-sm sm:text-base mt-2"
             style={{ color: "#A0A0A0" }}

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -74,6 +75,18 @@ function DashboardContent() {
       <DashboardLayout title="Dashboard" breadcrumbs={["Home", "Dashboard"]}>
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
+            <div className="flex justify-center mb-4">
+              <div className="relative h-16 w-16">
+                <Image
+                  src="/logos/logo only.png"
+                  alt="Electrocom Logo"
+                  fill
+                  sizes="64px"
+                  className="object-contain dark:brightness-0 dark:invert"
+                  priority
+                />
+              </div>
+            </div>
             <Loader2 className="h-8 w-8 animate-spin mx-auto text-sky-500" />
             <p className="mt-4 text-gray-500">Loading dashboard data...</p>
           </div>
