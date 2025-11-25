@@ -225,13 +225,7 @@ function TaskHubPageContent() {
   // Fetch projects for dropdown
   const fetchProjects = useCallback(async () => {
     try {
-      console.log('[Tasks Page] Fetching projects...');
       const response = await apiClient.getProjects();
-      console.log('[Tasks Page] Projects response:', {
-        hasResponse: !!response,
-        hasResults: !!response?.results,
-        resultsCount: response?.results?.length,
-      });
       if (response && response.results) {
         setProjects(response.results);
       } else {
@@ -247,7 +241,6 @@ function TaskHubPageContent() {
 
   // Fetch tasks
   const fetchTasks = useCallback(async () => {
-    console.log('[Tasks Page] fetchTasks called', { currentPage, debouncedSearchQuery, projectFilter, statusFilter, periodFilter, projectsLength: projects.length });
     setIsLoading(true);
     setError(null);
     setHasAttemptedFetch(true);
@@ -285,15 +278,7 @@ function TaskHubPageContent() {
       }
       params.date_filter = periodFilter === "all" ? "all" : periodFilter;
 
-      console.log('[Tasks Page] Fetching tasks with params:', params);
       const response = await apiClient.getTasks(params);
-      console.log('[Tasks Page] Tasks response received:', {
-        hasResponse: !!response,
-        hasResults: !!response?.results,
-        resultsCount: response?.results?.length,
-        count: response?.count,
-        responseKeys: response ? Object.keys(response) : [],
-      });
       
       // Handle null/undefined response
       if (!response) {
@@ -321,7 +306,6 @@ function TaskHubPageContent() {
       }
       
       const mappedTasks = response.results.map(mapBackendTaskListItemToFrontend);
-      console.log('[Tasks Page] Mapped tasks:', mappedTasks.length);
       setTasks(mappedTasks);
       setTotalPages(Math.ceil((response.count || mappedTasks.length) / 20)); // Assuming 20 items per page
       setError(null); // Clear any previous errors
@@ -363,7 +347,6 @@ function TaskHubPageContent() {
       setError(errorMessage);
       setTasks([]); // Set empty array on error to prevent infinite loading
     } finally {
-      console.log('[Tasks Page] fetchTasks finally block - setting isLoading to false');
       setIsLoading(false);
     }
   }, [currentPage, debouncedSearchQuery, projectFilter, statusFilter, approvalStatusFilter, periodFilter, projects]); // Include projects array for project filter lookup

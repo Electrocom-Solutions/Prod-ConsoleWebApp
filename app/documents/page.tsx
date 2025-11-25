@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Fragment } from 'react';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { UploadTemplateModal } from '@/components/documents/upload-template-modal';
 import { VersionHistoryModal } from '@/components/documents/version-history-modal';
@@ -784,9 +784,8 @@ export default function DocumentsPage() {
                   const publishedVersion = template.published_version || templateVersions[0];
 
                   return (
-                    <>
+                    <Fragment key={template.id}>
                       <tr
-                        key={template.id}
                         className={`hover:bg-gray-50 dark:hover:bg-gray-700 ${
                           isSelected ? 'bg-sky-50 dark:bg-sky-900/20' : ''
                         }`}
@@ -917,7 +916,7 @@ export default function DocumentsPage() {
                           </td>
                         </tr>
                       )}
-                    </>
+                    </Fragment>
                   );
                 })}
               </tbody>

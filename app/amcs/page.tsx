@@ -884,7 +884,6 @@ function AMCsPageContent() {
               setEmailAMC(null);
             }}
             onSend={(template, message) => {
-              console.log('Sending email with template:', template, 'Message:', message);
               showAlert('Info', 'Email sending functionality will be implemented in the backend API.', 'info');
               setShowEmailModal(false);
               setEmailAMC(null);

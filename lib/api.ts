@@ -8,9 +8,6 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 // Log API URL for debugging (in both development and production if needed)
 if (typeof window !== 'undefined') {
-  if (process.env.NODE_ENV === 'development') {
-    console.log('[API Client] Base URL:', API_BASE_URL);
-  }
   // In production, log if API URL is still localhost (indicates misconfiguration)
   if (process.env.NODE_ENV === 'production' && API_BASE_URL.includes('localhost')) {
     console.error('[API Client] WARNING: Using localhost URL in production! Check NEXT_PUBLIC_API_URL environment variable.');
@@ -1731,9 +1728,6 @@ class ApiClient {
     const method = options.method || 'GET';
     
     // Log the request for debugging (only in development)
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`[API] ${method} ${url}`);
-    }
     
     // CRITICAL: Get CSRF token for POST, PUT, DELETE, PATCH requests
     // Django requires CSRF token for all state-changing requests
@@ -2300,21 +2294,9 @@ Please verify:
    */
   async getCurrentUser(): Promise<LoginResponse['user'] | null> {
     try {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[API] Getting current user from:', `${this.baseURL}/api/user/`);
-      }
       const response = await this.request<{ user: LoginResponse['user'] }>('/api/user/', {
         method: 'GET',
       });
-      if (process.env.NODE_ENV === 'development' && response.user) {
-        // Log only non-sensitive user information
-        console.log('[API] Current user retrieved:', {
-          id: response.user.id,
-          username: response.user.username,
-          is_staff: response.user.is_staff,
-          is_superuser: response.user.is_superuser,
-        });
-      }
       return response.user;
     } catch (error: any) {
       // If it's a 403, user is not authorized (not staff/superuser)
