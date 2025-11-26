@@ -470,14 +470,28 @@ function TaskHubPageContent() {
     
     setIsSaving(true);
     try {
-      // Update task
+      // Update task with all fields
       const updateData: any = {
         task_name: updatedTask.description,
-        task_date: updatedTask.date,
+        deadline: updatedTask.date,
         location: updatedTask.location,
-        time_taken_minutes: updatedTask.time_taken_minutes,
+        estimated_time: updatedTask.time_taken_minutes,
         internal_notes: updatedTask.internal_notes,
       };
+      
+      // Get task_description from extended task object if available
+      const taskWithDescription = updatedTask as Task & { task_description?: string };
+      if (taskWithDescription.task_description !== undefined) {
+        updateData.task_description = taskWithDescription.task_description;
+      }
+      
+      // Add optional fields if they exist
+      if (updatedTask.project_id) {
+        updateData.project = updatedTask.project_id;
+      }
+      if (updatedTask.employee_id) {
+        updateData.employee = updatedTask.employee_id;
+      }
       
       // Map frontend status to backend status
       if (updatedTask.status === "Open") updateData.status = "Draft";

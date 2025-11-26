@@ -23,10 +23,11 @@ import {
   ExternalLink,
   Loader2,
   Upload,
+  ChevronDown,
 } from "lucide-react";
-import { Task, TaskResource, TaskAttachment, TaskActivity } from "@/types";
+import { Task, TaskResource, TaskAttachment, TaskActivity, TaskStatus } from "@/types";
 import { format } from "date-fns";
-import { apiClient, BackendTaskDetail, BackendTaskAttachment, BackendTaskActivity } from "@/lib/api";
+import { apiClient, BackendTaskDetail, BackendTaskAttachment, BackendTaskActivity, BackendProjectListItem, BackendEmployeeListItem } from "@/lib/api";
 import { showAlert, showDeleteConfirm, showSuccess, showConfirm } from "@/lib/sweetalert";
 
 interface TaskDetailSlideOverProps {
@@ -60,6 +61,25 @@ export function TaskDetailSlideOver({
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [rejectError, setRejectError] = useState("");
+  
+  // Editable task fields
+  const [taskName, setTaskName] = useState(task.description || "");
+  const [taskDate, setTaskDate] = useState(task.date || "");
+  const [location, setLocation] = useState(task.location || "");
+  const [timeTakenMinutes, setTimeTakenMinutes] = useState(task.time_taken_minutes || 0);
+  const [taskStatus, setTaskStatus] = useState<TaskStatus>(task.status || "Open");
+  const [taskDescription, setTaskDescription] = useState("");
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(task.project_id || null);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | null>(task.employee_id || null);
+  
+  // Dropdowns data
+  const [projects, setProjects] = useState<BackendProjectListItem[]>([]);
+  const [employees, setEmployees] = useState<BackendEmployeeListItem[]>([]);
+  const [showProjectDropdown, setShowProjectDropdown] = useState(false);
+  const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const [projectSearch, setProjectSearch] = useState("");
+  const [employeeSearch, setEmployeeSearch] = useState("");
 
   const fetchTaskDetail = useCallback(async () => {
     if (!task.id) return;
@@ -139,6 +159,24 @@ export function TaskDetailSlideOver({
       }
 
       setInternalNote(detail.internal_notes || "");
+      
+      // Initialize editable fields
+      setTaskName(detail.task_name || "");
+      setTaskDate(detail.task_date || "");
+      setLocation(detail.location || "");
+      setTimeTakenMinutes(detail.time_taken_minutes || 0);
+      setTaskDescription(detail.task_description || "");
+      setSelectedProjectId(detail.project || null);
+      setSelectedEmployeeId(detail.employee || null);
+      
+      // Map backend status to frontend status
+      let status: TaskStatus = "Open";
+      if (detail.status === "Draft") status = "Open";
+      else if (detail.status === "In Progress") status = "In Progress";
+      else if (detail.status === "Completed") status = "Completed";
+      else if (detail.status === "Canceled") status = "Rejected";
+      setTaskStatus(status);
+      
       setHasChanges(false);
     } catch (err: any) {
       console.error("Failed to fetch task detail:", err);
@@ -149,6 +187,29 @@ export function TaskDetailSlideOver({
       setIsLoading(false);
     }
   }, [task.id, initialResources]);
+  
+  // Fetch projects and employees when slideover opens
+  useEffect(() => {
+    if (isOpen) {
+      const fetchData = async () => {
+        try {
+          const [projectsResponse, employeesResponse] = await Promise.all([
+            apiClient.getProjects(),
+            apiClient.getEmployees({})
+          ]);
+          if (projectsResponse?.results) {
+            setProjects(projectsResponse.results);
+          }
+          if (employeesResponse?.results) {
+            setEmployees(employeesResponse.results);
+          }
+        } catch (err) {
+          console.error("Failed to fetch projects/employees:", err);
+        }
+      };
+      fetchData();
+    }
+  }, [isOpen]);
 
   // Fetch task details when slide over opens
   useEffect(() => {
@@ -156,6 +217,27 @@ export function TaskDetailSlideOver({
       fetchTaskDetail();
     }
   }, [isOpen, task.id, fetchTaskDetail]);
+  
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.project-dropdown-container')) {
+        setShowProjectDropdown(false);
+      }
+      if (!target.closest('.employee-dropdown-container')) {
+        setShowEmployeeDropdown(false);
+      }
+      if (!target.closest('.status-dropdown-container')) {
+        setShowStatusDropdown(false);
+      }
+    };
+
+    if (showProjectDropdown || showEmployeeDropdown || showStatusDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showProjectDropdown, showEmployeeDropdown, showStatusDropdown]);
 
   const updateResourceUnitCost = (resourceId: number, unitCost: number | null) => {
     setResources((prev) =>
@@ -183,6 +265,70 @@ export function TaskDetailSlideOver({
     );
     setHasChanges(true);
   };
+  
+  // Handlers for task field changes
+  const handleTaskNameChange = (value: string) => {
+    setTaskName(value);
+    setHasChanges(true);
+  };
+  
+  const handleTaskDateChange = (value: string) => {
+    setTaskDate(value);
+    setHasChanges(true);
+  };
+  
+  const handleLocationChange = (value: string) => {
+    setLocation(value);
+    setHasChanges(true);
+  };
+  
+  const handleTimeTakenChange = (value: number) => {
+    setTimeTakenMinutes(value);
+    setHasChanges(true);
+  };
+  
+  const handleTaskDescriptionChange = (value: string) => {
+    setTaskDescription(value);
+    setHasChanges(true);
+  };
+  
+  const handleStatusChange = (status: TaskStatus) => {
+    setTaskStatus(status);
+    setShowStatusDropdown(false);
+    setHasChanges(true);
+  };
+  
+  const handleProjectSelect = (projectId: number) => {
+    setSelectedProjectId(projectId);
+    setShowProjectDropdown(false);
+    setProjectSearch("");
+    setHasChanges(true);
+  };
+  
+  const handleEmployeeSelect = (employeeId: number) => {
+    setSelectedEmployeeId(employeeId);
+    setShowEmployeeDropdown(false);
+    setEmployeeSearch("");
+    setHasChanges(true);
+  };
+  
+  // Filter projects and employees
+  const filteredProjects = projects.filter((p) =>
+    p.name.toLowerCase().includes(projectSearch.toLowerCase())
+  );
+  
+  const filteredEmployees = employees.filter((employee) => {
+    const searchTerm = employeeSearch.toLowerCase();
+    const fullName = employee.full_name?.toLowerCase() || "";
+    const email = employee.email?.toLowerCase() || "";
+    const phone = employee.phone_number?.toLowerCase() || "";
+    const employeeCode = employee.employee_code?.toLowerCase() || "";
+    return fullName.includes(searchTerm) || email.includes(searchTerm) || phone.includes(searchTerm) || employeeCode.includes(searchTerm);
+  });
+  
+  // Get selected project and employee names
+  const selectedProjectName = projects.find(p => p.id === selectedProjectId)?.name || "";
+  const selectedEmployeeName = employees.find(e => e.id === selectedEmployeeId)?.full_name || employees.find(e => e.id === selectedEmployeeId)?.employee_code || "";
 
   const addResource = () => {
     const newResource: TaskResource = {
@@ -231,14 +377,50 @@ export function TaskDetailSlideOver({
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      // Update task internal notes
-    if (onSave) {
-        await onSave({ ...task, internal_notes: internalNote }, resources);
+      // Prepare updated task object with all fields
+      const updatedTask: Task = {
+        ...task,
+        description: taskName,
+        date: taskDate,
+        location: location,
+        time_taken_minutes: timeTakenMinutes,
+        status: taskStatus,
+        internal_notes: internalNote,
+        project_id: selectedProjectId || undefined,
+        employee_id: selectedEmployeeId || 0,
+      };
+
+      // Update task via onSave callback or directly via API
+      if (onSave) {
+        // Store taskDescription in a way that handleSaveTask can access it
+        // We'll pass it via the task object by extending it
+        const taskWithDescription = { ...updatedTask, task_description: taskDescription } as Task & { task_description?: string };
+        await onSave(taskWithDescription as Task, resources);
       } else {
         // Fallback: update directly via API
-        await apiClient.updateTask(task.id, {
+        const updateData: any = {
+          task_name: taskName,
+          deadline: taskDate,
+          location: location,
+          estimated_time: timeTakenMinutes,
+          task_description: taskDescription,
           internal_notes: internalNote,
-        });
+        };
+        
+        if (selectedProjectId) {
+          updateData.project = selectedProjectId;
+        }
+        if (selectedEmployeeId) {
+          updateData.employee = selectedEmployeeId;
+        }
+        
+        // Map frontend status to backend status
+        if (taskStatus === "Open") updateData.status = "Draft";
+        else if (taskStatus === "In Progress") updateData.status = "In Progress";
+        else if (taskStatus === "Completed") updateData.status = "Completed";
+        else if (taskStatus === "Rejected") updateData.status = "Canceled";
+        
+        await apiClient.updateTask(task.id, updateData);
       }
 
       // Update/create/delete resources
@@ -455,55 +637,237 @@ export function TaskDetailSlideOver({
                 Task Information
               </h3>
               <div className="space-y-4 rounded-lg bg-gray-50 p-4 dark:bg-gray-900">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                      <Calendar className="h-4 w-4" />
-                      <span>Date</span>
-                    </div>
-                    <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
-                      {format(new Date(task.date), "MMMM dd, yyyy")}
-                    </p>
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                      <Clock className="h-4 w-4" />
-                      <span>Time Taken</span>
-                    </div>
-                    <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
-                        {`${task.time_taken_minutes} minutes (${(task.time_taken_minutes / 60).toFixed(1)} hrs)`}
-                    </p>
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                      <MapPin className="h-4 w-4" />
-                      <span>Location</span>
-                    </div>
-                    <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
-                        {task.location || "-"}
-                    </p>
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                      <Briefcase className="h-4 w-4" />
-                      <span>Project</span>
-                    </div>
-                    <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
-                        {task.project_name || "-"}
-                    </p>
-                  </div>
-                </div>
-                  {taskDetail?.task_description && (
+                {/* Task Name */}
                 <div>
-                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     <FileText className="h-4 w-4" />
-                    <span>Description</span>
-                  </div>
-                  <p className="mt-1 text-sm text-gray-900 dark:text-white">
-                        {taskDetail.task_description}
-                  </p>
+                    Task Name
+                  </label>
+                  <input
+                    type="text"
+                    value={taskName}
+                    onChange={(e) => handleTaskNameChange(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-500 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                    placeholder="Enter task name"
+                  />
                 </div>
-                  )}
+                
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Date */}
+                  <div>
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      <Calendar className="h-4 w-4" />
+                      Date
+                    </label>
+                    <input
+                      type="date"
+                      value={taskDate ? taskDate.split('T')[0] : ''}
+                      onChange={(e) => handleTaskDateChange(e.target.value)}
+                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                    />
+                  </div>
+                  
+                  {/* Time Taken */}
+                  <div>
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      <Clock className="h-4 w-4" />
+                      Time Taken (minutes)
+                    </label>
+                    <input
+                      type="number"
+                      value={timeTakenMinutes}
+                      onChange={(e) => handleTimeTakenChange(parseInt(e.target.value) || 0)}
+                      min="0"
+                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                    />
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      {timeTakenMinutes > 0 ? `${timeTakenMinutes} minutes (${(timeTakenMinutes / 60).toFixed(1)} hrs)` : ""}
+                    </p>
+                  </div>
+                  
+                  {/* Location */}
+                  <div>
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      <MapPin className="h-4 w-4" />
+                      Location
+                    </label>
+                    <input
+                      type="text"
+                      value={location}
+                      onChange={(e) => handleLocationChange(e.target.value)}
+                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-500 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                      placeholder="Enter location"
+                    />
+                  </div>
+                  
+                  {/* Status */}
+                  <div className="relative status-dropdown-container">
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      <Check className="h-4 w-4" />
+                      Status
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-left text-gray-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white flex items-center justify-between"
+                    >
+                      <span>{taskStatus === "Open" ? "Draft" : taskStatus === "Rejected" ? "Canceled" : taskStatus}</span>
+                      <ChevronDown className="h-4 w-4 text-gray-400" />
+                    </button>
+                    {showStatusDropdown && (
+                      <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg">
+                        <button
+                          type="button"
+                          onClick={() => handleStatusChange("Open")}
+                          className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                        >
+                          Draft
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleStatusChange("In Progress")}
+                          className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                        >
+                          In Progress
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleStatusChange("Completed")}
+                          className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                        >
+                          Completed
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleStatusChange("Rejected")}
+                          className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                        >
+                          Canceled
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Project */}
+                  <div className="relative project-dropdown-container">
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      <Briefcase className="h-4 w-4" />
+                      Project
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={projectSearch || selectedProjectName}
+                        onChange={(e) => {
+                          setProjectSearch(e.target.value);
+                          setShowProjectDropdown(true);
+                          if (!e.target.value) {
+                            setSelectedProjectId(null);
+                          }
+                        }}
+                        onFocus={() => setShowProjectDropdown(true)}
+                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-500 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                        placeholder="Search and select project"
+                      />
+                      {selectedProjectId && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedProjectId(null);
+                            setProjectSearch("");
+                            setHasChanges(true);
+                          }}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                      {showProjectDropdown && filteredProjects.length > 0 && (
+                        <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                          {filteredProjects.map((project) => (
+                            <button
+                              key={project.id}
+                              type="button"
+                              onClick={() => handleProjectSelect(project.id)}
+                              className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                            >
+                              {project.name}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Employee */}
+                  <div className="relative employee-dropdown-container">
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      <UserPlus className="h-4 w-4" />
+                      Employee
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={employeeSearch || selectedEmployeeName}
+                        onChange={(e) => {
+                          setEmployeeSearch(e.target.value);
+                          setShowEmployeeDropdown(true);
+                          if (!e.target.value) {
+                            setSelectedEmployeeId(null);
+                          }
+                        }}
+                        onFocus={() => setShowEmployeeDropdown(true)}
+                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-500 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                        placeholder="Search and select employee"
+                      />
+                      {selectedEmployeeId && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedEmployeeId(null);
+                            setEmployeeSearch("");
+                            setHasChanges(true);
+                          }}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                      {showEmployeeDropdown && filteredEmployees.length > 0 && (
+                        <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                          {filteredEmployees.map((employee) => (
+                            <button
+                              key={employee.id}
+                              type="button"
+                              onClick={() => handleEmployeeSelect(employee.id)}
+                              className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                            >
+                              <div className="font-medium">{employee.full_name || employee.employee_code}</div>
+                              {employee.email && (
+                                <div className="text-xs text-gray-500 dark:text-gray-400">{employee.email}</div>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Task Description */}
+                <div>
+                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <FileText className="h-4 w-4" />
+                    Description
+                  </label>
+                  <textarea
+                    value={taskDescription}
+                    onChange={(e) => handleTaskDescriptionChange(e.target.value)}
+                    placeholder="Enter task description..."
+                    rows={4}
+                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-500 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                  />
+                </div>
               </div>
             </section>
 
