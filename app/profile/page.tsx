@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Image from "next/image";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -186,9 +187,23 @@ export default function ProfilePage() {
   if (isLoading) {
     return (
       <DashboardLayout title="Profile" breadcrumbs={["Home", "Profile"]}>
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-sky-600" />
-          <span className="ml-2 text-gray-500 dark:text-gray-400">Loading profile...</span>
+        <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
+          <div className="text-center">
+            <div className="flex justify-center mb-4">
+              <div className="relative h-16 w-16">
+                <Image
+                  src="/logos/logo only.png"
+                  alt="Electrocom Logo"
+                  fill
+                  sizes="64px"
+                  className="object-contain dark:brightness-0 dark:invert"
+                  priority
+                />
+              </div>
+            </div>
+            <Loader2 className="h-8 w-8 animate-spin mx-auto text-sky-500" />
+            <p className="mt-4 text-gray-500">Loading profile...</p>
+          </div>
         </div>
       </DashboardLayout>
     );

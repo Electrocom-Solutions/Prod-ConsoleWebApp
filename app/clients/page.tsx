@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import Image from "next/image";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { ClientFormModal } from "@/components/clients/client-form-modal";
 import { ClientSendMailModal } from "@/components/clients/client-send-mail-modal";
@@ -512,8 +513,22 @@ function ClientsPageContent() {
     return (
       <DashboardLayout title="Clients" breadcrumbs={["Home", "Clients"]}>
         <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
-          <Loader2 className="h-8 w-8 animate-spin text-sky-500" />
-          <p className="ml-3 text-gray-500">Loading clients...</p>
+          <div className="text-center">
+            <div className="flex justify-center mb-4">
+              <div className="relative h-16 w-16">
+                <Image
+                  src="/logos/logo only.png"
+                  alt="Electrocom Logo"
+                  fill
+                  sizes="64px"
+                  className="object-contain dark:brightness-0 dark:invert"
+                  priority
+                />
+              </div>
+            </div>
+            <Loader2 className="h-8 w-8 animate-spin mx-auto text-sky-500" />
+            <p className="mt-4 text-gray-500">Loading clients...</p>
+          </div>
         </div>
       </DashboardLayout>
     );
