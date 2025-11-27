@@ -162,7 +162,7 @@ export function TaskDetailSlideOver({
       
       // Initialize editable fields
       setTaskName(detail.task_name || "");
-      setTaskDate(detail.task_date || "");
+      setTaskDate(detail.deadline || "");
       setLocation(detail.location || "");
       setTimeTakenMinutes(detail.time_taken_minutes || 0);
       setTaskDescription(detail.task_description || "");

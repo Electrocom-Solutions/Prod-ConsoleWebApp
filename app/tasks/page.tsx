@@ -70,7 +70,7 @@ function mapBackendTaskListItemToFrontend(backendTask: BackendTaskListItem): Tas
     project_id: backendTask.project,
     project_name: backendTask.project_name || undefined,
     description: backendTask.task_name, // task_name is the description/title
-    date: backendTask.task_date,
+    date: backendTask.deadline || '', // Use empty string if null
     location: backendTask.location || "",
     time_taken_minutes: backendTask.time_taken_minutes,
     estimated_time_minutes: backendTask.time_taken_minutes,
@@ -102,7 +102,7 @@ function mapBackendTaskDetailToFrontend(backendTask: BackendTaskDetail): Task {
     project_id: backendTask.project,
     project_name: backendTask.project_name || undefined,
     description: backendTask.task_name, // task_name is the description/title
-    date: backendTask.task_date,
+    date: backendTask.deadline || '', // Use empty string if null
     location: backendTask.location || "",
     time_taken_minutes: backendTask.time_taken_minutes,
     estimated_time_minutes: backendTask.time_taken_minutes,
@@ -1542,8 +1542,10 @@ function TaskViewModal({
               <p className="mt-1 text-sm text-gray-900 dark:text-white">{taskDetail.task_name}</p>
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Date</label>
-              <p className="mt-1 text-sm text-gray-900 dark:text-white">{format(new Date(taskDetail.task_date), "MMM dd, yyyy")}</p>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Deadline</label>
+              <p className="mt-1 text-sm text-gray-900 dark:text-white">
+                {taskDetail.deadline ? format(new Date(taskDetail.deadline), "MMM dd, yyyy") : 'No deadline set'}
+              </p>
             </div>
             <div>
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Employee</label>

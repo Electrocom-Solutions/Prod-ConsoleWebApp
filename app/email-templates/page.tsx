@@ -431,7 +431,7 @@ function TemplateEditor({
   const availablePlaceholders = [
     "client_name", "client_id", "contact_name", "contact_email", "contact_phone",
     "amc_number", "period_from", "period_to", "amount", "due_date",
-    "employee_name", "task_id", "task_description", "location", "task_date",
+    "employee_name", "task_id", "task_description", "location", "deadline",
     "company_name", "company_email", "company_phone",
   ];
 
@@ -578,7 +578,7 @@ function TemplatePreview({ template, onClose }: { template: EmailTemplate; onClo
     task_id: "TASK-247",
     task_description: "Network Setup",
     location: "Andheri West",
-    task_date: "2025-01-15",
+    deadline: "2025-01-15",
     company_name: "Electrocom Pvt Ltd",
     company_email: "info@electrocom.com",
     company_phone: "+91 9876543210",

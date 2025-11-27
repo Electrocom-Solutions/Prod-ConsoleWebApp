@@ -13,7 +13,7 @@ import { showError } from "@/lib/sweetalert";
 
 type TaskResourceSummary = {
   task_id: number;
-  task_date: string;
+  deadline: string | null;
   employee_name: string;
   tender_name: string;
   project_name: string;
@@ -33,7 +33,7 @@ type TaskResourceSummary = {
 function mapBackendTaskResourceToFrontend(backendTask: BackendTaskResourceListItem): TaskResourceSummary {
   return {
     task_id: backendTask.id,
-    task_date: backendTask.task_date,
+    deadline: backendTask.deadline,
     employee_name: backendTask.employee_name || 'N/A',
     tender_name: backendTask.tender_name || 'N/A',
     project_name: backendTask.project_name || 'N/A',
@@ -147,7 +147,7 @@ function TaskResourcesPageContent() {
       ["Task ID", "Date", "Employee", "Tender", "Project", "Resources Used", "Total Cost"].join(","),
       ...taskResources.map(task => [
         task.task_id,
-        task.task_date,
+        task.deadline || 'No deadline',
         task.employee_name,
         task.tender_name,
         task.project_name,
@@ -312,7 +312,7 @@ function TaskResourcesPageContent() {
                               Task #{task.task_id}
                             </div>
                             <div className="text-sm text-gray-500 dark:text-gray-400">
-                              {new Date(task.task_date).toLocaleDateString()}
+                              {task.deadline ? new Date(task.deadline).toLocaleDateString() : 'No deadline'}
                             </div>
                           </div>
                           <div className="mt-1 font-semibold">{task.employee_name}</div>

@@ -363,7 +363,7 @@ export interface TaskStatisticsResponse {
 export interface BackendTaskListItem {
   id: number;
   task_name: string;
-  task_date: string;
+  deadline: string | null;
   location: string;
   time_taken_minutes: number;
   time_taken_hours: number;
@@ -419,7 +419,7 @@ export interface BackendTaskDetail {
   id: number;
   task_name: string;
   task_description?: string;
-  task_date: string;
+  deadline: string | null;
   location: string;
   time_taken_minutes: number;
   time_taken_hours: number;
@@ -1150,7 +1150,7 @@ export interface BackendTaskResourceListItem {
   project: number;
   project_name: string;
   tender_name: string | null;
-  task_date: string;
+  deadline: string | null;
   resources_count: number;
   grand_total: number;
   resource_breakdown: BackendTaskResourceBreakdown[];
@@ -1171,7 +1171,7 @@ export interface TaskResourceDetail {
   project: number;
   project_name: string;
   tender_name: string | null;
-  task_date: string;
+  deadline: string | null;
   resources_count: number;
   grand_total: number;
   resource_breakdown: BackendTaskResourceBreakdown[];
