@@ -722,7 +722,7 @@ function TaskHubPageContent() {
     ];
     const rows = tasks.map((task) => [
       task.id,
-      format(new Date(task.date), "dd/MM/yyyy"),
+      task.date ? format(new Date(task.date), "dd/MM/yyyy") : 'No deadline',
       task.employee_name || "-",
       task.project_name || "-",
       task.description,
@@ -1215,7 +1215,7 @@ function TaskHubPageContent() {
                         </div>
                       </td>
                       <td className="whitespace-nowrap px-4 py-4 text-sm text-gray-900 dark:text-white">
-                        {format(new Date(task.date), "MMM dd, yyyy")}
+                        {task.date ? format(new Date(task.date), "MMM dd, yyyy") : 'No deadline set'}
                       </td>
                       <td className="px-4 py-4 text-sm text-gray-900 dark:text-white">
                         {task.employee_name}
