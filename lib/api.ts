@@ -3207,7 +3207,7 @@ Please verify:
     project: number;
     task_name: string;
     deadline: string; // Maps to task_date
-    employee?: number;
+    employee: number;
     status?: 'Draft' | 'In Progress' | 'Completed' | 'Canceled';
     estimated_time?: number; // Maps to time_taken_minutes
     location?: string;
@@ -3219,9 +3219,9 @@ Please verify:
     formData.append('project', data.project.toString());
     formData.append('task_name', data.task_name);
     formData.append('deadline', data.deadline);
+    formData.append('employee', data.employee.toString());
     
     // Optional fields
-    if (data.employee !== undefined) formData.append('employee', data.employee.toString());
     if (data.status) formData.append('status', data.status);
     if (data.estimated_time !== undefined) formData.append('estimated_time', data.estimated_time.toString());
     if (data.location) formData.append('location', data.location);

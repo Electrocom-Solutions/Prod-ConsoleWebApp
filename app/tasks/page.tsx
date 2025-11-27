@@ -1403,7 +1403,7 @@ function TaskHubPageContent() {
                 project: project.id,
                 task_name: taskData.task_name,
                 deadline: taskData.deadline,
-                employee: taskData.employee_id || undefined,
+                employee: taskData.employee_id,
                 status: taskData.status === "Open" ? "Draft" : (taskData.status as any),
                 estimated_time: taskData.estimated_time_minutes || undefined,
                 location: taskData.location || undefined,
@@ -1715,7 +1715,7 @@ function CreateTaskModal({
   onCreate: (taskData: {
     task_name: string;
     project_name: string;
-    employee_id?: number;
+    employee_id: number;
     deadline: string;
     estimated_time_minutes: number;
     location: string;
@@ -1811,6 +1811,12 @@ function CreateTaskModal({
       return;
     }
 
+    // Validate employee is selected
+    if (!selectedEmployeeId) {
+      showAlert("Validation Error", "Please assign the task to an employee", "error");
+      return;
+    }
+
     // Validate deadline is set
     if (!formData.deadline) {
       showAlert("Validation Error", "Deadline is required", "error");
@@ -1862,7 +1868,7 @@ function CreateTaskModal({
             {/* Employee - Searchable Dropdown */}
             <div className="relative employee-dropdown-container">
               <label className="block text-sm font-medium mb-2 text-gray-900 dark:text-white">
-                Assign to Employee (Optional)
+                Assign to Employee <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <div className="flex items-center gap-2">
