@@ -2086,14 +2086,13 @@ function CreateTaskModal({
           {/* Location */}
           <div>
             <label className="block text-sm font-medium mb-2 text-gray-900 dark:text-white">
-              Location <span className="text-red-500">*</span>
+              Location
             </label>
             <input
               type="text"
               value={formData.location}
               onChange={(e) => setFormData({ ...formData, location: e.target.value })}
               placeholder="Enter task location"
-              required
               className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2 text-sm text-gray-900 dark:text-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
             />
           </div>
