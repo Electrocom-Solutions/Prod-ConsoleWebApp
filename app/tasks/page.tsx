@@ -603,9 +603,10 @@ function TaskHubPageContent() {
       const result = await apiClient.bulkDeleteTasks(selectedTasks);
       let message = `Successfully deleted ${result.deleted_count} task(s).`;
       if (result.skipped_count > 0) {
-        message += ` ${result.skipped_count} task(s) were not found.`;
+        message += ` ${result.skipped_count} task(s) were not found (may have been already deleted).`;
       }
       if (result.errors && result.errors.length > 0) {
+        // Only show actual errors (not "not found" messages)
         message += ` Errors: ${result.errors.join(", ")}`;
       }
       showSuccess(message);
