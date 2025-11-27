@@ -6,6 +6,7 @@ import Image from "next/image";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { ClientFormModal } from "@/components/clients/client-form-modal";
 import { ClientSendMailModal } from "@/components/clients/client-send-mail-modal";
+import { ClientViewModal } from "@/components/clients/client-view-modal";
 import {
   Plus,
   Search,
@@ -126,6 +127,8 @@ function ClientsPageContent() {
   const [formMode, setFormMode] = useState<"create" | "edit">("create");
   const [sendMailModalOpen, setSendMailModalOpen] = useState(false);
   const [selectedClientForMail, setSelectedClientForMail] = useState<Client | null>(null);
+  const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [selectedClientForView, setSelectedClientForView] = useState<Client | null>(null);
 
   // Fetch statistics
   const fetchStatistics = useCallback(async () => {
@@ -241,6 +244,11 @@ function ClientsPageContent() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
+
+  const handleViewClient = (client: Client) => {
+    setSelectedClientForView(client);
+    setViewModalOpen(true);
+  };
 
   const handleEditClient = async (client: Client) => {
     try {
@@ -951,20 +959,35 @@ function ClientsPageContent() {
 
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => handleEditClient(client)}
-                      className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
-                    >
-                      View
-                    </button>
-                    <button
                       onClick={() => {
                         setSelectedClientForMail(client);
                         setSendMailModalOpen(true);
                       }}
-                      className="rounded-lg border border-gray-300 p-2 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700"
+                      className="rounded-lg border border-gray-300 p-2 text-gray-400 hover:bg-gray-100 hover:text-sky-600 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-sky-400"
                       title="Send Email"
                     >
                       <Mail className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => handleViewClient(client)}
+                      className="rounded-lg border border-gray-300 p-2 text-gray-400 hover:bg-gray-100 hover:text-sky-600 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-sky-400"
+                      title="View Details"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => handleEditClient(client)}
+                      className="rounded-lg border border-gray-300 p-2 text-gray-400 hover:bg-gray-100 hover:text-sky-600 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-sky-400"
+                      title="Edit"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteClient(client.id)}
+                      className="rounded-lg border border-gray-300 p-2 text-gray-400 hover:bg-gray-100 hover:text-red-600 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-red-400"
+                      title="Delete"
+                    >
+                      <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
@@ -1104,9 +1127,9 @@ function ClientsPageContent() {
                             <Mail className="h-4 w-4" />
                           </button>
                           <button
-                            onClick={() => handleEditClient(client)}
+                            onClick={() => handleViewClient(client)}
                             className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-sky-600 dark:hover:bg-gray-700 dark:hover:text-sky-400"
-                            title="View"
+                            title="View Details"
                           >
                             <Eye className="h-4 w-4" />
                           </button>
@@ -1152,6 +1175,17 @@ function ClientsPageContent() {
           setSelectedClientForMail(null);
         }}
         client={selectedClientForMail}
+      />
+
+      {/* View Modal */}
+      <ClientViewModal
+        isOpen={viewModalOpen}
+        onClose={() => {
+          setViewModalOpen(false);
+          setSelectedClientForView(null);
+        }}
+        client={selectedClientForView}
+        onEdit={handleEditClient}
       />
     </DashboardLayout>
   );
