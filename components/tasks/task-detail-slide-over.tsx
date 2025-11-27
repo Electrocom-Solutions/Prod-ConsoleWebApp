@@ -29,6 +29,7 @@ import { Task, TaskResource, TaskAttachment, TaskActivity, TaskStatus } from "@/
 import { format } from "date-fns";
 import { apiClient, BackendTaskDetail, BackendTaskAttachment, BackendTaskActivity, BackendProjectListItem, BackendEmployeeListItem } from "@/lib/api";
 import { showAlert, showDeleteConfirm, showSuccess, showConfirm } from "@/lib/sweetalert";
+import { DatePicker } from "@/components/ui/date-picker";
 
 interface TaskDetailSlideOverProps {
   task: Task;
@@ -273,7 +274,7 @@ export function TaskDetailSlideOver({
   };
   
   const handleTaskDateChange = (value: string) => {
-    setTaskDate(value);
+    setTaskDate(value || "");
     setHasChanges(true);
   };
   
@@ -653,17 +654,16 @@ export function TaskDetailSlideOver({
                 </div>
                 
                 <div className="grid grid-cols-2 gap-4">
-                  {/* Date */}
+                  {/* Deadline */}
                   <div>
                     <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       <Calendar className="h-4 w-4" />
-                      Date
+                      Deadline
                     </label>
-                    <input
-                      type="date"
-                      value={taskDate ? taskDate.split('T')[0] : ''}
-                      onChange={(e) => handleTaskDateChange(e.target.value)}
-                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                    <DatePicker
+                      value={taskDate || ""}
+                      onChange={(value) => handleTaskDateChange(value || "")}
+                      placeholder="Select deadline date"
                     />
                   </div>
                   
