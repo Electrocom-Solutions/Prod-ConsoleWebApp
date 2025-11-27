@@ -154,23 +154,42 @@ function ProjectsPageContent() {
         search?: string;
         status?: "Planned" | "In Progress" | "On Hold" | "Completed" | "Canceled";
         page?: number;
-      } = { page: currentPage };
+      } = {};
 
       if (debouncedSearchQuery) params.search = debouncedSearchQuery;
       if (statusFilter !== "All") {
         params.status = statusFilter as "Planned" | "In Progress" | "On Hold" | "Completed" | "Canceled";
       }
 
-      const response = await apiClient.getProjects(params);
-      setProjects(response.results.map(mapBackendProjectListItemToFrontend));
-      setTotalPages(Math.ceil(response.count / 20)); // Assuming 20 items per page
+      // Fetch all pages to get all projects
+      let allProjects: ProjectWithNames[] = [];
+      let page = 1;
+      let hasMore = true;
+      
+      while (hasMore) {
+        params.page = page;
+        const response = await apiClient.getProjects(params);
+        const pageProjects = response.results.map(mapBackendProjectListItemToFrontend);
+        allProjects.push(...pageProjects);
+        
+        // Check if there are more pages
+        const totalPages = Math.ceil(response.count / 20);
+        hasMore = page < totalPages;
+        page++;
+        
+        // Safety limit: don't fetch more than 50 pages (1000 projects)
+        if (page > 50) break;
+      }
+      
+      setProjects(allProjects);
+      setTotalPages(1); // Since we're showing all, set to 1 page
     } catch (err: any) {
       console.error("Failed to fetch projects:", err);
       setError(err.message || "Failed to load projects.");
     } finally {
       setIsLoading(false);
     }
-  }, [currentPage, debouncedSearchQuery, statusFilter]);
+  }, [debouncedSearchQuery, statusFilter]);
 
   // Generate autocomplete suggestions
   useEffect(() => {

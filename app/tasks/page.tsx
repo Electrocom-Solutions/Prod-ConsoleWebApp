@@ -640,6 +640,16 @@ function TaskHubPageContent() {
       totalResourceCost: statistics.total_resource_cost,
     };
   }, [statistics]);
+  
+  // Calculate pending approval count with fallback
+  const pendingApprovalCount = useMemo(() => {
+    // Use statistics if available and valid
+    if (statistics && statistics.pending_approval !== undefined && statistics.pending_approval !== null) {
+      return statistics.pending_approval;
+    }
+    // Fallback: count from current tasks list (may not be accurate if paginated)
+    return tasks.filter(t => t.approval_status === 'pending').length;
+  }, [statistics, tasks]);
 
   const toggleTaskExpand = (taskId: number) => {
     setExpandedTaskId(expandedTaskId === taskId ? null : taskId);
@@ -879,10 +889,10 @@ function TaskHubPageContent() {
               <AlertCircle className="h-5 w-5 text-orange-500" />
             </div>
             <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-              {statistics?.pending_approval ?? "..."}
-              {statistics && statistics.pending_approval > 0 && (
+              {statistics ? pendingApprovalCount : "..."}
+              {pendingApprovalCount > 0 && (
                 <span className="ml-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-red-100 text-xs font-medium text-red-600 dark:bg-red-900/30 dark:text-red-400">
-                  {statistics.pending_approval}
+                  {pendingApprovalCount}
                 </span>
               )}
             </p>

@@ -577,7 +577,7 @@ function ClientsPageContent() {
         </div>
 
         {/* Quick Stats */}
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-3">
           <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
             <p className="text-sm text-gray-500 dark:text-gray-400">Total Clients</p>
             <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
@@ -588,12 +588,6 @@ function ClientsPageContent() {
             <p className="text-sm text-gray-500 dark:text-gray-400">Active AMCs</p>
             <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
               {statistics?.active_amcs_count ?? clients.filter((c) => c.amc_count > 0).length}
-            </p>
-          </div>
-          <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-            <p className="text-sm text-gray-500 dark:text-gray-400">Open Projects</p>
-            <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
-              {statistics?.open_projects_count ?? clients.reduce((sum, c) => sum + c.open_projects, 0)}
             </p>
           </div>
           <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
