@@ -3303,9 +3303,16 @@ Please verify:
     return this.request<{ approved_count: number; skipped_count: number; errors?: string[] }>('/api/tasks/bulk-approve/', {
       method: 'POST',
       body: JSON.stringify({ task_ids: taskIds }),
-      headers: {
-        'Content-Type': 'application/json',
-      },
+    });
+  }
+
+  /**
+   * Bulk delete tasks
+   */
+  async bulkDeleteTasks(taskIds: number[]): Promise<{ deleted_count: number; skipped_count: number; errors?: string[] }> {
+    return this.request<{ deleted_count: number; skipped_count: number; errors?: string[] }>('/api/tasks/bulk-delete/', {
+      method: 'POST',
+      body: JSON.stringify({ task_ids: taskIds }),
     });
   }
 

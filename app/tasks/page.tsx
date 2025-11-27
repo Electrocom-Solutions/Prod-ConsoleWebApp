@@ -590,6 +590,34 @@ function TaskHubPageContent() {
     }
   };
 
+  const handleBulkDelete = async () => {
+    if (selectedTasks.length === 0) {
+      showAlert("No Selection", "Please select at least one task to delete.", "info");
+      return;
+    }
+
+    const confirmed = await showDeleteConfirm(`${selectedTasks.length} task${selectedTasks.length > 1 ? "s" : ""}`);
+    if (!confirmed) return;
+
+    try {
+      const result = await apiClient.bulkDeleteTasks(selectedTasks);
+      let message = `Successfully deleted ${result.deleted_count} task(s).`;
+      if (result.skipped_count > 0) {
+        message += ` ${result.skipped_count} task(s) were not found.`;
+      }
+      if (result.errors && result.errors.length > 0) {
+        message += ` Errors: ${result.errors.join(", ")}`;
+      }
+      showSuccess(message);
+      setSelectedTasks([]);
+      await fetchTasks();
+      await fetchStatistics();
+    } catch (err: any) {
+      console.error("Failed to bulk delete tasks:", err);
+      showAlert("Bulk Delete Failed", err.message || "An error occurred during bulk deletion.", "error");
+    }
+  };
+
   const handleBulkAssign = async () => {
     if (selectedTasks.length === 0) {
       showAlert("No Selection", "Please select at least one task to assign.", "info");
@@ -1114,6 +1142,13 @@ function TaskHubPageContent() {
                 Mark Approved
               </button>
               <button
+                onClick={handleBulkDelete}
+                className="inline-flex items-center gap-2 rounded-lg bg-red-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-600"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </button>
+              <button
                 onClick={() => setSelectedTasks([])}
                 className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
               >
@@ -1305,15 +1340,13 @@ function TaskHubPageContent() {
                           >
                             <Edit className="h-4 w-4" />
                           </button>
-                          {(task.status === "Open" || task.status === "Rejected") && (
-                            <button
-                              onClick={() => handleDeleteTask(task.id)}
-                              className="rounded p-1 text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
-                              title="Delete"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          )}
+                          <button
+                            onClick={() => handleDeleteTask(task.id)}
+                            className="rounded p-1 text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
                         </div>
                       </td>
                     </tr>
