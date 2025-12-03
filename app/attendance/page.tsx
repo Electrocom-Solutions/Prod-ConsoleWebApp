@@ -510,6 +510,17 @@ function AttendancePageContent() {
                 value={selectedDate || undefined}
                 onChange={(dateString) => {
                   setSelectedDate(dateString || "");
+                  // Update currentMonth if the selected date is in a different month/year
+                  if (dateString) {
+                    const selectedDateObj = parseISO(dateString);
+                    const selectedMonth = new Date(selectedDateObj.getFullYear(), selectedDateObj.getMonth(), 1);
+                    const currentMonthStart = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+                    
+                    // Only update if the month/year is different
+                    if (selectedMonth.getTime() !== currentMonthStart.getTime()) {
+                      setCurrentMonth(selectedDateObj);
+                    }
+                  }
                 }}
                 placeholder="Select date"
               />
