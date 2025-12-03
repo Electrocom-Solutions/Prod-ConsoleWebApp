@@ -4136,8 +4136,9 @@ Please verify:
   /**
    * Get attendance statistics
    */
-  async getAttendanceStatistics(): Promise<AttendanceStatisticsResponse> {
-    return this.request<AttendanceStatisticsResponse>('/api/attendance/statistics/');
+  async getAttendanceStatistics(date?: string): Promise<AttendanceStatisticsResponse> {
+    const url = date ? `/api/attendance/statistics/?date=${date}` : '/api/attendance/statistics/';
+    return this.request<AttendanceStatisticsResponse>(url);
   }
 
   /**

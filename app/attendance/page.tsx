@@ -84,6 +84,7 @@ function AttendancePageContent() {
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [fullSizeImage, setFullSizeImage] = useState<string | null>(null);
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
@@ -92,9 +93,9 @@ function AttendancePageContent() {
   /**
    * Fetch statistics from backend
    */
-  const fetchStatistics = useCallback(async () => {
+  const fetchStatistics = useCallback(async (date?: string) => {
     try {
-      const stats = await apiClient.getAttendanceStatistics();
+      const stats = await apiClient.getAttendanceStatistics(date);
       setStatistics(stats);
     } catch (err: any) {
       console.error('Error fetching attendance statistics:', err);
@@ -176,11 +177,15 @@ function AttendancePageContent() {
 
   const approvalFilterOptions = ['All', 'Pending', 'Approved', 'Rejected'];
 
-  // Fetch statistics and employees on mount
+  // Fetch employees on mount
   useEffect(() => {
-    fetchStatistics();
     fetchEmployees();
-  }, [fetchStatistics, fetchEmployees]);
+  }, [fetchEmployees]);
+
+  // Fetch statistics when selected date changes (including initial mount)
+  useEffect(() => {
+    fetchStatistics(selectedDate || undefined);
+  }, [selectedDate, fetchStatistics]);
 
   // Fetch attendance records when filters change
   useEffect(() => {
@@ -706,11 +711,24 @@ function AttendancePageContent() {
                           </td>
                           <td className="px-6 py-4">
                             {record.check_in_selfie_url ? (
-                              <img
-                                src={record.check_in_selfie_url}
-                                alt="Punch in selfie"
-                                className="h-12 w-12 object-cover rounded border border-gray-300 dark:border-gray-600"
-                              />
+                              <div className="relative inline-block group">
+                                <img
+                                  src={record.check_in_selfie_url}
+                                  alt="Punch in selfie"
+                                  className="h-12 w-12 object-cover rounded border border-gray-300 dark:border-gray-600"
+                                />
+                                {/* Preview Button - Shows on Hover */}
+                                <div className="absolute inset-0 bg-black/50 rounded opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
+                                     onClick={(e) => {
+                                       e.stopPropagation();
+                                       setFullSizeImage(record.check_in_selfie_url || null);
+                                     }}>
+                                  <div className="bg-white dark:bg-gray-800 rounded-lg px-3 py-1.5 flex items-center gap-2 shadow-lg">
+                                    <Eye className="h-4 w-4 text-gray-700 dark:text-gray-300" />
+                                    <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Preview</span>
+                                  </div>
+                                </div>
+                              </div>
                             ) : (
                               <span className="text-gray-400 dark:text-gray-500">-</span>
                             )}
@@ -949,6 +967,30 @@ function AttendancePageContent() {
             setAttendanceDetail(null);
           }}
         />
+      )}
+
+      {/* Full Size Image Modal */}
+      {fullSizeImage && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4"
+          onClick={() => setFullSizeImage(null)}
+        >
+          <div className="relative max-w-7xl max-h-full">
+            <button
+              onClick={() => setFullSizeImage(null)}
+              className="absolute -top-10 right-0 text-white hover:text-gray-300 transition-colors"
+              title="Close"
+            >
+              <XIcon className="h-8 w-8" />
+            </button>
+            <img
+              src={fullSizeImage}
+              alt="Full size selfie"
+              className="max-w-full max-h-[90vh] object-contain rounded-lg"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        </div>
       )}
     </DashboardLayout>
   );
