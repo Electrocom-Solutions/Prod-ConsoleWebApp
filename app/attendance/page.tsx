@@ -717,16 +717,13 @@ function AttendancePageContent() {
                                   alt="Punch in selfie"
                                   className="h-12 w-12 object-cover rounded border border-gray-300 dark:border-gray-600"
                                 />
-                                {/* Preview Button - Shows on Hover */}
+                                {/* Eye Icon - Shows on Hover */}
                                 <div className="absolute inset-0 bg-black/50 rounded opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
                                      onClick={(e) => {
                                        e.stopPropagation();
                                        setFullSizeImage(record.check_in_selfie_url || null);
                                      }}>
-                                  <div className="bg-white dark:bg-gray-800 rounded-lg px-3 py-1.5 flex items-center gap-2 shadow-lg">
-                                    <Eye className="h-4 w-4 text-gray-700 dark:text-gray-300" />
-                                    <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Preview</span>
-                                  </div>
+                                  <Eye className="h-5 w-5 text-white" />
                                 </div>
                               </div>
                             ) : (
